@@ -132,7 +132,6 @@
                                     ($_.servicePlans.ServicePlanName |sort) -join ", "
                                 </ScriptBlock>
                             </TableColumnItem>
-                            
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>

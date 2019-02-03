@@ -32,8 +32,9 @@ $script:Tenant     = 'e6af5578-6d03-49e0-af3b-383cf5ec0b5f'  # "mobulaconsulting
     Also copy the tenant ID or domain name and make it the value for $script:Tenant
 #>
 
-#To prevent tokens being saved, remove the savePath
+#To prevent tokens being saved, remove the savePath or Set SaveCreds to FALSE
 $Script:SavePath    = Join-Path -Path (Split-Path -Path $profile  -Parent) -ChildPath "graph.xml"
+$Script:SaveCreds   = $true
 
 #The scopes requested. You can shorten this of you don't need all things phovided in the module
 $script:RequestedScope          = @(
@@ -171,7 +172,7 @@ Function Connect-MSGraph {
     if ($Temp -or $Credential) {
         $Script:RefreshToken = $Script:AccessToken = $Script:TokenExpiry =  $Script:GraphUser = $null
     }
-    $save = -not ($Temp -or $Credential)
+    $Script:SaveCreds = $saveCreds -and (-not ($Temp -or $Credential))
     <# Scenarios
         A. We have a current access token. Hooray! If called with checkonly return true, if called with passthrough return the token, if called with neither just return
         B. We don't. If called with check only return false. Otherwise we need to logon and that breaks down to
@@ -190,8 +191,8 @@ Function Connect-MSGraph {
     }
     elseif     ($CheckOnly) {return $false}
 
-    #Scenario B, 1 we have any tokens but there is a saved one, and we're not logging in with a temporary login (so $Save is true)
-    if ((-not $Script:RefreshToken) -and $Script:SavePath -and $Save -and (Test-Path -Path $Script:SavePath) ) {
+    #Scenario B, 1 we have any tokens but there is a saved one, and we're not logging in with a temporary login (so $Script:SaveCreds is true)
+    if ((-not $Script:RefreshToken) -and $Script:SavePath -and $Script:SaveCreds -and (Test-Path -Path $Script:SavePath) ) {
         Write-Verbose -Message "No Refresh token, loading data from $Script:SavePath"
         Import-Clixml -Path $Script:SavePath | Convert-AuthResponse
     }
@@ -213,7 +214,7 @@ Function Connect-MSGraph {
             Invoke-RestMethod -Method Post -Uri $tokenUri -Body @{
                      'grant_type' = 'password'; 'username' = $Credential.username; 'password' = $Credential.GetNetworkCredential().Password;
                      'client_id'  = $clientID;  'resource' = 'https://graph.microsoft.com'
-             }  | Convert-AuthResponse -Save:$save -SetExpiry -Action "Logged on as "
+             }  | Convert-AuthResponse -Save:$Script:SaveCreds -SetExpiry -Action "Logged on as "
              Write-Progress -Activity "Authenticating" -Status "Getting Token from Server" -Completed
         }
         else {
@@ -240,7 +241,7 @@ Function Connect-MSGraph {
                 Invoke-RestMethod -Method Post -Uri $tokenUri  -Body @{
                     'grant_type'  ='authorization_code';  'code' = $Matches[1];
                     'client_id'   = $Script:ClientID;     'redirect_uri'= $CallBackUri  #some places also neet  &client_secret=xxxyyyyzzz
-                } | Convert-AuthResponse -Save:$save  -SetExpiry -Action "Logged on as "
+                } | Convert-AuthResponse -Save:$Script:SaveCreds  -SetExpiry -Action "Logged on as "
                 Write-Progress -Activity "Authenticating" -Status "Getting Token from Server" -Completed
             }
         }
