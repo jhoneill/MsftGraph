@@ -514,7 +514,8 @@ Function Get-GraphTeam {
                         $b.pstypenames.add("GraphOneNoteBook")
                         foreach ($s in $b.sections) {
                             Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebookID -Value $b.id
-                            $s.pstypeNames.add("GraphOneNoteSection")}
+                            $s.pstypeNames.add("GraphOneNoteSection")
+                        }
                     }
                     Write-Progress -Activity 'Getting Group OneNote Notebooks' -Completed
                     return $books
@@ -1177,7 +1178,7 @@ Function Add-GraphChannelThread {
 # Doesn't seem to be a delete or a patch ?
 
 
-Function New-GraphWikiTab {
+Function Add-GraphWikiTab {
     <#
       .Synopsis
         Adds a wiki tab to a channel in teams
@@ -1192,7 +1193,10 @@ Function New-GraphWikiTab {
         #The label for the tab
         $TabLabel = "Wiki",
         #If specified the tab will be added without prompting for confirmation
-        [switch]$Force
+        [switch]$Force,
+        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
+        [Alias('PT')]
+        [switch]$PassThru
     )
     Connect-MSGraph
     if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
@@ -1213,16 +1217,12 @@ Function New-GraphWikiTab {
     Write-Debug $json
     if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Create wiki tab")) {
         $result = Invoke-RestMethod @webParams -body $json
-        $result.pstypeNames.add('GraphTab')
-        #Giving a type name formats things nicely, but need to set the name to be used when the tab is displayed
-        Add-Member -InputObject $result -MemberType NoteProperty -Name teamsAppName -Value 'Wiki'
-        return $result
-    }
-}
-# Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
-# https://products.office.com/en-us/microsoft-teams/appDefinitions.xml
-
-
+        if ($PassThru) {
+            $result.pstypeNames.add('GraphTab')
+            #Giving a type name formats things nicely, but need to set the name to be used when the tab is displayed
+            Add-Member -InputObject $result -MemberType NoteProperty -Name teamsAppName -Value 'Wiki'
+            return $result
+        }
     }
 }
 # Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
