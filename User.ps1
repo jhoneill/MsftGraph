@@ -107,7 +107,16 @@ Function Get-GraphUser {
         #Get the user's manager
         [Parameter(Mandatory=$true, ParameterSetName="Manager")]
         [switch]$Manager,
-        #Get the groups the user belongs to
+        #Get the user's teams
+        [Parameter(Mandatory=$true, ParameterSetName="Teams")]
+        [switch]$Teams,
+        #Get the user's Groups
+        [Parameter(Mandatory=$true, ParameterSetName="Groups")]
+        [switch]$Groups,
+        [Parameter(Mandatory=$false, ParameterSetName="Groups")]
+        [Parameter(Mandatory=$true, ParameterSetName="SecurityGroups")]
+        [switch]$SecurityGroups,
+        #Get the Directory-Roles and Groups the user belongs to; -Groups or -Teams only return one type of object.
         [Parameter(Mandatory=$true, ParameterSetName="MemberOf")]
         [switch]$MemberOf,
         #Get the user's Notebook(s)
@@ -119,9 +128,6 @@ Function Get-GraphUser {
         #Get the user's planners
         [Parameter(Mandatory=$true, ParameterSetName="Planner")]
         [switch]$PlannerTasks,
-        #Get the user's teams
-        [Parameter(Mandatory=$true, ParameterSetName="Teams")]
-        [switch]$Teams,
         #Get the user's MySite in SharePoint
         [Parameter(Mandatory=$true, ParameterSetName="Site")]
         [switch]$Site,
@@ -160,26 +166,7 @@ Function Get-GraphUser {
         #It would be nice if we could apply filter and orderby to some of these, but for some they are ignored and for others they cause errors.
 
         #for everything Except -Site we can define a URI and either return the Value Propety of the result, or the whole result.
-        if     ($MailboxSettings  ) { $uri = "https://graph.microsoft.com/v1.0/$userID/MailboxSettings" ; $returnTheValue = $false}
-        elseif ($Manager          ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Manager"         ; $returnTheValue = $false}
-        elseif ($Photo            ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Photo"           ; $returnTheValue = $false}
-        elseif ($Calendars        ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Calendars"       ; $returnTheValue = $true }
-        elseif ($Devices          ) { $uri = "https://graph.microsoft.com/beta/$userID/owneddevices"    ; $returnTheValue = $true }
-        elseif ($DirectReports    ) { $uri = "https://graph.microsoft.com/v1.0/$userID/directReports"   ; $returnTheValue = $true }
-        elseif ($LicenseDetails   ) { $uri = "https://graph.microsoft.com/v1.0/$userID/licenseDetails"  ; $returnTheValue = $true }
-        elseif ($MemberOf         ) { $uri = "https://graph.microsoft.com/v1.0/$userID/MemberOf"        ; $returnTheValue = $true }
-        elseif ($Teams            ) { $uri = "https://graph.microsoft.com/v1.0/$userID/joinedTeams"     ; $returnTheValue = $true }
-        elseif ($PlannerTasks     ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Planner/tasks"   ; $returnTheValue = $true }
-        elseif ($Drive            ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Drive"           ; $returnTheValue = $false
-                                      if ($WorkOrSchool) {$uri += '?$expand=root($expand=children)'}                              }
-        elseif ($OutlookCategories) { $uri = "https://graph.microsoft.com/v1.0/$userID/Outlook"  +
-                                                                            '/MasterCategories'         ; $returnTheValue = $true }
-        elseif ($Notebooks        ) { $uri = "https://graph.microsoft.com/v1.0/$userID/onenote/" +
-                                                                    'notebooks?$expand=sections'        ; $returnTheValue = $true }
-        else                      {
-                                    $uri = "https://graph.microsoft.com/v1.0/$userID"                   ; $returnTheValue = $false
-                                    if ($select) {$uri = $uri + '?$select=' + ($Select -join ",") }
-        }
+
         # Site needs special handling. Get the user's MySite. Convert it into a graph URL and get that, expand drives subSites and lists, and add formatting types
         Write-Progress -Activity 'Getting user information'
         if     ($Site) {
@@ -187,63 +174,103 @@ Function Get-GraphUser {
             $result = Invoke-RestMethod @webParams -Uri $uri
             $uri    = $result.mysite -replace "^https://(.*?)/(.*)$", 'https://graph.microsoft.com/v1.0/sites/$1:/$2?expand=drives,lists,sites'
             $result = Invoke-RestMethod @webParams -Uri $uri
-            $result.pstypenames.Add("GraphSite")
-            $result.lists | Add-Member -MemberType NoteProperty   -Name SiteID   -Value  $result.id
-            $result.lists | Add-Member -MemberType ScriptProperty -Name Template -Value {$this.list.template}
+            $result.pstypenames.Add("GraphSite") 
+            foreach ($l in $result.lists) {
+                $l.pstypenames.Add("GraphList") 
+                Add-Member -InputObject $l -MemberType NoteProperty   -Name SiteID   -Value  $result.id
+                Add-Member -InputObject $l -MemberType ScriptProperty -Name Template -Value {$this.list.template}
+            }
             Write-Progress -Activity 'Getting user information' -Completed
             return $result
+        }        
+        elseif ($Devices          ) { $uri = "https://graph.microsoft.com/beta/$userID/owneddevices"    ; $returnTheValue = $true }
+        elseif ($DirectReports    ) { $uri = "https://graph.microsoft.com/v1.0/$userID/directReports"   ; $returnTheValue = $true }
+        elseif ($LicenseDetails   ) { $uri = "https://graph.microsoft.com/v1.0/$userID/licenseDetails"  ; $returnTheValue = $true }
+        elseif ($MemberOf         ) { $uri = "https://graph.microsoft.com/v1.0/$userID/MemberOf"        ; $returnTheValue = $true }
+        elseif ($Teams            ) { $uri = "https://graph.microsoft.com/v1.0/$userID/joinedTeams"     ; $returnTheValue = $true }
+        elseif ($PlannerTasks     ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Planner/tasks"   ; $returnTheValue = $true }
+        elseif ($Photo            ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Photo"           ; $returnTheValue = $false}
+        elseif ($MailboxSettings  ) { $uri = "https://graph.microsoft.com/v1.0/$userID/MailboxSettings" ; $returnTheValue = $false}
+        elseif ($Manager          ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Manager"         ; $returnTheValue = $false}
+        elseif ($Drive            ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Drive"           ; $returnTheValue = $false
+                                      if ($WorkOrSchool) {$uri += '?$expand=root($expand=children)'}                              }
+        elseif ($Groups -or 
+                $SecurityGroups   ) { $uri = "https://graph.microsoft.com/v1.0/$userID/getMemberGroups"} #special handler no need for $return the value
+            
+        elseif ($OutlookCategories) { $uri = "https://graph.microsoft.com/v1.0/$userID/Outlook"   +
+                                                                            '/MasterCategories'         ; $returnTheValue = $true }
+        elseif ($Calendars        ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Calendars" +
+                                                                                 '?$orderby=Name'       ; $returnTheValue = $true }
+        elseif ($Notebooks        ) { $uri = "https://graph.microsoft.com/v1.0/$userID/onenote/"  +
+                                                                    'notebooks?$expand=sections'        ; $returnTheValue = $true }
+        else                        { $uri = "https://graph.microsoft.com/v1.0/$userID"                 ; $returnTheValue = $false
+                                      if ($select) {$uri = $uri + '?$select=' + ($Select -join ",") }                             }
+
+        try   {
+            if ($Groups -or $SecurityGroups) {
+                $uri          = "https://graph.microsoft.com/v1.0/$userID/getMemberGroups"
+                if  ($SecurityGroups) {$body = '{  "securityEnabledOnly": true  }'}
+                else                  {$body = '{  "securityEnabledOnly": false }'}
+                
+                $result       = Invoke-RestMethod  -Uri $uri -Method Post -Headers $Script:DefaultHeader -Body $body -ContentType 'application/json'
+                $results      = @()
+                foreach ($r in $result.value) {
+                    $uri = "https://graph.microsoft.com/v1.0/directoryObjects/$r"
+                    $results += Invoke-RestMethod -Uri $uri -Method Get  -Headers $Script:DefaultHeader
+                }
+            }
+            elseif (-not $returnTheValue) {
+                    $results = Invoke-RestMethod -Uri $uri @webParams  
+            }
+            else {
+                    $result  = Invoke-RestMethod -Uri $uri @webParams  
+                    $results = $result.value
+                    while      ($result.'@odata.nextLink') {
+                        $result   =  Invoke-RestMethod @webParams -Uri $result.'@odata.nextLink'
+                        $results += $result.value
+                    }
+            }
         }
-        elseif ($returnTheValue) {
-            try   {
-                $result  =  ( Invoke-RestMethod @webParams -Uri $uri)
-                $results =  $result.value
-                while      ($result.'@odata.nextLink') {
-                    $result   =  Invoke-RestMethod @webParams -Uri $result.'@odata.nextLink'
-                    $results += $result.value
-                }
+        catch {
+            if ($_.exception.response.statuscode.value__ -eq 404) {
+                Write-Progress -Activity 'Getting user information' -Completed
+                Write-Warning -Message "Not found error while getting data for user '$userid'" ; return
             }
-            catch {
-                if ($_.exception.response.statuscode.value__ -eq 404) {
-                    Write-Progress -Activity 'Getting user information' -Completed
-                    Write-Warning -Message "Not found error while getting data for user '$userid'" ; return
+            else {throw $_ ; return}
+        }
+
+        foreach ($r in $results) {
+                if     ($r.'@odata.type' -match 'directoryRole$') 
+                                           { $r.pstypenames.Add('GraphDirectoryRole')}
+                elseif (($r.'@odata.type' -match 'user$' -or 
+                         $PSCmdlet.ParameterSetName -eq 'None') -and
+                        (-not $Select ))   { $r.pstypenames.Add('GraphUser') }
+                elseif ($r.'@odata.type' -match 'group$') 
+                                           { $r.pstypenames.Add('GraphGroup') }
+                elseif ($r.'@odata.type' -match 'device$') 
+                                           { $r.pstypenames.Add('GraphDevice') }
+                elseif ($MailboxSettings ) { $r.pstypenames.Add('GraphMailboxSettings')}
+                elseif ($Photo           ) { $r.pstypenames.Add('GraphPhoto')}
+                elseif ($Drive           ) { $r.pstypenames.Add('GraphDrive')}
+                elseif ($Calendars       ) { $r.pstypenames.Add('GraphCalendar')}
+                elseif ($LicenseDetails  ) { $r.pstypenames.Add('GraphLicense')}
+                elseif ($PlannerTasks    ) { $r.pstypenames.Add('GraphTask')}
+                elseif ($Notebooks      )  { 
+                    $r.pstypenames.Add('GraphOneNoteBook')
+                    foreach ($s in $r.sections) {
+                            Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebookID -Value $r.id
+                            $s.pstypeNames.add("GraphOneNoteSection")
+                    }
                 }
-                else {throw $_ ; return}
-            }
-            foreach ($r in $results) {
-                if     ($Calendars      ) { $r.pstypenames.Add("GraphCalendar")}
-                elseif ($Devices        ) { $r.pstypenames.Add("GraphDevice") }
-                elseif ($LicenseDetails ) { $r.pstypenames.Add("GraphLicense")}
-                elseif ($MemberOf       ) { $r.pstypenames.Add("GraphGroup")}
-                elseif ($Notebooks      ) { $r.pstypenames.Add("GraphOneNoteBook")}
-                elseif ($PlannerTasks   ) { $r.pstypenames.Add("GraphTask")}
-                elseif ($Teams          ) {
+                elseif ($Teams           ) {
                     $defaultProperties = @('displayName','description','isArchived')
                     $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultProperties)
                     $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
                     Add-Member -InputObject $r -MemberType MemberSet      -Name PSStandardMembers -Value $PSStandardMembers
                 }
-            }
-            Write-Progress -Activity 'Getting user information' -Completed
-            return $results
         }
-        else {
-            try {
-                $result = Invoke-RestMethod @webParams -Uri $uri
-            }
-            catch {
-                if ($_.exception.response.statuscode.value__ -eq 404) {
-                    Write-Warning -Message  "Not found error while getting data for user '$userid'" ; return
-                }
-                else {throw $_ ; return}
-            }
-            if ($MailboxSettings ) { $result.pstypenames.Add("GraphMailboxSettings")}
-            elseif (      $Drive ) { $result.pstypenames.Add("GraphDrive")}
-            elseif (      $Photo ) { $result.pstypenames.Add("GraphPhoto")}
-            elseif (-not $Select ) { $result.pstypenames.Add("GraphUser") } #Manager or no parameters, but don't apply formatting type when there are custom fields
-            Write-Progress -Activity 'Getting user information' -Completed
-
-            return $result
-        }
+        Write-Progress -Activity 'Getting user information' -Completed
+        return $results
     }
 }
 

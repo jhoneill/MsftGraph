@@ -137,7 +137,36 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>              
+        </View>
+        <View>
+            <Name>DirectoryRole</Name><ViewSelectedBy><TypeName>GraphDirectoryRole</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>DisplayName</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Description</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>DisplayName</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Description</PropertyName>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
         <View>
             <Name>Office 365 Service plan</Name><ViewSelectedBy><TypeName>GraphServicePlan</TypeName></ViewSelectedBy>
             <TableControl>
@@ -1207,10 +1236,6 @@
                     <label>Display Name</label>
                     <PropertyName>displayName</PropertyName>
                   </ListItem>
-                   <ListItem>
-                    <Label>Parent Notebook</Label>
-                    <ScriptBlock>$_.parentNotebook.displayName</ScriptBlock>
-                  </ListItem>
                   <ListItem>
                     <label>Is Default</label>
                     <PropertyName>isDefault</PropertyName>
@@ -1274,10 +1299,10 @@
         <View>
             <Name>Graph Site</Name><ViewSelectedBy><TypeName>Graphsite</TypeName></ViewSelectedBy>
             <TableControl>
-                <AutoSize />
                 <TableHeaders>
                     <TableColumnHeader>
                       <Label>Name</Label>
+                      <Width>30</Width>
                       <Alignment>left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
@@ -1286,13 +1311,16 @@
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>Drives</Label>
+                        <Width>7</Width>
                         <Alignment>Left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>Lists</Label>
+                        <Width>6</Width>
                         <Alignment>Left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
+                        <Width>9</Width>
                         <Label>Subsites</Label>
                         <Alignment>Left</Alignment>
                     </TableColumnHeader>
