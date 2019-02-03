@@ -371,7 +371,8 @@ Function New-GraphPlanTask       {
         $Links,
         #if specified the task will be added without confirmation. (This is the default unless $confirmPreference has been changed)
         [switch]$Force,
-        #By default, the task is added without returning a result. -Passthru specifies the new task should be return.
+        #By default, the task is added without returning a result. -Passthru specifies the new task should be returned.
+        [Alias('PT')]
         [switch]$Passthru
     )
     Begin   {
@@ -531,6 +532,7 @@ Function Set-GraphPlanTask       {
         #Specified no confirmation will occur
         [switch]$Force,
         #If Specified returns the modified task.
+        [Alias('PT')]
         [switch]$Passthru
     )
     begin   {
@@ -899,7 +901,7 @@ Function Add-GraphPlannerTab     {
         $Team,
         #The label for the tab.
         $TabLabel,
-        #If specified the command returns an object representing the new tab, otherwise nothing is returned.
+        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
         $PassThru,
         #If Specified the tab will be added without confirming
         $Force

@@ -438,6 +438,7 @@ function Copy-FromGraphFolder {
         #If specified prevents an existing file from being overwritten.
         [Switch]$NoClobber,
         #If Specified the destination file will be returned (similar to Copy-Item)
+        [Alias('PT')]
         [Switch]$Passthru
     )
     begin    {

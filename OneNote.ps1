@@ -301,7 +301,8 @@ Function Add-GraphOneNotePage    {
         $ContentType = 'text/html',
         #If specified, the command will run without asking for confirmation; this is the default unless Confirm Preference has been set
         [switch]$Force,
-        #Add doesn't return a result unless -PassThru is specified. Note that the title cannot be seen on a newly created item.
+        #Normally the page is added 'silently'. If passthru is specified, an object describing the new page will be returned.
+        [Alias('PT')]
         [switch]$PassThru
     )
     Connect-MSGraph
@@ -356,7 +357,8 @@ Function Add-FileToGraphOneNote  {
         [ValidateNotNullOrEmpty()][string[]]$PreContent,
         #Specifies text to add after the embedded object. By default, there is no text in that position.
         [ValidateNotNullOrEmpty()][string[]]$PostContent,
-        #Add does not return the new page unless -PassThru is specified
+        #Normally the page containing the file is added 'silently'. If passthru is specified, an object describing the new page will be returned.
+        [Alias('PT')]
         [switch]$PassThru,
         #If specified the command will not pause for conformation, this is the default unless $ConfirmPreference is modified,
         [switch]$Force
@@ -661,8 +663,11 @@ Function Add-GraphOneNoteTab     {
         $Team,
         #The label for the tab, if left blank the name of the Notebook or Section will be sued
         $TabLabel,
-        #Add doesn't return a result unless -passthru is specified
-        $PassThru
+        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
+        [Alias('PT')]
+        [switch]$PassThru,
+        #If Specified the tab will be added without pausing for confirmation, this is the default unless $ConfirmPreference has been set.
+        $Force
     )
     Connect-MSGraph
     if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }

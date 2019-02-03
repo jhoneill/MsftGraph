@@ -92,6 +92,7 @@ Function Connect-MSGraph {
         #If Specified disposes of any existing connection and creates a new one
         [Switch]$ForceNew,
         #If Specified returns the access token
+        [Alias('PT')]
         [Switch]$PassThru,
         #If Specified returns true if we have a current session and false if not
         [Switch]$CheckOnly,

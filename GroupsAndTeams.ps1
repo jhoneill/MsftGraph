@@ -1138,6 +1138,7 @@ Function Add-GraphChannelThread {
         [ValidateSet("Text","HTML")]
         [String]$ContentType = "Text",
         #Normally the message is added 'silently'. If passthru is specified, the new message will be returned.
+        [Alias('PT')]
         [switch]$Passthru,
         #if Specified the message will be created without prompting.
         [switch]$Force
@@ -1216,6 +1217,12 @@ Function New-GraphWikiTab {
         #Giving a type name formats things nicely, but need to set the name to be used when the tab is displayed
         Add-Member -InputObject $result -MemberType NoteProperty -Name teamsAppName -Value 'Wiki'
         return $result
+    }
+}
+# Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
+# https://products.office.com/en-us/microsoft-teams/appDefinitions.xml
+
+
     }
 }
 # Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0

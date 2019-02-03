@@ -412,6 +412,7 @@ Function Add-GraphListItem {
         #If the list parameter does not contain a .SiteID property allows the site to specified as an ID or object
         $Site,
         #If specified the new item will be returned, otherwise it is created silently.
+        [Alias('PT')]
         [switch]$Passthru,
         #If specified the item will be added without prompting for confirmation (this is the default unless confirm preference is changed)
         [switch]$Force
@@ -471,6 +472,7 @@ Function Set-GraphListItem {
         #If there is no site id in the item or list parameter allows the site to specified as an ID or object
         $Site,
         #If specified, passes through the server's confirmation of the update
+        [Alias('PT')]
         [switch]$Passthru,
         #If specified the item will be updated without prompting for confirmation
         [switch]$Force
