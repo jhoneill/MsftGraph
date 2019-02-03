@@ -1,0 +1,1856 @@
+﻿<Configuration>
+    <Controls>
+        <Control>
+            <Name>OneDriveItems-GroupingFormat</Name>
+            <CustomControl><CustomEntries><CustomEntry><CustomItem><Frame>
+                <LeftIndent>8</LeftIndent>
+                <CustomItem>
+                    <ExpressionBinding><ScriptBlock>
+                     $global:DriveCache[$_.parentReference.driveId] + ( $_.parentReference.path -replace "^.*/root"," - Path: /root")
+                    </ScriptBlock></ExpressionBinding>
+                    <NewLine/>
+                </CustomItem> 
+            </Frame></CustomItem></CustomEntry></CustomEntries></CustomControl>
+        </Control>
+          <Control>
+            <Name>SharePointLists-GroupingFormat</Name>
+            <CustomControl><CustomEntries><CustomEntry><CustomItem><Frame>
+                <LeftIndent>8</LeftIndent>
+                <CustomItem>
+                    <ExpressionBinding><ScriptBlock>
+                     ( "URLs under " + $_.parentUrl )
+                    </ScriptBlock></ExpressionBinding>
+                    <NewLine/>
+                </CustomItem> 
+            </Frame></CustomItem></CustomEntry></CustomEntries></CustomControl>
+        </Control>
+    </Controls>
+    <ViewDefinitions>
+        <View>
+            <Name>Office 365 Licences</Name><ViewSelectedBy><TypeName>GraphLicense</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                   <TableColumnHeader>
+                      <Label>SKU</Label>
+                      <Alignment>left</Alignment>
+                   </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>ID</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Plans</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>skuPartNumber</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>skuID</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                           	    <ScriptBlock>
+                                    $_.servicePlans.ServicePlanName -join ", "
+                                </ScriptBlock>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>              
+        <View>
+            <Name>Office 365 SKU</Name><ViewSelectedBy><TypeName>GraphSKU</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                   <TableColumnHeader>
+                      <Label>SKU</Label>
+                      <Alignment>left</Alignment>
+                   </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Applies To</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Consumed</Label>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Enabled</Label>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Suspended</Label>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Warning</Label>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Service Plans</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>skuPartNumber</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>appliesto</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>consumedunits</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                           	    <ScriptBlock>
+                                    $_.prepaidunits.enabled 
+                                </ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                           	    <ScriptBlock>
+                                    $_.prepaidunits.suspended 
+                                </ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                           	    <ScriptBlock>
+                                    $_.prepaidunits.warning 
+                                </ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <Alignment>Left</Alignment>
+                           	    <ScriptBlock>
+                                    ($_.servicePlans.ServicePlanName |sort) -join ", "
+                                </ScriptBlock>
+                            </TableColumnItem>
+                            
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>              
+        <View>
+            <Name>Office 365 Service plan</Name><ViewSelectedBy><TypeName>GraphServicePlan</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>SKU</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Service Plan Name</Label>
+                      <Alignment>left</Alignment>
+                   </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Applies To</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>provisioningStatus</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>skuPartNumber</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>servicePlanName</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>appliesTo</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>provisioningStatus</PropertyName>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>   
+        <View>
+            <Name>Graph Calendars</Name><ViewSelectedBy><TypeName>GraphCalendar</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                   <TableColumnHeader>
+                      <Label>Name</Label>
+                      <Alignment>left</Alignment>
+                   </TableColumnHeader>
+                   <TableColumnHeader>
+                      <Label>Owner</Label>
+                      <Alignment>left</Alignment>
+                   </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Can Share</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Can View Private</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Can Edit</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>Name</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.owner.name + $(if ($_.Owner.address){ ' (' + $_.owner.address + ")"})</ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>canShare</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                    <PropertyName>canViewPrivateItems</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>canEdit</PropertyName>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>  
+        <View>
+            <Name>Graph Devices</Name><ViewSelectedBy><TypeName>GraphDevice</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                   <TableColumnHeader>
+                      <Label>Name</Label>
+                      <Alignment>left</Alignment>
+                   </TableColumnHeader>
+                   <TableColumnHeader>
+                        <Label>Last login (approx.)</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>OS</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Version</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Profile Type</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Trust Type</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Managed</Label>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Compliant</Label>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>displayName</PropertyName>
+                            </TableColumnItem>
+                           <TableColumnItem>
+                                <PropertyName>approximateLastSignInDateTime</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                    <PropertyName>operatingSystem</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>operatingSystemVersion</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>profileType</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>trustType</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>isManaged</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>isCompliant</PropertyName>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Graph Drives</Name><ViewSelectedBy><TypeName>GraphDrive</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                   <TableColumnHeader>
+                      <Label>Name</Label>
+                      <Alignment>left</Alignment>
+                   </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Type</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Owner</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Quota State</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Quota Total</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Quota Remaining</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>Name</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <PropertyName>driveType</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.Owner.User.DisplayName</ScriptBlock>
+                                <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.quota.state</ScriptBlock>
+                                <Alignment>Center</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                           	    <ScriptBlock>$_.quota.total.ToString('#,###,,"MB"')</ScriptBlock>
+                                <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                  <ScriptBlock>$_.quota.remaining.ToString('#,###,,"MB"')</ScriptBlock>
+                                  <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>            
+        <View>
+            <Name>Graph Files</Name><ViewSelectedBy><TypeName>GraphDriveItem</TypeName></ViewSelectedBy>
+            <GroupBy>
+                <ScriptBlock>$_.parentReference.path</ScriptBlock>
+                <CustomControlName>OneDriveItems-GroupingFormat</CustomControlName>  
+            </GroupBy>
+                <TableControl>
+                  <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Mode</Label> 
+                      <Alignment>left</Alignment>
+                       <Width>15</Width>
+                   </TableColumnHeader>
+
+                   <TableColumnHeader>
+                      <Label>LastWriteTime</Label>
+                      <Alignment>Right</Alignment>
+                       <Width>20</Width>
+                   </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Length</Label>
+                          <Width>16</Width>
+                        <Alignment>Right</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                  <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                 <ScriptBlock>if ($_.file) {'-----'} else {if ($_.specialFolder.name) {'&lt;' + $_.specialFolder.name +'&gt;'} else {'&lt;dir&gt;'}}</ScriptBlock>
+                                 <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>[String]::Format("{0:d}  {0:t}", ([dateTime]$_.fileSystemInfo.lastModifiedDateTime))</ScriptBlock>
+                                 <Alignment>Right</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                            <Alignment>right</Alignment>
+                           	<ScriptBlock>$_.size.tostring("N0")</ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Name</PropertyName>
+                                 <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Graph Mailbox Settings</Name><ViewSelectedBy><TypeName>GraphMailboxSettings</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Timezone</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Langauge</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>AutoReplies</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>timezone</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <ScriptBlock>$_.language.displayName</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.AutomaticRepliesSetting.Status</ScriptBlock>
+                                <Alignment>Center</Alignment>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Graph Users</Name><ViewSelectedBy><TypeName>GraphUser</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Display Name</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Job Title</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Office Location</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Mail</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Business Phones</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Mobile Phones</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>UPN</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>          
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>displayName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>jobTitle</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>officeLocation</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Mail</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.businessPhones -join ", "</ScriptBlock>
+                                <Alignment>Center</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>mobilePhone</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>userPrincipalName</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Graph Groups</Name><ViewSelectedBy><TypeName>GraphGroup</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Display Name</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Description</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Visibility</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Options</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Group Types</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Security Enabled</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Mail Enabled</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Mail</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>          
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>displayName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Description</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Visibility</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                 <ScriptBlock>$_.resourceProvisioningOptions -join ", "</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                 <ScriptBlock>$_.groupTypes -join ", "</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>SecurityEnabled</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>mailEnabled</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Mail</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>                       
+        <View>
+            <Name>Graph Tasks</Name><ViewSelectedBy><TypeName>GraphTask</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Title</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>% Complete</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Created Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Start Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                   <TableColumnHeader>
+                        <Label>Due Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader> 
+                    <TableColumnHeader>
+                        <Label>Completed Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>          
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>title</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>percentComplete</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.CreatedDatetime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                 <ScriptBlock>([datetime]$_.startDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.dueDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.completedDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>  
+        <View>
+            <Name>Graph Extended Tasks</Name><ViewSelectedBy><TypeName>GraphExtendedTask</TypeName></ViewSelectedBy>
+            <ListControl>
+            <ListEntries>
+              <ListEntry>
+                <ListItems>
+                  <ListItem>
+                    <label>Plan</label>
+                    <PropertyName>PlanTitle</PropertyName>
+                  </ListItem>
+                  <ListItem> 
+                    <Label>Bucket</Label>
+                     <PropertyName>Bucketname</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <label>Task title</label>
+                    <PropertyName>title</PropertyName>
+                  </ListItem>
+                    <ListItem>
+                    <label>Description</label>
+                    <PropertyName>description</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Assignees</Label>
+                     <PropertyName>Assignees</PropertyName>
+                  </ListItem>         
+                  <ListItem>
+                    <label>Created</label>
+                    <ScriptBlock>([datetime]($_.createdDateTime)).tostring("g")</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <label>Start</label>
+                    <ScriptBlock>([datetime]($_.startDateTime)).tostring("g")</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Due</Label>
+                     <ScriptBlock>([datetime]($_.dueDateTime)).tostring("g")</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Completed</Label>
+                    <ScriptBlock>([datetime]($_.completedDateTime)).tostring("g")</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>% Complete</Label>
+                    <PropertyName>percentComplete</PropertyName>
+                  </ListItem>  
+                  <ListItem>
+                    <Label>Categories</Label>
+                    <ScriptBlock>$_.appliedCategories.psobject.Properties.where({$_.value -eq $true}).name -join "; "</ScriptBlock>
+                  </ListItem> 
+                  <ListItem>
+                    <Label>Checklist</Label>
+                    <ScriptBlock>$_.checklist.psobject.Properties.value.title -join "; "</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Check list items</Label>
+                      <PropertyName>checklistItemCount</PropertyName>
+                  </ListItem>  
+                  <ListItem>
+                    <Label>References</Label>
+                        <PropertyName>referenceCount</PropertyName>
+                  </ListItem>
+                </ListItems>    
+              </ListEntry>
+            </ListEntries>
+          </ListControl>
+        </View>  
+        <View>
+            <Name>Graph Plans</Name><ViewSelectedBy><TypeName>GraphPlan</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Title</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Owner Name</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>CreatorName</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>title</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>OwnerName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>CreatorName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>           
+        <View>
+            <Name>Graph Buckets</Name><ViewSelectedBy><TypeName>GraphBucket</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Plan Title</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Bucket Name</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>PlanTitle</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Name</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>        
+        <View>
+            <Name>Graph Channels</Name><ViewSelectedBy><TypeName>GraphChannel</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Display Name</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>description</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>displayName</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>description</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>         
+        <View>
+            <Name>Graph Tabs</Name><ViewSelectedBy><TypeName>GraphTab</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>DisplayName</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>App Name</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>App ID</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <ScriptBlock>[System.Web.HttpUtility]::UrlDecode($_.displayname)</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>teamsAppName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>teamsAppId</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View> 
+        <View>
+            <Name>Graph Team messages</Name><ViewSelectedBy><TypeName>GraphTeamMsg</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>From</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>CreatedDateTime</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>MessageType</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Deleted</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Importance</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Content</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>                    
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>FromUserName</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]($_.createdDateTime)).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>messageType</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>deleted</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Importance</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>                           
+                            <TableColumnItem>
+                                <ScriptBlock>$_.body.content</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View> 
+        <View>
+            <Name>Graph Teams</Name><ViewSelectedBy><TypeName>GraphTeam</TypeName></ViewSelectedBy>
+            <ListControl>
+            <ListEntries>
+              <ListEntry>
+                <ListItems>
+                  <ListItem>
+                    <label>Display Name</label>
+                    <PropertyName>displayName</PropertyName>
+                  </ListItem>
+                  <ListItem> 
+                    <Label>Description</Label>
+                     <PropertyName>description</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <label>Is Archived</label>
+                    <PropertyName>isArchived</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <label>Visibility</label>
+                    <PropertyName>visibility</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <label>Mail</label>
+                    <PropertyName>mail</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Members mayCreate/Update Channels</Label>
+                    <ScriptBlock>$_.memberSettings.allowCreateUpdateChannels</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Guests mayCreate/Update Channels</Label>
+                    <ScriptBlock>$_.guestSettings.allowCreateUpdateChannels</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Members May Delete Channels</Label>
+                    <ScriptBlock>$_.memberSettings.allowDeleteChannels</ScriptBlock>
+                  </ListItem>  
+                  <ListItem>
+                    <Label>Guests May Delete Channels</Label>
+                    <ScriptBlock>$_.guestSettings.allowDeleteChannels</ScriptBlock>
+                  </ListItem>  
+                  <ListItem>
+                    <Label>Members May Add/RemoveApps</Label>
+                    <ScriptBlock>$_.memberSettings.allowAddRemoveApps</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Members May Create/Update/Remove Tabs</Label>
+                    <ScriptBlock>$_.memberSettings.allowCreateUpdateRemoveTabs</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Members May Create/Update/Remove Connectors</Label>
+                    <ScriptBlock>$_.memberSettings.allowCreateUpdateRemoveConnectors</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Users May Edit Messages</Label>
+                    <ScriptBlock>$_.messagingSettings.allowUserEditMessages</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Users May Delete Messages</Label>
+                    <ScriptBlock>$_.messagingSettings.allowUserDeleteMessages</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Owners May Delete Messages</Label>
+                    <ScriptBlock>$_.messagingSettings.allowOwnerDeleteMessages</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Allow Team Mentions</Label>
+                    <ScriptBlock>$_.messagingSettings.allowTeamMentions</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Allow Channel Mentions</Label>
+                    <ScriptBlock>$_.messagingSettings.allowChannelMentions</ScriptBlock>
+                  </ListItem>  
+                  <ListItem>
+                    <Label>Allow Giphy</Label>
+                    <ScriptBlock>$_.funSettings.allowGiphy</ScriptBlock>
+                  </ListItem> 
+                  <ListItem>
+                    <Label>Giphy Content Rating</Label>
+                    <ScriptBlock>$_.funSettings.giphyContentRating</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Allow Stickers And Memes</Label>
+                    <ScriptBlock>$_.funSettings.allowStickersAndMemes</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Allow Custom Memes</Label>
+                    <ScriptBlock>$_.funSettings.allowCustomMemes</ScriptBlock>
+                  </ListItem>         
+                </ListItems>    
+              </ListEntry>
+            </ListEntries>
+          </ListControl>
+        </View>   
+        <View>
+            <Name>Graph Threads</Name><ViewSelectedBy><TypeName>GraphThread</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Topic</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Is Locked</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Last Delivered</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Senders</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>topic</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>isLocked</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.lastDeliveredDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.uniqueSenders -join ', '</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>   
+        
+        <View>
+          <Name>Graph Sign-in log entryk</Name><ViewSelectedBy><TypeName>GraphSigninLog</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Created</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>UserPrincipalName</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>appDisplayName</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>ipAddress</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>clientAppUsed</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Device</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.createdDateTime).tostring('g')</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>UserPrincipalName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>appDisplayName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>ipAddress</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>clientAppUsed</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.deviceDetail.DisplayName</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>   
+        
+        <View>
+          <Name>Graph OneNote NoteBook</Name><ViewSelectedBy><TypeName>GraphOneNoteBook</TypeName></ViewSelectedBy>
+          <ListControl>
+            <ListEntries>
+              <ListEntry>
+                <ListItems>
+                  <ListItem>
+                    <label>Display Name</label>
+                    <PropertyName>displayName</PropertyName>
+                  </ListItem>
+                  <ListItem> 
+                    <Label>Sections</Label>
+                    <ScriptBlock>$_.sections.displayName -join ", "</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <label>Is Default</label>
+                    <PropertyName>isDefault</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <label>User Role</label>
+                    <PropertyName>userRole</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>OneNote Client Url</Label>
+                    <ScriptBlock>$_.links.oneNoteClientUrl.href</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>OneNote Web Url</Label>
+                    <ScriptBlock>$_.links.oneNoteWebUrl.href</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Created By</Label>
+                    <ScriptBlock>$_.createdBy.user.displayName</ScriptBlock>
+                  </ListItem> 
+                  <ListItem> 
+                    <Label>Last Modified By</Label>
+                    <ScriptBlock>$_.lastModifiedBy.user.displayName</ScriptBlock>
+                  </ListItem>
+                  <ListItem> 
+                    <Label>Last Modified Date</Label>
+                    <ScriptBlock>([datetime]$_.lastModifiedDateTime).ToString('g')</ScriptBlock>
+                  </ListItem>  
+                </ListItems>
+              </ListEntry>
+            </ListEntries>
+          </ListControl>
+        </View>         
+        <View>
+          <Name>Graph OneNote Section</Name><ViewSelectedBy><TypeName>GraphOneNoteSection</TypeName></ViewSelectedBy>
+          <ListControl>
+            <ListEntries>
+              <ListEntry>
+                <ListItems>
+                  <ListItem>
+                    <label>Display Name</label>
+                    <PropertyName>displayName</PropertyName>
+                  </ListItem>
+                   <ListItem>
+                    <Label>Parent Notebook</Label>
+                    <ScriptBlock>$_.parentNotebook.displayName</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <label>Is Default</label>
+                    <PropertyName>isDefault</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>OneNote Client Url</Label>
+                    <ScriptBlock>$_.links.oneNoteClientUrl.href</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>OneNote Web Url</Label>
+                    <ScriptBlock>$_.links.oneNoteWebUrl.href</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Created By</Label>
+                    <ScriptBlock>$_.createdBy.user.displayName</ScriptBlock>
+                  </ListItem> 
+                  <ListItem> 
+                    <Label>Last Modified By</Label>
+                    <ScriptBlock>$_.lastModifiedBy.user.displayName</ScriptBlock>
+                  </ListItem>
+                  <ListItem> 
+                    <Label>Last Modified Date</Label>
+                    <ScriptBlock>([datetime]$_.lastModifiedDateTime).ToString('g')</ScriptBlock>
+                  </ListItem>  
+                </ListItems>
+              </ListEntry>
+            </ListEntries>
+          </ListControl>
+        </View>         
+        <View>
+          <Name>Graph OneNote Page</Name><ViewSelectedBy><TypeName>GraphOneNotePage</TypeName></ViewSelectedBy>
+          <ListControl>
+            <ListEntries>
+              <ListEntry>
+                <ListItems>
+                  <ListItem>
+                    <label>Title</label>
+                    <PropertyName>title</PropertyName>
+                  </ListItem>
+                   <ListItem>
+                    <Label>Parent Section</Label>
+                    <ScriptBlock>$_.parentSection.displayname</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                  <Label>OneNote Client Url</Label>
+                    <ScriptBlock>$_.links.oneNoteClientUrl.href</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>OneNote Web Url</Label>
+                    <ScriptBlock>$_.links.oneNoteWebUrl.href</ScriptBlock>
+                  </ListItem>
+                  <ListItem> 
+                    <Label>Last Modified Date</Label>
+                    <ScriptBlock>([datetime]$_.lastModifiedDateTime).ToString('g')</ScriptBlock>
+                  </ListItem>  
+                </ListItems>
+              </ListEntry>
+            </ListEntries>
+          </ListControl>
+        </View>  
+        <View>
+            <Name>Graph Site</Name><ViewSelectedBy><TypeName>Graphsite</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Name</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Description</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Drives</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Lists</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Subsites</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Web URL</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>Name</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>description</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>0+ $_.drives.count</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>0 + $_.lists.count</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <ScriptBlock>0 + $_.sitesCount</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>webUrl</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>        
+        <View>
+            <Name>Graph Column</Name><ViewSelectedBy><TypeName>GraphColumn</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Name</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Required</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Unique</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Indexed</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>ReadOnly</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Type</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Contains</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>Name</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>required</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>enforceUniqueValues</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>indexed</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Readonly</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <ScriptBlock>if ($_.lookup) {'Lookup'} elseif ($_.choice) {'Choice'} elseif ($_.personOrGroup) {'Person/Group'} elseif ($_.datetime) {'Date/Time'} elseif ($_.calculated) {'calculated'} elseif ($_.currency) {'Currency'} elseif ($_.text) {'Text'} elseif ($_.Number) {'Number'}   </ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <ScriptBlock>if ($_.lookup) {$_.lookup.listid + "/" + $_.lookup.columnName} elseif ($_.choice) {$_.choice.choices -join ", "} elseif ($_.personOrGroup) {$_.personOrGroup.ChooseFromType} elseif ($_.datetime) {$_.datetime.Format} elseif ($_.calculated) {$_.calculated.formula} elseif ($_.calculated) {$_.calculated.formula} elseif ($_.currency) {$_.currency.locale}  </ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>        
+    
+        <View>
+            <Name>Graph List</Name><ViewSelectedBy><TypeName>GraphList</TypeName></ViewSelectedBy>
+                <GroupBy>
+                    <ScriptBlock>$_.parentURL</ScriptBlock>
+                    <CustomControlName>sharePointLists-GroupingFormat</CustomControlName>  
+                 </GroupBy>
+                 <TableControl>
+                 <AutoSize /> 
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Name</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Template</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Last Modified</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Path</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Description</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>Name</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.list.template</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <ScriptBlock>([DateTime]$_.lastModifiedDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.webUrl.replace($_.Parenturl,'')</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>description</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View> 
+        <View>
+            <Name>Graph Conversation</Name><ViewSelectedBy><TypeName>GraphConversation</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Topic</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Has Attachments</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Last Delivered</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Senders</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>topic</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>hasAttachments</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.lastDeliveredDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.uniqueSenders -join ', '</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Graph Post</Name><ViewSelectedBy><TypeName>GraphPost</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Topic</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Received</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Sender</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>From</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Categories</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Body</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>topic</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.receivedDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.sender.emailAddress.name</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.from.emailAddress.name</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.categories -join ', '</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.body.content</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Graph Mailfolder</Name><ViewSelectedBy><TypeName>GraphMailFolder</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Display Name</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Child Folders</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Unread Items</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Total Items</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>displayName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>childFolderCount</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <PropertyName>unreadItemCount</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>totalItemCount</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Graph MailMessage</Name><ViewSelectedBy><TypeName>GraphMailMessage</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>From Name</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Subject</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Sent</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Preview</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>fromName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>subject</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                   <ScriptBlock>([datetime]$_.sentdatetime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>bodypreview</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Graph Contact</Name><ViewSelectedBy><TypeName>GraphContact</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>Display name</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>File as</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Job title</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Company Name</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Mobile phone</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Business phone(s)</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader><TableColumnHeader>
+                    <Label>Home phones</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Mail</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>displayname</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>fileas</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>jobtitle</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>companyname</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>mobilephone</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                   <ScriptBlock>$_.businessphones -join ","</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                   <ScriptBlock>$_.homephones -join ","</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           
+                           <TableColumnItem>
+                                <ScriptBlock>($_.emailaddresses | select-object -ExpandProperty address) -join ", "</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+          <Name>Graph Event</Name><ViewSelectedBy><TypeName>GraphEvent</TypeName></ViewSelectedBy>
+          <ListControl>
+            <ListEntries>
+              <ListEntry>
+                <ListItems>
+                  <ListItem>
+                   <label>Subject</label>
+                    <PropertyName>subject</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                   <label>All Day</label>
+                    <PropertyName>isallday</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Start</Label>
+                    <ScriptBlock>([datetime]$_.start.datetime).ToString("g") + $_.start.timezone </ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>End</Label>
+                    <ScriptBlock>([datetime]$_.end.datetime).ToString("g") + $_.end.timezone </ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Location</Label>
+                    <ScriptBlock>$_.location.displayname</ScriptBlock>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Importance</Label>
+                    <PropertyName>importance</PropertyName>
+                  </ListItem>
+                    <ListItem>
+                    <Label>Sensitivity</Label>
+                    <PropertyName>sensitivity</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Is cancelled</Label>
+                    <PropertyName>iscancelled</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Show As</Label>
+                    <PropertyName>showas</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Reminder On</Label>
+                    <PropertyName>isReminderOn</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Reminder time</Label>
+                    <PropertyName>reminderMinutesBeforeStart</PropertyName>
+                  </ListItem>
+                  <ListItem>
+                    <Label>Organizer</Label>
+                    <ScriptBlock>$_.organizer.emailaddress.name</ScriptBlock>
+                  </ListItem> 
+                  <ListItem>
+                    <Label>Body Preview</Label>
+                    <PropertyName>bodypreview</PropertyName>
+                  </ListItem>
+                </ListItems>
+              </ListEntry>
+            </ListEntries>
+          </ListControl>
+        </View>         
+        <View>
+            <Name>Graph App</Name><ViewSelectedBy><TypeName>GraphApp</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Display Name</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Version</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Teams AppId</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.teamsAppDefinition.displayName</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$_.teamsAppDefinition.version</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                             <TableColumnItem>
+                                <ScriptBlock>$_.teamsAppDefinition.teamsAppId</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>      
+    </ViewDefinitions>
+</Configuration>

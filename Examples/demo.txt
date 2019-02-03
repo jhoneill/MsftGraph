@@ -1,0 +1,25 @@
+﻿ipmo C:\Users\mcp\Documents\WindowsPowerShell\MSGraphAPI\msgraph.psd1 -Force
+$myteam = Get-GraphUser -Teams -Name consultants
+$myteam
+$myteamSite = Get-GraphTeam $myteam -Site
+$myteamSite
+Get-GraphSite $myteamsite -Lists
+$problemslist = Get-Graphsite $myteamSite -Lists |where name -like "prob*"
+
+Get-GraphList $problemslist -ColumnList
+get-graphlist $problemslist -Items -Property title,issuestatus,AssignedToLookupID,priority
+
+
+$pages = (get-graphteam $myteam -Notebooks).sections[0] | Get-GraphOneNoteSection -Pages
+$pages
+start  $pages[0].links.oneNoteWebUrl.href
+Update-GraphOneNotePage -Page $pages[0] -Action append -Content ("<b>" +( get-date) + "</b>")
+$TeamDrive = Get-GraphTeam -Drive
+$TeamDrive
+$TeamDrive.webUrl
+Get-GraphTeam $myteam -Plans
+$teamplan = Get-GraphTeam $myteam -Plans |where title -like "team*"
+Get-GraphPlan $teamplan -Tasks | where percentcomplete -ne 100
+Get-GraphPlan $teamplan -Buckets
+Add-GraphPlanTask -Plan $teamplan -Bucket "To Do" -Title "All read new spec" -DueDate ([datetime]::Now).AddDays(7) -Links $teamdrive.webUrl
+
