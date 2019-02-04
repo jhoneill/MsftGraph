@@ -1240,6 +1240,10 @@
                     <PropertyName>isDefault</PropertyName>
                   </ListItem>
                   <ListItem>
+                    <Label>Parent Notebook</Label>
+                    <ScriptBlock>$_.parentNotebook.displayName</ScriptBlock>
+                  </ListItem>                  
+                  <ListItem>
                     <Label>OneNote Client Url</Label>
                     <ScriptBlock>$_.links.oneNoteClientUrl.href</ScriptBlock>
                   </ListItem>

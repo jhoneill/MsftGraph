@@ -42,9 +42,11 @@
             Write-Progress "Getting Notebook Information"
             $n =  (Invoke-RestMethod @webParams -Uri  ("$Notebook`?`$expand=Sections" + ($Name -replace "^\?","&")))
             $n.pstypeNames.Add("GraphOneNoteBook")
+            #Section fetched this way won't have parentNotebook, so make sure it is available when needed
+            $bookobj =new-object -TypeName psobject -Property @{'id'=$n.id; 'displayname'=$n.displayName; 'Self'=$n.self}
             foreach ($s in $n.sections) {
                 $s.pstypeNames.add("GraphOneNoteSection")
-                Add-Member -InputObject $s -Name ParentNotebookID -MemberType NoteProperty -Value $n.id
+                Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebook   -Value $bookobj
             }
             Write-Progress "Getting Notebook Information" -Completed
             return $n
@@ -52,10 +54,10 @@
         elseif ($sections) {
             if   ($notebook) {$results =  Invoke-RestMethod @webParams -Uri ("$Notebook/sections" + $Name) }
             else {$results =  Invoke-RestMethod @webParams -Uri ('https://graph.microsoft.com/v1.0/me/onenote/Sections' +  $Name) }
+            #Section fetched this way have parentNotebook
             $sectionList = $results.value
             foreach ($s in $sectionList) {
                 $s.pstypeNames.add("GraphOneNoteSection")
-                Add-Member -InputObject $s -Name ParentNotebookID -MemberType ScriptProperty -Value {$this.ParentNotebook.id}
             }
             return $sectionList
         }
@@ -64,16 +66,23 @@
             if($n.value) {
                 foreach ($item in $n.value) {
                     $item.pstypeNames.Add('GraphOneNoteBook')
+                    #Section fetched this way won't have parentNotebook, so make sure it is available when needed
+                    $bookobj =new-object -TypeName psobject -Property @{'id'=$item.id; 'displayname'=$item.displayName; 'Self'=$item.self}
                     foreach ($s in $item.sections) {
                         $s.pstypeNames.add('GraphOneNoteSection')
-                        Add-Member -InputObject $s -Name ParentNotebookID -MemberType NoteProperty -Value $item.id
+                        Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebook   -Value $bookobj
                     }
                 }
                 return $n.value
             }
             elseif ($n.self) {
                 $n.pstypeNames.Add('GraphOneNoteBook')
-                foreach ($s in $n.sections) {$s.pstypeNames.add('GraphOneNoteSection')}
+                #Section fetched this way won't have parentNotebook, so make sure it is available when needed
+                $bookobj =new-object -TypeName psobject -Property @{'id'=$n.id; 'displayname'=$n.displayName; 'Self'=$n.self}
+                foreach ($s in $n.sections) {
+                    $s.pstypeNames.add('GraphOneNoteSection')
+                    Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebook   -Value $bookobj
+                }
                 return $n
             }
         }
@@ -138,7 +147,6 @@ Function Get-GraphOneNoteSection {
             $sectionList = $results.value
             foreach ($s in $sectionList) {
                 $s.pstypeNames.add("GraphOneNoteSection")
-                Add-Member -InputObject $s -Name ParentNotebookID -MemberType ScriptProperty -Value {$this.ParentNotebook.id}
             }
             return $sectionList
         }
@@ -155,7 +163,6 @@ Function Get-GraphOneNoteSection {
         else   {
             $result  = Invoke-RestMethod @webParams -Uri  $uri
             $result.pstypeNames.add("GraphOneNoteSection")
-            Add-Member -InputObject $result -Name ParentNotebookID -MemberType ScriptProperty -Value {$this.ParentNotebook.id}
             return $result
         }
     }
@@ -211,10 +218,6 @@ Function New-GraphOneNoteSection {
         if ($Force -or $PSCmdlet.ShouldProcess($SectionName,"Add section to Notebook $($Notebook.displayname)")) {
             $result = Invoke-RestMethod @webParams -Uri $uri -Body $json
             $result.pstypenames.add('GraphOneNoteSection')
-            #Some things need the section's parent ID, if we were passed notebook as an object, add its ID to the section object
-            if     ($Notebook.id)  {
-                Add-Member -InputObject $result -MemberType NoteProperty -Name ParentNotebookID -Value $Notebook.id
-            }
             return $result
         }
     }
@@ -688,9 +691,9 @@ Function Add-GraphOneNoteTab     {
     #This bit had to be reverse engineered, from a beta version of the API, so if it works past next week, be happy.
     #If the "Notebook" object is actually a section, and it was fetched by one of the module commands (get-GraphTeam -notebook, or get-graphNotebook -section)
     #then $Notebook it will have a a parentNotebook ID. This IF..Else is to make sure we have the real notebook ID, and catch a sectionID if there is one.
-    if   ($Notebook.parentNotebookid) {
+    if   ($Notebook.parentNotebook.id) {
                     $ParamsPt2    = '&notebookSource=PickSection&sectionId='+ $Notebook.id
-                    $NotebookID   = $Notebook.parentNotebookid
+                    $NotebookID   = $Notebook.parentNotebook.id
           }
     else  {         $ParamsPt2    = '&notebookSource=New'
                     $NotebookID   = $Notebook.id }

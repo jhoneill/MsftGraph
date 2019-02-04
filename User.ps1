@@ -174,15 +174,15 @@ Function Get-GraphUser {
             $result = Invoke-RestMethod @webParams -Uri $uri
             $uri    = $result.mysite -replace "^https://(.*?)/(.*)$", 'https://graph.microsoft.com/v1.0/sites/$1:/$2?expand=drives,lists,sites'
             $result = Invoke-RestMethod @webParams -Uri $uri
-            $result.pstypenames.Add("GraphSite") 
+            $result.pstypenames.Add("GraphSite")
             foreach ($l in $result.lists) {
-                $l.pstypenames.Add("GraphList") 
+                $l.pstypenames.Add("GraphList")
                 Add-Member -InputObject $l -MemberType NoteProperty   -Name SiteID   -Value  $result.id
                 Add-Member -InputObject $l -MemberType ScriptProperty -Name Template -Value {$this.list.template}
             }
             Write-Progress -Activity 'Getting user information' -Completed
             return $result
-        }        
+        }
         elseif ($Devices          ) { $uri = "https://graph.microsoft.com/beta/$userID/owneddevices"    ; $returnTheValue = $true }
         elseif ($DirectReports    ) { $uri = "https://graph.microsoft.com/v1.0/$userID/directReports"   ; $returnTheValue = $true }
         elseif ($LicenseDetails   ) { $uri = "https://graph.microsoft.com/v1.0/$userID/licenseDetails"  ; $returnTheValue = $true }
@@ -194,9 +194,9 @@ Function Get-GraphUser {
         elseif ($Manager          ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Manager"         ; $returnTheValue = $false}
         elseif ($Drive            ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Drive"           ; $returnTheValue = $false
                                       if ($WorkOrSchool) {$uri += '?$expand=root($expand=children)'}                              }
-        elseif ($Groups -or 
+        elseif ($Groups -or
                 $SecurityGroups   ) { $uri = "https://graph.microsoft.com/v1.0/$userID/getMemberGroups"} #special handler no need for $return the value
-            
+
         elseif ($OutlookCategories) { $uri = "https://graph.microsoft.com/v1.0/$userID/Outlook"   +
                                                                             '/MasterCategories'         ; $returnTheValue = $true }
         elseif ($Calendars        ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Calendars" +
@@ -211,7 +211,7 @@ Function Get-GraphUser {
                 $uri          = "https://graph.microsoft.com/v1.0/$userID/getMemberGroups"
                 if  ($SecurityGroups) {$body = '{  "securityEnabledOnly": true  }'}
                 else                  {$body = '{  "securityEnabledOnly": false }'}
-                
+
                 $result       = Invoke-RestMethod  -Uri $uri -Method Post -Headers $Script:DefaultHeader -Body $body -ContentType 'application/json'
                 $results      = @()
                 foreach ($r in $result.value) {
@@ -220,10 +220,10 @@ Function Get-GraphUser {
                 }
             }
             elseif (-not $returnTheValue) {
-                    $results = Invoke-RestMethod -Uri $uri @webParams  
+                    $results = Invoke-RestMethod -Uri $uri @webParams
             }
             else {
-                    $result  = Invoke-RestMethod -Uri $uri @webParams  
+                    $result  = Invoke-RestMethod -Uri $uri @webParams
                     $results = $result.value
                     while      ($result.'@odata.nextLink') {
                         $result   =  Invoke-RestMethod @webParams -Uri $result.'@odata.nextLink'
@@ -240,14 +240,14 @@ Function Get-GraphUser {
         }
 
         foreach ($r in $results) {
-                if     ($r.'@odata.type' -match 'directoryRole$') 
+                if     ($r.'@odata.type' -match 'directoryRole$')
                                            { $r.pstypenames.Add('GraphDirectoryRole')}
-                elseif (($r.'@odata.type' -match 'user$' -or 
+                elseif (($r.'@odata.type' -match 'user$' -or
                          $PSCmdlet.ParameterSetName -eq 'None') -and
                         (-not $Select ))   { $r.pstypenames.Add('GraphUser') }
-                elseif ($r.'@odata.type' -match 'group$') 
+                elseif ($r.'@odata.type' -match 'group$')
                                            { $r.pstypenames.Add('GraphGroup') }
-                elseif ($r.'@odata.type' -match 'device$') 
+                elseif ($r.'@odata.type' -match 'device$')
                                            { $r.pstypenames.Add('GraphDevice') }
                 elseif ($MailboxSettings ) { $r.pstypenames.Add('GraphMailboxSettings')}
                 elseif ($Photo           ) { $r.pstypenames.Add('GraphPhoto')}
@@ -255,10 +255,12 @@ Function Get-GraphUser {
                 elseif ($Calendars       ) { $r.pstypenames.Add('GraphCalendar')}
                 elseif ($LicenseDetails  ) { $r.pstypenames.Add('GraphLicense')}
                 elseif ($PlannerTasks    ) { $r.pstypenames.Add('GraphTask')}
-                elseif ($Notebooks      )  { 
+                elseif ($Notebooks      )  {
                     $r.pstypenames.Add('GraphOneNoteBook')
+                    #Section fetched this way won't have parentNotebook, so make sure it is available when needed
+                    $bookobj =new-object -TypeName psobject -Property @{'id'=$r.id; 'displayname'=$r.displayName; 'Self'=$r.self}
                     foreach ($s in $r.sections) {
-                            Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebookID -Value $r.id
+                            Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebook   -Value $bookobj
                             $s.pstypeNames.add("GraphOneNoteSection")
                     }
                 }

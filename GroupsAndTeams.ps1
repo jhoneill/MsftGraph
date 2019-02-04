@@ -506,14 +506,16 @@ Function Get-GraphTeam {
                     return $users
                 }  #can do group ?$expand=Memebers, the others don't expand
                 elseif ($Notebooks)     {
-                    Write-Progress -Activity 'Getting Group OneNote Notebooks' -Completed
-                    #if groups can have more than then add if name ... uri = blah + "?`$expand=sections&`$filter=startswith(tolower(displayname),'$name')"
+                    Write-Progress -Activity 'Getting Group OneNote Notebooks'
+                    #if groups can have more than onebook , then add if name ... uri = blah + "?`$expand=sections&`$filter=startswith(tolower(displayname),'$name')"
                     $results = (Invoke-RestMethod  @webparams -Uri ("$groupURI/onenote/notebooks" + '?$expand=sections'  ) )
                     $books   = $results.value
                     foreach ($b in $books) {
                         $b.pstypenames.add("GraphOneNoteBook")
+                        #Section fetched this way won't have parentNotebook, so make sure it is available when needed
+                        $bookobj =new-object -TypeName psobject -Property @{'id'=$b.id; 'displayname'=$b.displayName; 'Self'=$b.self}
                         foreach ($s in $b.sections) {
-                            Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebookID -Value $b.id
+                            Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebook   -Value $bookobj
                             $s.pstypeNames.add("GraphOneNoteSection")
                         }
                     }
@@ -614,12 +616,12 @@ Function Get-GraphTeam {
                         Add-Member -InputObject $t -MemberType NoteProperty -Name Mail        -Value $g.Mail
                         Add-Member -InputObject $t -MemberType NoteProperty -Name visibility  -Value $g.visibility
                         Write-Progress -Activity 'Getting Group/Team information' -Completed
-                        return $t
+                        $t #<= No return here, because we want to keep loopin
                     }
                     else {
                         $g.pstypenames.Add("GraphGroup")
                         Write-Progress -Activity 'Getting Group/Team information' -Completed
-                        return $g
+                        $g  #<= No return here, because we want to keep loopin
                     }
                 }
             }
