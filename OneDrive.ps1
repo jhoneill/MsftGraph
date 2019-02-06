@@ -41,7 +41,7 @@
         In this case the drive ID could be ommitted because the default is to use the user's home drive
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param   (
+    param   (
         #The drive to examine - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
         [parameter(ValueFromPipeline=$true)]
         $Drive = 'me/Drive',
@@ -81,13 +81,13 @@
         [Parameter(Mandatory=$true, ParameterSetName='ItemID')]
         [String]$ItemID
     )
-    Begin   {
+    begin  {
         Connect-MSGraph
         $webParams = @{Method  = "Get"
                        Headers = $Script:DefaultHeader
         }
     }
-    Process {
+    process {
         #region Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
         if     ($Drive.id)               {$drive = "drives/$($drive.id)"}
@@ -306,10 +306,10 @@ function Copy-ToGraphFolder {
         [switch]$ForceResumable
     )
 
-    Begin   {
+    begin  {
         Connect-MSGraph
     }
-    Process {
+    process {
         #Ensure Path gives us something we can upload
         $uploadItem = Get-Item -Path $Path
         if (-not $uploadItem)         {Write-Warning -Message "Could not find $Path"          ; return }

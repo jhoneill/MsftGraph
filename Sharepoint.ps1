@@ -1,4 +1,4 @@
-﻿Function Get-GraphSite {
+﻿function Get-GraphSite {
     <#
       .Synopsis
         Gets details of a sharepoint site, or its lists, drives or subsites
@@ -15,7 +15,7 @@
         from the site(s) including hidden ones.
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param(
         #Specifies a site, if omitted "root" will be assumed - the root site of the user's tennant.
         [Parameter( ValueFromPipeline=$true,Position=0)]
         $Site = "root",
@@ -113,7 +113,7 @@
     #https://graph.microsoft.com/v1.0/sites/root/contentTypes
 }
 
-Function Get-GraphList {
+function Get-GraphList {
     <#
       .Synopsis
         Gets sharepoint list objects or their items
@@ -178,7 +178,7 @@ Function Get-GraphList {
         Driveitems can be piped into  Copy-FromGraphFolder .
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param(
         #The list either as an ID or as a list object (which may contain the site.)
         [parameter(ValueFromPipeline=$true, ParameterSetName="ListID",Position=0)]
         [parameter(ValueFromPipeline=$true, ParameterSetName="ListItems",Position=0)]
@@ -285,7 +285,7 @@ GET /sites/{site-id}/lists/{list-id}/items/{item-id}/versions
 #>
 
 
-Function New-GraphList {
+function New-GraphList {
     <#
       .Synopsis
         Creates a new sharepoint list
@@ -379,7 +379,7 @@ Function New-GraphList {
     }
 }
 
-Function Add-GraphListItem {
+function Add-GraphListItem {
     <#
       .Synopsis
         Adds an item to a SharePoint List
@@ -402,7 +402,7 @@ Function Add-GraphListItem {
      The third creates a list item with Title, IssueStatus and Priority fields.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param(
+    param(
         #The list to add to; this can be an ID, or list object with an ID, and a site ID
         [parameter(Mandatory=$true,Position=0)]
         $List,
@@ -442,7 +442,7 @@ Function Add-GraphListItem {
     }
 }
 
-Function Set-GraphListItem {
+function Set-GraphListItem {
     <#
       .Synopsis
         Updates an item in a SharePoint List
@@ -460,7 +460,7 @@ Function Set-GraphListItem {
       The first line gets the items from a list , and the second updates the Priority field of the third one
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param(
+    param(
         #The item to update; this can be an ID or an object with an ID, and a list and site ID as well
         [parameter(ValueFromPipeline=$true, Mandatory=$true,Position=0)]
         $Item,
@@ -503,7 +503,7 @@ Function Set-GraphListItem {
     }
 }
 
-Function Remove-GraphListItem {
+function Remove-GraphListItem {
     <#
       .Synopsis
         Deletes an item from a SharePoint List
@@ -519,7 +519,7 @@ Function Remove-GraphListItem {
     #>
 
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
-    Param(
+    param(
         #The item to remove; this can be an ID or an object with an ID, and a list and site ID as well
         [parameter(ValueFromPipeline=$true, Mandatory=$true,Position=0)]
         $Item,
@@ -550,7 +550,7 @@ Function Remove-GraphListItem {
     if ($force -or $PSCmdlet.ShouldProcess($item,'Delete List Item') ){ Invoke-RestMethod @webParams }
 }
 
-  Function New-GraphColumn {
+  function New-GraphColumn {
     <#
       .synopsis
         Create a new Column definition for a sharepoint list
@@ -571,7 +571,7 @@ Function Remove-GraphListItem {
     #>
     [CmdletBinding(DefaultParameterSetName='None')]
     [Alias('ListColumn')]
-    Param (
+    param (
         [Parameter(Mandatory=$true,Position=0)]
         # The API-facing name of the column as it appears in the fields on a listItem. For the user-facing name, see displayName.
         [string]$Name,
@@ -625,7 +625,7 @@ Function Remove-GraphListItem {
 }
 
 #region create all the column definitions used in a column
- Function New-GraphBooleanColumn {
+ function New-GraphBooleanColumn {
     <#
       .synopsis
         Creates a definition of a Sharepoint calculated column
@@ -634,12 +634,12 @@ Function Remove-GraphListItem {
     #>
     [CmdletBinding()]
     [Alias('BooleanColumn')]
-    Param (
+    param (
     )
     return @{'boolean' = @{} }
 }
 
- Function New-GraphCalculatedColumn {
+ function New-GraphCalculatedColumn {
     <#
       .synopsis
         Creates a definition of a Sharepoint calculated column
@@ -648,7 +648,7 @@ Function Remove-GraphListItem {
     #>
     [CmdletBinding()]
     [Alias('CalculatedColumn')]
-    Param (
+    param (
         #The formula used to calculate the value.
         $Formula ,
         #Should the value be presented as a date only or a date and time
@@ -668,7 +668,7 @@ Function Remove-GraphListItem {
     return @{'calculated' = $columnSettings}
 }
 
- Function New-GraphChoiceColumn {
+ function New-GraphChoiceColumn {
     <#
       .synopsis
         Creates a definition of a Sharepoint choice column
@@ -677,7 +677,7 @@ Function Remove-GraphListItem {
     #>
     [CmdletBinding()]
     [Alias('ChoiceColumn')]
-    Param (
+    param (
         #The list of values available for this column..
         [Parameter(Mandatory=$true,Position=0)]
         [string[]]$Choices,
@@ -694,7 +694,7 @@ Function Remove-GraphListItem {
     }}
 }
 
-Function New-GraphCurrencyColumn {
+function New-GraphCurrencyColumn {
     <#
       .synopsis
         Creates a definition of a Sharepoint datetime column
@@ -716,7 +716,7 @@ Function New-GraphCurrencyColumn {
     else {throw "$locale is not a known language"}
 }
 
- Function New-GraphDateTimeColumn {
+ function New-GraphDateTimeColumn {
     <#
       .synopsis
         Creates a definition of a Sharepoint datetime column
@@ -725,7 +725,7 @@ Function New-GraphCurrencyColumn {
     #>
     [CmdletBinding()]
     [Alias('DateTimeColumn')]
-    Param (
+    param (
         #Should the value be presented as a date only or a date and time
         [ValidateSet( 'dateOnly', 'dateTime')]
         $Format = 'dateTime',
@@ -739,7 +739,7 @@ Function New-GraphCurrencyColumn {
       }  }
 }
 
- Function New-GraphLookupColumn {
+ function New-GraphLookupColumn {
     <#
       .synopsis
         Creates a definition of a Sharepoint lookup column
@@ -748,7 +748,7 @@ Function New-GraphCurrencyColumn {
     #>
     [CmdletBinding()]
     [Alias('LookupColumn')]
-    Param (
+    param (
         #The unique identifier of the lookup source list.
         [Parameter(Mandatory=$true,Position=0)]
         [string]$ListId,
@@ -774,7 +774,7 @@ Function New-GraphCurrencyColumn {
     return @{'lookup' = $columnSettings}
 }
 
-Function New-GraphNumberColumn {
+function New-GraphNumberColumn {
     <#
       .synopsis
         Creates a definition of a Sharepoint number column
@@ -783,7 +783,7 @@ Function New-GraphNumberColumn {
     #>
     [CmdletBinding()]
     [Alias('NumberColumn')]
-    Param (
+    param (
         #How the value should be presented in the UX, number by default, the only other choice is percentage
         [ValidateSet('number', 'percentage')]
         $DisplayAs = 'number',
@@ -808,7 +808,7 @@ Function New-GraphNumberColumn {
     return @{'number' = $columnSettings}
 }
 
- Function New-GraphPersonOrGroupColumn {
+ function New-GraphPersonOrGroupColumn {
     <#
       .synopsis
         Creates a definition of a Sharepoint person or group column
@@ -817,7 +817,7 @@ Function New-GraphNumberColumn {
     #>
     [CmdletBinding()]
     [Alias('PersonColumn')]
-    Param (
+    param (
         #If Specified allows multiple/users to be specified
         [switch]$MultipleSelection,
         #Chooses how the name should be displayed; the default is to show name and presence, but it can first name, title, mail etc.
@@ -839,7 +839,7 @@ Function New-GraphNumberColumn {
     return @{'personOrGroup' = $columnSettings}
 }
 
-Function New-GraphTextColumn {
+function New-GraphTextColumn {
     <#
       .Synopsis
         Creates a definition of a sharepoint text column
@@ -848,7 +848,7 @@ Function New-GraphTextColumn {
     #>
     [CmdletBinding()]
     [Alias('TextColumn')]
-    Param (
+    param (
         #Text is single line unless multiline is specified.
         [Switch]$MultiLine,
         #A new entry replaces exisitng text unless append is specified
@@ -876,7 +876,7 @@ Function New-GraphTextColumn {
 }
 #endregion
 
-Function New-GraphContentType {
+function New-GraphContentType {
     [cmdletbinding()]
     param (
         #The ID of the contenttype
@@ -897,13 +897,13 @@ Function New-GraphContentType {
     }
 }
 
-Function Get-GraphSiteColumn {
+function Get-GraphSiteColumn {
     <#
       .synopsis
         Gets a column which is defined for the whole site.
     #>
     [cmdletbinding(DefaultParameterSetName='None')]
-    Param (
+    param (
     #Selects column(s) by name (and possibly group)
     [Parameter(ParameterSetName='Terms',Position=0, ValueFromPipeline=$true)]
     [String]$Name,
@@ -942,13 +942,13 @@ Function Get-GraphSiteColumn {
     }
 }
 
-Function Get-GraphSiteUserList {
+function Get-GraphSiteUserList {
     <#
       .Synopsis
         Gets the Users list for a [team] site
     #>
     [cmdletbinding()]
-    Param (
+    param (
         #The [team] Site whose user-list will be fetched
         [parameter(ValueFromPipeline=$true,Position=0,Mandatory=$True)]
         $Site

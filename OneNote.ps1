@@ -1,4 +1,4 @@
-﻿Function Get-GraphOneNoteBook    {
+﻿function Get-GraphOneNoteBook    {
     <#
       .Synopsis
         Gets notebook objects or sections of notebooks
@@ -18,7 +18,7 @@
         Finds a PowerShell secion in any of the users workbooks. Again the search is casse insensitive
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param   (
+    param   (
         #A graph URI pointing to the notebook, or a notebook object where the .self property is a graph URI...
         [Parameter(ValueFromPipeline=$true)]
         $Notebook ,
@@ -27,13 +27,13 @@
         #if specified filters the returned objects by to those with names begining with ...
         [string]$Name
     )
-    Begin   {
+    begin   {
         Connect-MSGraph
         $webParams = @{Method  = "Get"
                        Headers = $Script:DefaultHeader
         }
     }
-    Process {
+    process  {
         if ($Notebook.self) {$Notebook=$Notebook.self}
         if ($Name) {$Name = '?$filter=startswith(tolower(displayname),''{0}'')' -f ($Name.ToLower() -replace '\*$','') }
 
@@ -89,7 +89,7 @@
     }
 }
 
-Function Get-GraphOneNoteSection {
+function Get-GraphOneNoteSection {
     <#
       .Synopsis
         Gets details of  sections in OneNote notebooks or their pages
@@ -116,7 +116,7 @@ Function Get-GraphOneNoteSection {
       form Get-GraphOneNotebook -Sections ) or the URL for a section.
     #>
     [cmdletbinding()]
-    Param   (
+    param   (
         #A graph URI pointing to the section, or a section object where the .self property is a graph URI...
         [Parameter(Mandatory=$true, ValueFromPipeline=$true,ParameterSetName='Sections',Position=0)]
         $Section ,
@@ -128,13 +128,13 @@ Function Get-GraphOneNoteSection {
         #If specified filters pages or Sections to those with names beginning ...
         [string]$Name
     )
-    Begin   {
+    begin   {
         Connect-MSGraph
         $webParams = @{Method  = "Get"
                        Headers = $Script:DefaultHeader
         }
     }
-    Process {
+    process  {
         if     ($Notebook) {
             #A notebook has sections URL we'll use it. If not if it's an object with a self parameter try with that, otherwise if it is a string, assume it's the URI for the notebook
             if     ($Notebook.sectionsUrl)  {$uri  = $Notebook.sectionsUrl}
@@ -168,7 +168,7 @@ Function Get-GraphOneNoteSection {
     }
 }
 
-Function New-GraphOneNoteSection {
+function New-GraphOneNoteSection {
     <#
       .Synopsis
         Adds a section to a OneNote notebook
@@ -190,7 +190,7 @@ Function New-GraphOneNoteSection {
         and the third adds a welcome page to the new section.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param   (
+    param   (
         #A graph URI pointing to the notebook, or a notebook object
         [Parameter(Mandatory=$true)]
         $Notebook ,
@@ -200,7 +200,7 @@ Function New-GraphOneNoteSection {
         #If specified, the command will run without asking for confirmation; this is the default unless Confirm Preference has been set
         [switch]$Force
     )
-    Begin   {
+    begin   {
         Connect-MSGraph
         $webParams = @{'Method'      = 'Post'
                        'Headers'     = $Script:DefaultHeader
@@ -212,7 +212,7 @@ Function New-GraphOneNoteSection {
         elseif ($notebook -notmatch "/sections$") {$uri = $Notebook + "/sections"}
         else                                      {$uri = $Notebook }
     }
-    Process {
+    process  {
         $json = ConvertTo-Json @{"displayName" = $sectionName}
         Write-Debug $json
         if ($Force -or $PSCmdlet.ShouldProcess($SectionName,"Add section to Notebook $($Notebook.displayname)")) {
@@ -223,7 +223,7 @@ Function New-GraphOneNoteSection {
     }
 }
 
-Function Get-GraphOneNotePage    {
+function Get-GraphOneNotePage    {
     <#
       .Synopsis
         Gets a OneNote page's metadata or content
@@ -237,7 +237,7 @@ Function Get-GraphOneNotePage    {
         the page content marked up with IDs to update the page.
     #>
     [cmdletbinding()]
-    Param   (
+    param   (
         #A graph URI pointing to the page, or a page object where the .self property is a graph URI...
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         $Page,
@@ -246,13 +246,13 @@ Function Get-GraphOneNotePage    {
         #If specified returs the contents with guids for each section where content can be inserted.
         [switch]$ContentWithIDs
     )
-    Begin   {
+    begin   {
         Connect-MSGraph
         $webParams = @{'Method'  = 'Get';
                        'Headers' = $Script:DefaultHeader
         }
     }
-    Process {
+    process  {
         if     ($Page.self)        {$uri=$Page.self}
         elseif ($page-is [string]) {$uri=$Page}
         else   {Write-Warning -Message 'Could not process the page parameter' ; return}
@@ -268,7 +268,7 @@ Function Get-GraphOneNotePage    {
     }
 }
 
-Function Add-GraphOneNotePage    {
+function Add-GraphOneNotePage    {
     <#
       .synopsis
         Adds a page (in HTML format) to an existing OneNote Section
@@ -293,7 +293,7 @@ Function Add-GraphOneNotePage    {
         With $Section already defined this adds a simple page, with a title and a short body.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param (
+    param (
         #The section either as a URL or or as section object, which contrains a self URL or a pages URL
         [Parameter(Mandatory=$true)]
         $Section ,
@@ -332,7 +332,7 @@ Function Add-GraphOneNotePage    {
     }
 }
 
-Function Add-FileToGraphOneNote  {
+function Add-FileToGraphOneNote  {
     <#
       .Synopsis
         Adds a file to a new OneNote page
@@ -348,7 +348,7 @@ Function Add-FileToGraphOneNote  {
         Add-GraphOneNotePage.
     #>
     [CmdletBinding(SupportsShouldProcess=$true)]
-    Param   (
+    param   (
         #The file to upload to OneNote
         [Parameter(ValueFromPipeline=$true,Mandatory=$true)]
         $Path ,
@@ -366,13 +366,13 @@ Function Add-FileToGraphOneNote  {
         #If specified the command will not pause for conformation, this is the default unless $ConfirmPreference is modified,
         [switch]$Force
     )
-    Begin   {
+    begin   {
         $webParams = @{ 'Method'      = 'Post'
                         'Headers'     = $Script:DefaultHeader
                         'ContentType' = 'multipart/form-data; boundary=MyAppPartBoundary'
         }
     }
-    Process {
+    process  {
         #If section wasn't passed but we have it in an enviroment variable use that
         if     (-not $Section -and
                      $env:DefaultOneNoteSection) {$Section = $env:DefaultOneNoteSection}
@@ -436,7 +436,7 @@ Content-type:$mimetype
     }
 }
 
-Function Update-GraphOneNotePage {
+function Update-GraphOneNotePage {
     <#
         .Synopsis
             Update a OneNote page
@@ -452,7 +452,7 @@ Function Update-GraphOneNotePage {
             https://docs.microsoft.com/en-gb/graph/onenote-update-page
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param   (
+    param   (
         #A graph URI pointing to the page, or a page object where the .self property is a graph URI...
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         $Page,
@@ -471,10 +471,10 @@ Function Update-GraphOneNotePage {
         #If specified, the page is updated without prompting.
         [switch]$Force
     )
-    Begin   {
+    begin   {
         Connect-MSGraph
     }
-    Process {
+    process  {
          #If the content contains binary data, the request must be sent using the multipart/form-data content type with a "Commands" part.
         if     ($Page.self)          {$uri = $Page.self}
         elseif ($Page -is [String])  {$uri = $Page}
@@ -508,7 +508,7 @@ Function Update-GraphOneNotePage {
     }
 }
 
-Function Remove-GraphOneNotePage {
+function Remove-GraphOneNotePage {
     <#
       .Synopsis
         Removes a OneNote page
@@ -525,17 +525,17 @@ Function Remove-GraphOneNotePage {
         within this sectioned finds page names that begin "process..." and removes them
     #>
     [cmdletbinding(ConfirmImpact='High',SupportsShouldProcess=$true)]
-    Param   (
+    param   (
         #A graph URI pointing to the page, or a page object where the .self property is a graph URI...
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         $Page,
         #If specified, the page is deleted without prompting.
         [switch]$Force
     )
-    Begin   {
+    begin   {
         Connect-MSGraph
     }
-    Process {
+    process  {
         if     ($Page.self)         {$uri = $Page.self}
         elseif ($Page -is [string]) {$uri = $Page}
         else   {Write-Warning -Message 'Could not process the Page parameter' ; return}
@@ -559,7 +559,7 @@ Function Remove-GraphOneNotePage {
     }
 }
 
-Function Out-GraphOneNote        {
+function Out-GraphOneNote        {
     <#
       .Synopsis
         Output to a new OneNote page
@@ -568,11 +568,11 @@ Function Out-GraphOneNote        {
      .EXAMPLE
         Generates a page
       .EXAMPLE
-        start ( Get-Process | Out-OneNoteLive -Title "Processes @ $(get-date)" -property Name,Handles,NPM,PM,VM,WS )
+        start ( Get-process  | Out-OneNoteLive -Title "Processes @ $(get-date)" -property Name,Handles,NPM,PM,VM,WS )
         Generates a page and opens it
     #>
     [CmdletBinding(DefaultParameterSetName='Page')]
-    Param   (
+    param   (
         #Specifies the objects to be represented in HTML.
         [parameter(ValueFromPipeline=$true)]
         [psobject]$InputObject,
@@ -602,9 +602,9 @@ Function Out-GraphOneNote        {
         #Specifies text to add after the closing </TABLE> tag. By default, there is no text in that position.
         [ValidateNotNullOrEmpty()][string[]]$PostContent
     )
-    Begin   { $stuff = @() }
-    Process { $Stuff = $Stuff + $InputObject}
-    End     {
+    begin   { $stuff = @() }
+    process { $Stuff = $Stuff + $InputObject}
+    end     {
         Connect-MSGraph
         $webParams = @{ Method      = "Post"
                         Headers     = $Script:DefaultHeader
@@ -631,7 +631,7 @@ Function Out-GraphOneNote        {
     }
 }
 
-Function Add-GraphOneNoteTab     {
+function Add-GraphOneNoteTab     {
     <#
       .Synopsis
         Adds a tab in a Teams channel for a OneNote section or Notebook

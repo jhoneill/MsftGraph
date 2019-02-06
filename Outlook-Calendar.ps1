@@ -1,10 +1,10 @@
-Function Get-GraphReminderView   {
+function Get-GraphReminderView   {
     <#
       .Synopsis
         Returns a view of items with reminder sets across all a users calendars.
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param(
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
          [string]$User,
 
@@ -51,7 +51,7 @@ Function Get-GraphReminderView   {
     }
 }
 
-Function Get-GraphEvent          {
+function Get-GraphEvent          {
     <#
       .Synopsis
         Get the  events in a calendar
@@ -95,7 +95,7 @@ Function Get-GraphEvent          {
         format-table will pick up the default display properties. .
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param(
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
         [Parameter( Mandatory=$true, ParameterSetName="User",ValueFromPipelineByPropertyName=$true)]
         [Parameter( Mandatory=$true, ParameterSetName="UserAndSubject",ValueFromPipelineByPropertyName=$true)]
@@ -223,7 +223,7 @@ Function Get-GraphEvent          {
     #endregion
 }
 
-Function New-RecurrencePattern   {
+function New-RecurrencePattern   {
     <#
       .synopsis
         Creates a new recurrence pattern for an appointment
@@ -325,12 +325,12 @@ Function New-RecurrencePattern   {
     return @{'range'=$range; 'pattern'=$pattern}
 }
 
-Function New-Attendee            {
+function New-Attendee            {
     <#
       .Synopsis
         Creats a new meeting attendee, with a mail address and the type of attendance.
     #>
-    Param(
+    param(
         # The recipient's email address, e.g Alex@contoso.com
         [Parameter(Mandatory=$true,Position=0, ValueFromPipeline=$true)]
         $Mail,
@@ -339,11 +339,11 @@ Function New-Attendee            {
         #Is the attendee required or optional or a resource (such as a room). Defaults to required
         [ValidateSet('required', 'optional', 'resource')]
         $AttendeeType = 'required'
-        )
-        @{ 'type'= $AttendeeType ; 'emailAddress' = (New-MailAddress -Mail:$mail -DisplayName:$DisplayName )}
+    )
+    @{ 'type'= $AttendeeType ; 'emailAddress' = (New-MailAddress -Mail:$mail -DisplayName:$DisplayName )}
 }
 
-Function New-GraphEvent          {
+function New-GraphEvent          {
     <#
       .Synopsis
         Adds a new event to a calendar
@@ -373,7 +373,7 @@ Function New-GraphEvent          {
     #>
     [cmdletbinding()]
     [Alias('Add-GraphEvent')]
-    Param (
+    param (
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
         [Parameter( ParameterSetName="User",ValueFromPipelineByPropertyName=$true)]
         [string]$User,
@@ -500,7 +500,7 @@ Function New-GraphEvent          {
     return $result
 }
 
-Function Set-GraphEvent          {
+function Set-GraphEvent          {
     <#
       .Synopsis
         Modifies an event on a calendar
@@ -510,7 +510,7 @@ Function Set-GraphEvent          {
         a
     #>
     [cmdletbinding(SupportsShouldProcess=$true,DefaultParameterSetName='None')]
-    Param (
+    param (
         #The event to be updateds either as an ID or as an event object containing an ID.
         [Parameter(ValueFromPipeline=$true,Position=0,Mandatory=$true)]
         $Event,
@@ -644,7 +644,7 @@ Function Set-GraphEvent          {
     }
 }
 
-Function Remove-GraphEvent       {
+function Remove-GraphEvent       {
     <#
       .Synopsis
         Deletes an item from the calendar
@@ -653,7 +653,7 @@ Function Remove-GraphEvent       {
         they will reveive a cancellation message.
     #>
     [cmdletbinding(DefaultParameterSetName="None",SupportsShouldProcess=$true,ConfirmImpact='High')]
-    Param(
+    param   (
 
         #The event to be removed either as an ID or as an event object containing an ID.
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
@@ -675,7 +675,7 @@ Function Remove-GraphEvent       {
         #if Sepcified the event will be deleted without prompting for confirmation
         [switch]$Force
     )
-    begin {
+    begin   {
         Connect-MSGraph
     }
     process {

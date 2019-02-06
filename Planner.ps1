@@ -1,4 +1,4 @@
-﻿Function Get-GraphPlan           {
+﻿function Get-GraphPlan           {
     <#
       .Synopsis
         Gets information about plans used in the Planner app.
@@ -8,7 +8,7 @@
         for each of these plans gets the tasks, expanding the name, bucket name, and assignee names
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param   (
+    param   (
         #The ID of the plan or a plan object with an ID property. if omitted the current users planner will be assumed.
         [Parameter( ValueFromPipeline=$true,Position=0)]
         $Plan,
@@ -90,13 +90,13 @@
     }
 }
 
-Function New-GraphTeamPlan       {
+function New-GraphTeamPlan       {
     <#
       .Synopsis
         Creates new a plan for a team.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param   (
+    param   (
         #The ID of the team
         [parameter(ValueFromPipeline=$true, Mandatory=$true, Position=0)]
         $Team,
@@ -132,7 +132,7 @@ Function New-GraphTeamPlan       {
     }
 }
 
-Function Set-GraphPlanDetails    {
+function Set-GraphPlanDetails    {
     <#
     .Synopsis
         Sets the category labels on a Plan
@@ -199,13 +199,13 @@ Function Set-GraphPlanDetails    {
     if ($Force -or $PSCmdlet.ShouldProcess($PlanTitle,"Update Plan Details")) {Invoke-RestMethod @webParams }
 }
 
-Function Add-GraphPlanBucket     {
+function Add-GraphPlanBucket     {
     <#
       .Synopsis
         Adds a task-bucket to an exsiting plan
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param   (
+    param   (
         #The ID of the Plan or a Plan object with an ID property.
         [Parameter(Mandatory=$true,Position=0)]
         $Plan,
@@ -234,7 +234,7 @@ Function Add-GraphPlanBucket     {
     }
 }
 
-Function Rename-GraphPlanBucket  {
+function Rename-GraphPlanBucket  {
     [CmdletBinding(SupportsShouldProcess)]
     <#
       .Synopsis
@@ -266,13 +266,13 @@ Function Rename-GraphPlanBucket  {
     }
 }
 
-Function Remove-GraphPlanBucket  {
+function Remove-GraphPlanBucket  {
     <#
       .synopsis
         Removes a bucket from a plan in planner
     #>
     [CmdletBinding(SupportsShouldProcess,ConfirmImpact='High')]
-    Param (
+    param (
         #The bucket to remove
         [parameter(ValueFromPipeline=$true,Mandatory=$true,Position=0)]
         $Bucket,
@@ -301,7 +301,7 @@ Function Remove-GraphPlanBucket  {
     }
 }
 
-Function Get-GraphBucketTaskList {
+function Get-GraphBucketTaskList {
     [CmdletBinding()]
     Param(
         #Bucket to query either as an ID or a Bucket object with an ID
@@ -324,7 +324,7 @@ Function Get-GraphBucketTaskList {
     }
 }
 
-Function New-GraphPlanTask       {
+function New-GraphPlanTask       {
     <#
       .Synopsis
         Adds a task to an exsiting plan
@@ -332,7 +332,7 @@ Function New-GraphPlanTask       {
         Multiple items may be piped in, to be added to the same plan.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param   (
+    param   (
         #The ID of the Plan or a Plan object with an ID property.
         [Parameter(Mandatory=$true, Position=0)]
         $Plan,
@@ -375,7 +375,7 @@ Function New-GraphPlanTask       {
         [Alias('PT')]
         [switch]$Passthru
     )
-    Begin   {
+    begin   {
         if ($Plan.owner)  {$owner = $plan.owner}
         if ($Plan.id)     {$Plan = $Plan.id}
 
@@ -397,7 +397,7 @@ Function New-GraphPlanTask       {
                         Contenttype = "application/json"
         }
     }
-    Process {
+    process {
         if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
         $settings =  [ordered]@{"planId"=$Plan; "title"=$title}
 
@@ -458,7 +458,7 @@ Function New-GraphPlanTask       {
     }
 }
 
-Function Get-GraphPlanTask       {
+function Get-GraphPlanTask       {
     <#
       .Synopsis
         Gets a task from a plan in planner, and optionally expands IDs to names and fetches extended properties
@@ -482,13 +482,13 @@ Function Get-GraphPlanTask       {
     }
 }
 
-Function Set-GraphPlanTask       {
+function Set-GraphPlanTask       {
     <#
       .Synopsis
         Update an a existing task in a planner plan
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param   (
+    param   (
         #The Task to update, either an ID or a Task object with an ID property.
         [Parameter(ValueFromPipelineByPropertyName=$true, Mandatory=$true, Position=0)]
         $Task,
@@ -539,7 +539,7 @@ Function Set-GraphPlanTask       {
         Connect-MSGraph
         $planHash = @{}
     }
-    Process {
+    process {
         if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
         #Did we get a task object with an ID , a title, a Plan ID and an etag ? Or and ID with the need to look up the others up
         $tag = $plan = $promptTitle = $null
@@ -631,13 +631,13 @@ Function Set-GraphPlanTask       {
     }
 }
 
-Function Remove-GraphPlanTask    {
+function Remove-GraphPlanTask    {
     <#
       .synopsis
         Removes a task from a plan in planner
     #>
     [CmdletBinding(SupportsShouldProcess,ConfirmImpact='High')]
-    Param   (
+    param   (
         #The task to remove, either as an ID, or as a Task object containing an ID.
         [parameter(ValueFromPipeline=$true,Mandatory=$true,Position=0)]
         $Task,
@@ -666,14 +666,14 @@ Function Remove-GraphPlanTask    {
     }
 }
 
-Function Expand-GraphTask        {
+function Expand-GraphTask        {
     <#
       .Synopsis
         Adds Assignees, buckname, plan name. Checklist, links, Preview and description fields in an existing task
       .Description
         This is not exported - it is called in Get-GraphPlan -FullTasks and Get-GraphPlanTask -Expand
     #>
-    Param   (
+    param   (
         #ID of a task or a task object contining an ID
         [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
         $Task
@@ -727,7 +727,7 @@ Function Expand-GraphTask        {
     }
 }
 
-Function Set-GraphTaskDetails    {
+function Set-GraphTaskDetails    {
     <#
       .Synopsis
         Adds Checklist, links, Preview and/or description to an existing task
@@ -736,7 +736,7 @@ Function Set-GraphTaskDetails    {
 
     #>
     [CmdletBinding(SupportsShouldProcess=$true)]
-    Param (
+    param (
         #ID of a task or a task object contining an ID
         [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
         $Task ,
@@ -873,7 +873,7 @@ Function Set-GraphTaskDetails    {
     Write-Progress -Activity "Updating task" -Completed
 }
 
-Function Add-GraphPlannerTab     {
+function Add-GraphPlannerTab     {
     <#
       .Synopsis
         Adds a planner tab to a team-channel for a pre-existing plan
