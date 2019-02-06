@@ -1,10 +1,10 @@
-﻿Function Get-GraphMailTips       {
+﻿function Get-GraphMailTips       {
     <#
       .synopsis
         Gets mail tips for one or more users (is their mailbox full, are auto-replies on etc)
     #>
     [cmdletbinding()]
-    Param(
+    param(
         #mail addresses
         [Parameter(Mandatory=$true)]
         [string[]]$Address
@@ -18,7 +18,7 @@
     (Invoke-RestMethod -Method post -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/me/getMailTips" -Body $json -ContentType "application/json").value
 }
 
-Function Get-GraphMailFolderList {
+function Get-GraphMailFolderList {
     <#
       .Synopsis
         Get the user's Mailbox folders
@@ -27,7 +27,7 @@ Function Get-GraphMailFolderList {
         Gets the current users inbox folder
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param(
         #UserID as a guid or User Principal name. If not specified defaults to "me"
         [string]$UserID,
         #Select the first n folders.
@@ -74,7 +74,7 @@ Function Get-GraphMailFolderList {
     #endregion
 }
 
-Function Get-GraphMailItem       {
+function Get-GraphMailItem       {
     <#
       .Synopsis
         Get items in a mail folder
@@ -105,7 +105,7 @@ Function Get-GraphMailItem       {
         This shows a filter based on two conditions.
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param(
         #UserID as a guid or User Principal name. If not specified defaults to "me"
         [string]$User ,
         #The ID of a folder, or one of the well known folder names 'archive', 'clutter', 'conflicts', 'conversationhistory', 'deleteditems', 'drafts', 'inbox', 'junkemail', 'localfailures', 'msgfolderroot', 'outbox', 'recoverableitemsdeletions', 'scheduled', 'searchfolders', 'sentitems', 'serverfailures', 'syncissues'
@@ -171,7 +171,7 @@ Function Get-GraphMailItem       {
     }
 }
 
-Function New-MailAddress         {
+function New-MailAddress         {
     param (
         # The recipient's email address, e.g Alex@contoso.com
         [Parameter(Mandatory=$true,Position=0, ValueFromPipeline=$true)]
@@ -181,15 +181,16 @@ Function New-MailAddress         {
     )
     $recip = @{address=$Mail}
     if ($DisplayName) {$recip['name'] = $DisplayName}
-    return $recip
+    
+    $recip
 }
 
-Function New-Recipient           {
+function New-Recipient           {
     <#
       .Synopsis
         Creats a new meeting attendee, with a mail address and the type of attendance.
     #>
-    Param(
+    param(
         # The recipient's email address, e.g Alex@contoso.com
         [Parameter(Mandatory=$true,Position=0, ValueFromPipeline=$true)]
         $Mail,
@@ -199,7 +200,7 @@ Function New-Recipient           {
     @{ 'emailAddress' = (New-MailAddress -Mail:$mail -DisplayName:$DisplayName )}
 }
 
-Function Send-GraphMailMessage   {
+function Send-GraphMailMessage   {
     <#
       .Synopsis
         Sends Mail using the Graph API from the current user's mailbox.
@@ -390,7 +391,7 @@ Function Send-GraphMailMessage   {
     }
 }
 
-Function Send-GraphMailForward   {
+function Send-GraphMailForward   {
     <#
       .synopsis
         Forwards a mail message.
@@ -425,7 +426,7 @@ Function Send-GraphMailForward   {
     Invoke-RestMethod -Method post -Uri $uri -ContentType 'application/json' -Body $json -Headers $script:DefaultHeader
 }
 
-Function Send-GraphMailReply     {
+function Send-GraphMailReply     {
     <#
       .synopsis
         Replies to a mail message.

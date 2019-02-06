@@ -1,10 +1,10 @@
-Function Get-GraphReminderView   {
+﻿function Get-GraphReminderView   {
     <#
       .Synopsis
         Returns a view of items with reminder sets across all a users calendars.
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param(
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
          [string]$User,
 
@@ -51,7 +51,7 @@ Function Get-GraphReminderView   {
     }
 }
 
-Function Get-GraphEvent          {
+function Get-GraphEvent          {
     <#
       .Synopsis
         Get the  events in a calendar
@@ -95,7 +95,7 @@ Function Get-GraphEvent          {
         format-table will pick up the default display properties. .
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param(
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
         [Parameter( Mandatory=$true, ParameterSetName="User",ValueFromPipelineByPropertyName=$true)]
         [Parameter( Mandatory=$true, ParameterSetName="UserAndSubject",ValueFromPipelineByPropertyName=$true)]
@@ -223,7 +223,7 @@ Function Get-GraphEvent          {
     #endregion
 }
 
-Function New-RecurrencePattern   {
+function New-RecurrencePattern   {
     <#
       .synopsis
         Creates a new recurrence pattern for an appointment
@@ -325,55 +325,58 @@ Function New-RecurrencePattern   {
     return @{'range'=$range; 'pattern'=$pattern}
 }
 
-Function New-Attendee            {
+function New-EventAttendee       {
     <#
       .Synopsis
         Creats a new meeting attendee, with a mail address and the type of attendance.
     #>
-    Param(
+    [cmdletbinding(DefaultParameterSetName='Default')]
+    param(
         # The recipient's email address, e.g Alex@contoso.com
-        [Parameter(Mandatory=$true,Position=0, ValueFromPipeline=$true)]
+        [Parameter(Position=0, ValueFromPipelineByPropertyName=$true,ParameterSetName='Default',Mandatory=$true)]
         $Mail,
         #The displayname for the recipient
+        [Parameter(Position=1, ValueFromPipelineByPropertyName=$true,ParameterSetName='Default')]
         $DisplayName,
         #Is the attendee required or optional or a resource (such as a room). Defaults to required
         [ValidateSet('required', 'optional', 'resource')]
-        $AttendeeType = 'required'
-        )
-        @{ 'type'= $AttendeeType ; 'emailAddress' = (New-MailAddress -Mail:$mail -DisplayName:$DisplayName )}
+        $AttendeeType = 'required',
+        [Parameter(ValueFromPipeline=$true,ParameterSetName='PipedStrings',Mandatory=$true)]
+        $InputObject 
+    )
+    @{ 'type'= $AttendeeType ; 'emailAddress' = (New-MailAddress -Mail:$mail -DisplayName:$DisplayName )}
 }
 
-Function New-GraphEvent          {
+function Add-GraphEvent          {
     <#
       .Synopsis
-        Adds a new event to a calendar
+        Adds an event to a calendar
       .link
         Get-GraphEvent
       .Example
         >
         >$rec = New-RecurrencePattern -Weekly Friday -EndDate 2019-04-01
-        >New-GraphEvent -Start "2019-01-23 15:30:00" -subject "Enter time sheet" -Recurrence $rec
+        >Add-GraphEvent -Start "2019-01-23 15:30:00" -subject "Enter time sheet" -Recurrence $rec
         Creates a recurring event. The first sets up a weekly schedule for Fridays until April 1st.
         The second sets the time  (if no end is given, it is set for 30 minutes after the start),
         the subject, and the recurrence pattern
       .Example
         >
         >$Chris = New-Attendee -Mail Chris@Contoso.com
-        >New-GraphEvent -subject "Requirements for Basingstoke project" -Start "2019-02-02 10:00" -End "2019-02-02 11:00" -Attendees $chris
+        >Add-GraphEvent -subject "Requirements for Basingstoke project" -Start "2019-02-02 10:00" -End "2019-02-02 11:00" -Attendees $chris
         Creates a meeting with a second person. The first command creates an attendee - by default the attendee is 'required'
         The second creates the appointment, adding the attendee and sending a meeting request.
       .Example
         >
         >$Chris = New-Attendee -Mail Chris@Contoso.com -display 'Chris Cross' optional
-        >$Phil  = New-Attendee -Mail Phil@Contoso.com -display
-        >New-GraphEvent -subject "Phase II planning" -Start "2019-02-02 14:00" -End "2019-02-02 14:30" -Attendees $chris,$phil
+        >$Phil  = New-Attendee -Mail Phil@Contoso.com  
+        >Add-GraphEvent -subject "Phase II planning" -Start "2019-02-02 14:00" -End "2019-02-02 14:30" -Attendees $chris,$phil
         Creates a meeting with a two additonal attendee. The first command creates an optional attendee with a display name
         the second creates an attendee with no displayed name and the default 'required' type
         Finally the meeting is created.
     #>
     [cmdletbinding()]
-    [Alias('Add-GraphEvent')]
-    Param (
+    param (
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
         [Parameter( ParameterSetName="User",ValueFromPipelineByPropertyName=$true)]
         [string]$User,
@@ -448,11 +451,11 @@ Function New-GraphEvent          {
         If ($Calendar.id) {$Calendar = $Calendar.ID}
         $webParams['uri'] = "https://graph.microsoft.com/v1.0/users/$user/calendars/$Calendar/events"
     }
-    elseif ($User)   {  # get the default calendar for a specific user
+    elseif ($User)     {  # get the default calendar for a specific user
         if ($User.ID) {$User=$User.ID}
         $webParams['uri'] = "https://graph.microsoft.com/v1.0/users/$user/calendar/events"  #for the default calendar you can also use users/{id}/events "Calendar"
     }
-    elseif ($Group) {  # get the [only] calendar for a group
+    elseif ($Group)    {  # get the [only] calendar for a group
         if ($Group.ID) {$Group=$Group.ID}
         $webParams['uri'] = "https://graph.microsoft.com/v1.0/groups/$Group/calendar/events"   #for the default calendar you can also use groups/{id}/events
     }
@@ -490,17 +493,20 @@ Function New-GraphEvent          {
                         $settings.recurrence.range['startDate'] = $Start.ToString('yyyy-MM-dd');
     }
     if ($Attendees)    {$settings['attendees'] = @() + $Attendees }
-    $body =  (ConvertTo-Json $settings -Depth 10)
-    Write-Verbose $Body
+    $json =  (ConvertTo-Json $settings -Depth 10)
+    Write-Debug $json
     #endregion
 
-    #send back the new appoinment and give it a type so it will get formatted.
-    $result = Invoke-RestMethod @webParams -Body $body
-    $result.pstypeNames.add('GraphEvent')
-    return $result
+    $result = Invoke-RestMethod @webParams -Body $json
+    if ($PassThru) {
+        #send back the new appoinment and give it a type so it will get formatted.
+        $result.pstypeNames.add('GraphEvent')
+        
+        $result
+    }
 }
 
-Function Set-GraphEvent          {
+function Set-GraphEvent          {
     <#
       .Synopsis
         Modifies an event on a calendar
@@ -510,7 +516,7 @@ Function Set-GraphEvent          {
         a
     #>
     [cmdletbinding(SupportsShouldProcess=$true,DefaultParameterSetName='None')]
-    Param (
+    param (
         #The event to be updateds either as an ID or as an event object containing an ID.
         [Parameter(ValueFromPipeline=$true,Position=0,Mandatory=$true)]
         $Event,
@@ -633,18 +639,18 @@ Function Set-GraphEvent          {
     if ($Recurrence)      {$settings['recurrence']                 = $Recurrence
                            $settings.recurrence.range['startDate'] = $Start.ToString('yyyy-MM-dd');
     }
-    $body =  (ConvertTo-Json $settings -Depth 10)
-    Write-Verbose $Body
+    $json =  (ConvertTo-Json $settings -Depth 10)
+    Write-Debug $json
     #endregion
 
     if ($Force -or $PSCmdlet.ShouldProcess($Event.subject,'Update calendar event')) {
-        $result = Invoke-RestMethod @webParams -Body $body
+        $result = Invoke-RestMethod @webParams -Body $json
         $result.pstypeNames.add('GraphEvent')
         return $result
     }
 }
 
-Function Remove-GraphEvent       {
+function Remove-GraphEvent       {
     <#
       .Synopsis
         Deletes an item from the calendar
@@ -653,7 +659,7 @@ Function Remove-GraphEvent       {
         they will reveive a cancellation message.
     #>
     [cmdletbinding(DefaultParameterSetName="None",SupportsShouldProcess=$true,ConfirmImpact='High')]
-    Param(
+    param   (
 
         #The event to be removed either as an ID or as an event object containing an ID.
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
@@ -675,7 +681,7 @@ Function Remove-GraphEvent       {
         #if Sepcified the event will be deleted without prompting for confirmation
         [switch]$Force
     )
-    begin {
+    begin   {
         Connect-MSGraph
     }
     process {

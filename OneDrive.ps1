@@ -41,7 +41,7 @@
         In this case the drive ID could be ommitted because the default is to use the user's home drive
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param   (
+    param   (
         #The drive to examine - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
         [parameter(ValueFromPipeline=$true)]
         $Drive = 'me/Drive',
@@ -81,13 +81,11 @@
         [Parameter(Mandatory=$true, ParameterSetName='ItemID')]
         [String]$ItemID
     )
-    Begin   {
+    begin   {
         Connect-MSGraph
         $webParams = @{Method  = "Get"
                        Headers = $Script:DefaultHeader
         }
-    }
-    Process {
         #region Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
         if     ($Drive.id)               {$drive = "drives/$($drive.id)"}
@@ -95,18 +93,22 @@
         #Strip leading and trailing / from $drive so it fits in the URI template.
         $Drive = $Drive -replace '/$','' -replace '^/',''
         try   {
-            if ($script:WorkOrSchool) {
-                    $uri = "https://graph.microsoft.com/v1.0/$Drive`?`$expand=root(`$expand=children)"
-            }
-            else {  $uri = "https://graph.microsoft.com/v1.0/$Drive"} #This expand fails on consumer one drive
+            if ($script:WorkOrSchool) {$uri = "https://graph.microsoft.com/v1.0/$Drive`?`$expand=root(`$expand=children)"}
+            else                      {$uri = "https://graph.microsoft.com/v1.0/$Drive"} #The expand fails on consumer one drive
             $driveObj  =  (Invoke-RestMethod @webParams -uri $uri )
             $driveObj.pstypenames.Add('GraphDrive')
             $global:drivecache[$driveObj.id] = $driveObj.name
         }
         catch {
+            $drive = $null
             throw ('Error trying to get drive $drive - the code was ' + $_.exception.response.statuscode.value__  ) ; return
         }
         #endregion
+
+    }
+    process {
+        #To catch being piped to with -erroraction SilentlyContinue and a failure to get the drive in the begin block. 
+        if ($null -eq $drive) {return}  
 
         #region Getting a single item (file or folder) by ID or by path.
         # Make something we can insert in a REST URI
@@ -117,13 +119,20 @@
         elseif ($ItemPath )                                 {$ItemID =  $ItemPath -replace '^/?(.*?)[:/]*$', 'root:/$1:'} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
         #if we had and item ID or built an itemID string as from the path, get the item, add a type and return it/
         if     ($ItemID ) {
-           $item = Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/$Drive/$ItemID"
-           $item.pstypenames.add('GraphDriveItem')
-           return $item
+            try   {$item = Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/$Drive/$ItemID" }
+            catch {
+                if ($_.exception.response.statuscode.value__ -eq 404) {
+                     Write-Warning -Message "Item Not found" ; return 
+                }
+                #we got something other than a 404 error
+                else {Write-Warning -Message $_.exception.tostring() ; return }
+            }
+            $item.pstypenames.add('GraphDriveItem')
+            return $item
         }
         #endregion
         #region Getting collections of items either in special folders by name, normal folders by path/id recent items, or shared with me.
-        #if we got a folder path or ID, so search for its items; first make make sure we can insert it into the URL
+        #if we got a folder path or ID, search for its items; first make make sure we can insert it into the URL
         if    (($search) -and -not
                ($FolderID   -or $FolderPath) )                  {$FolderID = 'root'}                                               #If We were asked to search but not told where, choose "root"
         elseif ($FolderID  -and $FolderID -Match '^/?items')    {$FolderID =  $FolderID   -replace '^/?(.*)/?$',             '$1'} #Other processing mirrors items above.
@@ -132,44 +141,42 @@
         elseif ($FolderPath -and $FolderPath -Match '^/?root:') {$FolderID =  $FolderPath -replace '^/?(.*?)[:/]*$',       '$1:' }
         elseif ($FolderPath )                                   {$FolderID =  $FolderPath -replace '^/?(.*?)[:/]*$', 'root:/$1:' }
         elseif ($SpecialFolder)                                 {$FolderID = "special/$SpecialFolder"                            }
-
-        if     ($FolderID )     {
-            if ($Search) {$children = (Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/$Drive/$FolderID/search(q='$search')?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file").value}
-            else         {$children = (Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/$Drive/$FolderID/children?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file").value}
-        }
-        elseif ($SharedWithMe ) {
-            if ($search) {$children = (Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/me/drive/search(q='preferredLanguage')").value}
-            Else         {$children = (Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/me/Drive/SharedWithMe").value}
-        }
-        elseif ($Recent       ) {
-                          $children = (Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/$Drive/recent").value
+      
+        if ($FolderID -or $SharedWithMe -or $Recent) {
+            if     ($FolderID -and $Search)     {$webParams['URI']=  "https://graph.microsoft.com/v1.0/$Drive/$FolderID/search(q='$search')?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file"}
+            elseif ($FolderID             )     {$webParams['URI'] = "https://graph.microsoft.com/v1.0/$Drive/$FolderID/children?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file" } 
+            elseif ($SharedWithMe -and $search) {}  #can these be combined ? 
+            elseif ($SharedWithMe             ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/me/Drive/SharedWithMe"        }
+            elseif ($Search                   ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/me/drive/search(q='$Search')" }  #me or $drive 
+            elseif ($Recent                   ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/$Drive/recent"                }  #Me or $drive
+            try    {$children = (Invoke-RestMethod @WebParams).value }               
+            catch  {
+                    if ($_.exception.response.statuscode.value__ -eq 404) {
+                          Write-Warning -Message "Not found" ;return 
+                    }
+                    else {Write-Warning -Message $_.exception.tostring() ; return}
+            } 
+            if ($Subfolders) {$children.where({$_.folder}) | Sort-Object -Property name}
         }
         #endregion
         #region Getting the drive - either the drive object itself , or the folders in its root.
-        else                    {
-            if ($Subfolders) {
-                $children = $driveObj.root.children.where({$_.folder}) | Sort-Object -Property Name
-            }
-            else             {
-                foreach ($c in $driveObj.children) {$c.pstypenames.Add("GraphDriveItem")}
-                return $driveObj
-            }
+        elseif ($Subfolders) {
+            $children = $driveObj.root.children.where({$_.folder}) | Sort-Object -Property Name
+        }
+        else             {
+            foreach ($c in $driveObj.children) {$c.pstypenames.Add("GraphDriveItem")}
+            return $driveObj
         }
         #endregion
 
         #The above will either have left a collection of items in $children, or explictly returned a result.
-        #region return any collection of items - filtered to subfolders, or not , as required
-        if     ($children -and $Subfolders) {
-                $children =  $children.where({$_.folder}) | Sort-Object -Property name
-                foreach ($c in $children) {$c.pstypenames.Add("GraphDriveItem")}
-                return $children
-        }
-        elseif ($children)  {
-                $children = $children  | Sort-Object -Property @{e={$null -eq $_.folder}},name
+        #region return any collection of items - filtered to subfolders, or not , as required. Tell the user if the folder is empty but send nothing to the pipeline
+        if (-not $children) { Write-Host  "Folder exists, but is empty."}
+        else  {
                 foreach ($c in $children ) {$c.pstypenames.Add("GraphDriveItem")  }
-                return $children
+                
+                $children  | Sort-Object -Property @{e={$null -eq $_.folder}},name
         }
-        else  { Write-Warning -Message "No Results returned"}
         #endregion
 
         <#
@@ -306,10 +313,10 @@ function Copy-ToGraphFolder {
         [switch]$ForceResumable
     )
 
-    Begin   {
+    begin  {
         Connect-MSGraph
     }
-    Process {
+    process {
         #Ensure Path gives us something we can upload
         $uploadItem = Get-Item -Path $Path
         if (-not $uploadItem)         {Write-Warning -Message "Could not find $Path"          ; return }

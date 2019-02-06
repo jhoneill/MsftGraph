@@ -1,4 +1,4 @@
-Function Get-GraphContactList    {
+function Get-GraphContactList    {
     <#
       .Synopsis
         Get the user's contacts
@@ -9,7 +9,7 @@ Function Get-GraphContactList    {
         The results are displayed as table with display name and mobile number
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param(
         #UserID as a guid or User Principal name. If not specified defaults to "me"
         [string]$UserID,
         #If specified selects the first n contacts
@@ -72,7 +72,7 @@ Function Get-GraphContactList    {
     #endregion
 }
 
-Function New-ContactAddress {
+function New-ContactAddress {
     <#
       .synopsis
         Builds a street / postal / physical address to use in the contact commands
@@ -93,7 +93,7 @@ Function New-ContactAddress {
         It can then be used like this. Set-GraphContact $pavel -BusinessAddress $fabrikamAddress
     #>
     [cmdletbinding()]
-    Param (
+    param (
         #Street address. This can contain carriage returns for a district, e.g. "101 London Road`r`nBotley"
         [String]$Street,
         #City, or town as people outside the US tend to call it
@@ -115,7 +115,7 @@ Function New-ContactAddress {
 }
 
 
-Function New-GraphContact {
+function New-GraphContact {
     <#
       .Synopsis
         Adds an entry to the current users Outlook contacts
@@ -137,7 +137,7 @@ Function New-GraphContact {
         }
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param   (
+    param   (
         [Parameter(ValueFromPipelineByPropertyName)]
         $GivenName,
         [Parameter(ValueFromPipelineByPropertyName)]
@@ -209,7 +209,7 @@ Function New-GraphContact {
     }
 }
 
-Function Set-GraphContact {
+function Set-GraphContact {
     <#
       .Synopsis
         Modifies or adds an entry in the current users Outlook contacts
@@ -228,7 +228,7 @@ Function Set-GraphContact {
 
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param   (
+    param   (
     #The contact to be updated either as an ID or as contact object containing an ID.
     [Parameter(ValueFromPipeline=$true,ParameterSetName='UpdateContact',Mandatory=$true, Position=0 )]
     $Contact,
@@ -371,7 +371,7 @@ Function Set-GraphContact {
     }
 }
 
-Function Remove-GraphContact {
+function Remove-GraphContact {
     <#
       .synopsis
          Deletes a contact from the detaul user's contacts
@@ -383,7 +383,7 @@ Function Remove-GraphContact {
         are confident you have the right contact selected.
     #>
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
-    Param (
+    param (
         #The contact to remove, as an ID or as a contact object containing an ID
         [parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true )]
         $Contact,

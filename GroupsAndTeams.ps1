@@ -1,8 +1,12 @@
 ﻿#see also Get-MsolGroup ; Get-MsolGroupMember ; add-MsolGroupMember; Remove-MsolGroupMember
-Function Get-GraphGroupList {
+function Get-GraphGroupList {
     <#
       .Synopsis
         Gets a list of groups
+      .Description
+        This list of groups returned can be filtered by name (the beginning of the displayname and mail
+        address are checked) or with a custom filter string. Or it can be sorted, Or specific fields can be selected
+        However there is a limitation in the graph API which prevent these being combined.
       .Example
         >Get-GraphGroupList | format-table -autosize  Displayname, SecurityEnabled, Mailenabled, Mail, ID
         Displays a table of groups in the current tennant
@@ -10,59 +14,57 @@ Function Get-GraphGroupList {
         >(Get-GraphGroupList -Name consult | Get-GraphTeam -Site).weburl
         Gets any group whose name begins "Consult" , finds its sharepoint site, and returns the site's URL
     #>
-    [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    [cmdletbinding(DefaultparameterSetName="None")]
+    param (
         #if specified limits the groups returned to those with names begining...
-        [Parameter(Mandatory=$true, ParameterSetName='FilterByName')]
+        [parameter(Mandatory=$true, parameterSetName='FilterByName')]
         [string]$Name,
-        #Field(s) to select
-        [ValidateSet("classification", "createdDateTime", "description", "displayName", "groupTypes",
-                    "id", "mail", "mailEnabled", "mailNickname",      "onPremisesLastSyncDateTime",
-                    "onPremisesProvisioningErrors", "onPremisesSecurityIdentifier", "onPremisesSyncEnabled",
-                    "preferredDataLocation",  "proxyAddresses", "renewedDateTime", "securityEnabled", "visibility")]
+        #Field(s) to select: ID and displayname are always included;
+        #The following are only available when getting a single group:
+        #'allowExternalSenders','autoSubscribeNewMembers','isSubscribedByMail' 'unseenCount',
+        [ValidateSet( 'assignedLicenses', 'classification', 'createdDateTime', 'description', 'groupTypes',
+                    'licenseProcessingState', 'mail', 'mailEnabled', 'mailNickname', 'onPremisesLastSyncDateTime',
+                    'onPremisesProvisioningErrors', 'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled',
+                    'preferredDataLocation', 'proxyAddresses', 'renewedDateTime', 'securityEnabled', 'visibility')]
+        [parameter(Mandatory=$true, parameterSetName='SelectFields')]
         [string[]]$Select,
         #An oData order by string
+        [parameter(Mandatory=$true, parameterSetName='Sort')]
         [string]$OrderBy,
         #An oData filter string; there is a graph limitation  that you can't filter by description or Visibility.
-        [Parameter(Mandatory=$true, ParameterSetName='FilterByString')]
+        [parameter(Mandatory=$true, parameterSetName='FilterByString')]
         [string]$Filter
     )
+    #investigate '?$filter=groupTypes/any(c:c+eq+''Unified'')'
+
     Connect-MSGraph
-    #https://docs.microsoft.com/en-us/graph/api/group-list?view=graph-rest-1.0
-    $webParams   = @{Method = "Get"
-                     Headers = $Script:DefaultHeader
+
+    $webparams    = @{'Method'  = "Get"
+                      'Headers' = $Script:DefaultHeader
     }
-    $uri         = 'https://graph.microsoft.com/v1.0/Groups/'
-    $JoinChar    = "?"
-    if ($Select) {
-        $uri     = $uri + '?$select=' + ($Select -join ',')
-        $JoinChar= "&"
-    }
-    if ($Name)   {
+    $uri          = 'https://graph.microsoft.com/v1.0/Groups/'
+
+    if     ($Select)  {$uri += '?$select='  + ((@('id','displayName') + $Select) -join ',')}
+    elseif ($OrderBy) {$uri += '?$OrderBy=' + $OrderBy}
+    elseif ($Filter)  {$uri += '?$Filter='  + $Filter }
+    elseif ($Name)    {
+        #for once we don't need to fix case.If * is specified , remove it.
         if ($Name -match '\*') {$Name = $Name -replace "\*",""}
-        #The StartsWith oData function is case insensitive so we don't need to fix case.
-        $uri     = $uri + $JoinChar + ("`$filter=startswith(displayName,'{0}') or startswith(mail,'{0}')" -f $Name )
-        $JoinChar= "&"
+        $uri      += ("?`$filter=startswith(displayName,'{0}') or startswith(mail,'{0}')" -f $Name )
     }
-    if ($OrderBy){
-        $uri     = $uri + $JoinChar + '$OrderBy=' + $OrderBy
-        $JoinChar= "&"
-    }
-    if ($Filter) {
-      $uri       = $uri + $JoinChar + '$Filter='  +$Filter
-      $JoinChar  = "&"
-    }
+
     Write-progress -Activity "Finding Groups"
-    $groups = (Invoke-RestMethod @webParams -Uri $uri ).value
-    foreach ($g in $groups) {$g.pstypenames.Add("GraphGroup") }
+    $groups = (Invoke-RestMethod @webparams -Uri $uri ).value
+    #If Selecting fields, don't set a type to display fields we probably do not have.
+    if (-not $Select) {
+         foreach ($g in $groups) {$g.pstypenames.Add("GraphGroup") }
+    }
     Write-progress -Activity "Finding Groups" -Completed
-    #return groups as they are if they have been sorted server-side, otherwise sort them here.
-    if ($OrderBy) {return $groups}
-    else          {       $groups | Sort-Object -Property DisplayName}
-#(Invoke-RestMethod -Method get -Headers @{Authorization = "Bearer $script:AccessToken"} -Uri 'https://graph.microsoft.com/v1.0/groups?$filter=groupTypes/any(c:c+eq+''Unified'')').VALUE
+
+    $groups
 }
 
-Function New-GraphGroup {
+function New-GraphGroup {
     <#
       .Synopsis
         Adds a new group/team
@@ -73,9 +75,9 @@ Function New-GraphGroup {
         A non-Teams enabled group can be teams enabled with Set-GraphGroup -EnableTeam
         Creating and modifying groups requires consent to use the Group.ReadWrite.All scope
     #>
-    [cmdletbinding(SupportsShouldProcess=$true)]
+    [cmdletbinding(SupportsShouldprocess=$true)]
     [Alias("New-GraphTeam")]
-    Param(
+    param(
         #The Name of the group / team
         [parameter(Mandatory=$true, Position=0)]
         [string]$Name,
@@ -98,8 +100,8 @@ Function New-GraphGroup {
     Connect-MSGraph
     if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
 
-    $webParams = @{ Headers     = $Script:DefaultHeader  }
-    if ( (Invoke-RestMethod -Method Get @webParams -Uri "https://graph.microsoft.com/v1.0/groups?`$filter=displayname eq '$Name'" ).value) {
+    $webparams = @{ Headers     = $Script:DefaultHeader  }
+    if ( (Invoke-RestMethod -Method Get @webparams -Uri "https://graph.microsoft.com/v1.0/groups?`$filter=displayname eq '$Name'" ).value) {
         throw "There is already a group with the display name '$Name'." ; return
     }
     #Server-side is case-sensitive for [most] JSON so make sure hashtable names and constants have the right case!
@@ -111,14 +113,15 @@ Function New-GraphGroup {
                     'visibility'           = $Visibility.ToLower() ;
                     'groupTypes'           = @("Unified") ;
     }
-    if ($Description)        {$settings['description'] = $Description}
+    if ($Description) {
+                  $settings['description'] = $Description
+    }
     #if we got owners or users with no ID, fix them at the end, if they have an ID add them now
     if ($Members) {
         $settings['members@odata.bind']= @();
         foreach ($m in $Members) {
             if  ($m.id) {$settings['members@odata.bind'] += "https://graph.microsoft.com/v1.0/users/$($m.id)"}
             else        {$settings['members@odata.bind'] += "https://graph.microsoft.com/v1.0/users/$m"}
-         #   else        {$noIDMembers += $m}
         }
     }
     #If we make someone else the owner of the group, we can't make it a team, so only set owners here if we are not making a team.
@@ -129,15 +132,15 @@ Function New-GraphGroup {
             else{           $settings['owners@odata.bind']  += "https://graph.microsoft.com/v1.0/users/$o"}
         }
     }
-    $webParams["contentType"] = 'application/json'
+    $webparams["contentType"] = 'application/json'
     #Don't add URI or body to web params as we are going to make two calls ...
     $uri       = "https://graph.microsoft.com/v1.0/groups"
     $json = ConvertTo-Json $settings
     Write-Debug $json
 
-    if ($Force -or $PSCmdlet.shouldProcess($Name,"Add new Group")) {
+    if ($Force -or $PSCmdlet.shouldprocess($Name,"Add new Group")) {
         Write-Progress -Activity 'Creating Group/Team' -CurrentOperation "Adding Group $Name"
-        $group = Invoke-RestMethod @webParams -Method Post -uri $uri -body $json
+        $group = Invoke-RestMethod @webparams -Method Post -uri $uri -body $json
         foreach ($m in $group.members) {if ($m.'@odata.type' -match "user") {$m.pstypenames.add("GraphUser")}}
         if ($NoTeam) {
             $group.pstypenames.Add("GraphGroup")
@@ -147,7 +150,7 @@ Function New-GraphGroup {
         else {
             $uri = $uri + "/" + $group.id + "/team"
             Write-Progress -Activity 'Creating Group/Team' -CurrentOperation "Team-enabling Group $Name"
-            $team   = Invoke-RestMethod @webParams -Method Put -uri $uri -Body "{ }"
+            $team   = Invoke-RestMethod @webparams -Method Put -uri $uri -Body "{ }"
             $team.pstypenames.Add("GraphTeam")
             Add-Member -InputObject $team -MemberType NoteProperty -Name DisplayName -Value $group.displayName
             Add-Member -InputObject $team -MemberType NoteProperty -Name Description -Value $group.description
@@ -159,7 +162,8 @@ Function New-GraphGroup {
                 $Owners | Add-GraphGroupMember -Group $group -AsOwner -Force
             }
             Write-Progress -Activity 'Creating Group/Team' -Completed
-            return $team
+
+            $team
         }
     }
 }
@@ -175,7 +179,7 @@ Content-Type: application/json
 }
 #>
 
-Function Set-GraphGroup {
+function Set-GraphGroup {
     <#
       .synopsis
         Sets options on a group
@@ -183,9 +187,9 @@ Function Set-GraphGroup {
         Allows or blocks external senders, changes visibility or description and enables the group as a team.
         Other options for a team are set via Set-GraphTeam.
     #>
-    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
-    Param (
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true,Position=0)]
+    [cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
+    param (
+        [parameter(Mandatory=$true, ValueFromPipeline=$true,Position=0)]
         $Group ,
         #If specified, the group can receive external email; the option can be disabled with -AllowExternalSenders:$false.
         [switch]$AllowExternalSenders,
@@ -199,34 +203,48 @@ Function Set-GraphGroup {
         #If specified the group will be updated without prompting for confirmation.
         [switch]$Force
     )
-    if ($Group.Id)  {$uri = "https://graph.microsoft.com/v1.0/groups/$($Group.ID)"}
-    else            {$uri = "https://graph.microsoft.com/v1.0/groups/$Group"}
-    $settings = @{}
-    if ($Visibility)                         {$settings['visibility']            = $Visibility.ToLower()}
-    if ($Description)                        {$settings['description']           = $Description}
-    if ($PSBoundParameters.ContainsKey(
-                    'AllowExternalSenders')) {$settings['allowExternalSenders']  = [bool]$AllowExternalSenders}
-    if ($settings.Count -and ($Force -or $PSCmdlet.ShouldProcess($group.displayname,'Update Group'))) {
-        Connect-MSGraph
-        Invoke-RestMethod -Uri $uri -Headers $Script:DefaultHeader -Method Patch -ContentType 'application/json' -Body (ConvertTo-Json $settings)
+    Connect-MSGraph
 
-        $g = Invoke-RestMethod -Uri $uri -Headers $Script:DefaultHeader -Method Get
-        if ($EnableTeam -and $g.resourceProvisioningOptions -notcontains 'Team') {
-             $uri = $uri +  "/team"
-             Invoke-RestMethod -Uri $uri -Headers $Script:DefaultHeader -Method Put -ContentType 'application/json' -Body "{ }"
+    if     ($Group.Id)            {$uri = "https://graph.microsoft.com/v1.0/groups/$($Group.ID)"}
+    elseif ($Group -is [string])  {$uri = "https://graph.microsoft.com/v1.0/groups/$Group"}
+    else   {Write-Warning -Message 'Could not process group paramaeter' ; return}
+    $webparams = @{'uri'         = $uri
+                   'Headers'     = $Script:DefaultHeader
+                   'ContentType' = 'application/json'
+    }
+
+    $settings = @{}
+    if ($Visibility)        {$settings['visibility']            = $Visibility.ToLower()}
+    if ($Description)       {$settings['description']           = $Description}
+    if ($PSBoundparameters.ContainsKey('AllowExternalSenders')) {
+                             $settings['allowExternalSenders']  = [bool]$AllowExternalSenders
+    }
+    $json = ConvertTo-Json $settings
+    Write-Debug $json
+    if (($settings.Count -or $EnableTeam) -and
+        ($Force -or $PSCmdlet.Shouldprocess($group.displayname,'Update Group'))) {
+        if ($settings.Count) {
+                  Invoke-RestMethod @webparams -Method Patch -Body $json | Out-Null
         }
-        elseif ($EnableTeam) {Write-Warning  "$($g.displayName) is already team enabled" }
+        if ($EnableTeam)     {
+            $g  = Invoke-RestMethod @webparams -Method Get
+            if ($g.resourceProvisioningOptions -notcontains 'Team') {
+                  $webparams['uri'] +=  "/team"
+                  Invoke-RestMethod @webparams -Method Put -Body "{ }"   | Out-Null
+            }
+            elseif ($EnableTeam) {Write-Warning  "Group $($g.displayName) is already team-enabled." }
+        }
     }
 }
 
-Function Remove-GraphGroup {
+function Remove-GraphGroup {
     <#
       .Synopsis
         Removes a group/team
     #>
-    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
+    [cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
     [Alias("Remove-GraphTeam")]
-    Param(
+    param(
         #The ID of the Group / team
         [parameter(Mandatory=$true, Position=0,ValueFromPipeline=$true )]
         [Alias("Team")]
@@ -234,22 +252,28 @@ Function Remove-GraphGroup {
         #If specified the group will be removed without prompting
         $Force
     )
-    Begin   {
+    begin   {
         Connect-MSGraph
     }
-    Process {
-        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-        if ($Group.displayName) {$displayName = $Group.DisplayName}
-        if  ($Group.id)         {$Group   = $Group.id}
+    process {
+        if     (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        if     ($Group.displayName)  {$displayName = $Group.DisplayName}
+        if     ($Group.ID)           {$groupID     = $Group.ID}
+        elseif ($Group -is [String]) {$groupID     = $Group   }
+        else   {Write-Warning -Message 'Could not process Group parameter.'; return }
 
-        $webParams = @{Headers = $Script:DefaultHeader ; uri =  "https://graph.microsoft.com/v1.0/groups/$Group/"}
+        $webparams = @{'Headers' = $Script:DefaultHeader
+                       'uri'     = "https://graph.microsoft.com/v1.0/groups/$groupID/"
+        }
         if (-not $displayName){
-            try   {  $g  = Invoke-RestMethod -Method Get @webParams }
+            try   {  $g  = Invoke-RestMethod -Method Get @webparams }
             catch        {throw "Could not get the thread to delete"; return}
             if (-not $g) {throw "Could not get the thread to delete"; return}
             else         {$displayName = $g.displayname}
         }
-         if ($PSCmdlet.ShouldProcess($DisplayName,"Delete Group")) { Invoke-RestMethod -Method Delete  @webParams }
+        if ($PSCmdlet.Shouldprocess($DisplayName,"Delete Group")) {
+            Invoke-RestMethod -Method Delete  @webparams
+        }
     }
 }
 
@@ -257,14 +281,14 @@ Function Remove-GraphGroup {
 # DELETE /directory/deletedItems/{id}                permanent delete
 # POST /directory/deletedItems/{id}/restore          restore item
 
-Function Add-GraphGroupMember {
+function Add-GraphGroupMember {
     <#
       .Synopsis
         Adds a user (or group) to a group/team as either a member or owner.
     #>
-    [cmdletbinding(SupportsShouldProcess=$true)]
+    [cmdletbinding(SupportsShouldprocess=$true)]
     [Alias("Add-GraphTeamMember")]
-    Param(
+    param   (
         #The group / team either as an ID or a group/team object with an IDn
         [parameter(Mandatory=$true, Position=0)]
         [Alias("Team")]
@@ -277,47 +301,50 @@ Function Add-GraphGroupMember {
         #If specified group member will be added without prompting
         [Switch]$Force
     )
-    Begin   {
+    begin   {
         Connect-MSGraph
-        if ($Group.id) {$Group       = $Group.id}
-        $webParams = @{'Method'      = 'Post'
+        if     ($Group.ID)           {$groupID  = $Group.ID}
+        elseif ($Group -is [String]) {$groupID  = $Group   }
+        else   {Write-Warning -Message 'Could not process Group parameter.'; return }
+
+        if ($AsOwner) {$uri   = "https://graph.microsoft.com/v1.0/groups/$groupID/owners/`$ref" }
+        else          {$Uri   = "https://graph.microsoft.com/v1.0/groups/$groupID/members/`$ref"}
+
+        $webparams = @{'Method'      = 'Post'
+                       'uri'         = $uri
                        'Headers'     = $Script:DefaultHeader
                        'ContentType' = 'application/json'
         }
-        if ($AsOwner) {
-              $webParams['URI']      = "https://graph.microsoft.com/v1.0/groups/$Group/owners/`$ref"
-        }
-        else {$webParams['URI']      = "https://graph.microsoft.com/v1.0/groups/$Group/members/`$ref"}
     }
-    Process {
-        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-        if   ($Member.displayName) {$membername = $Member.displayName}
-        if   ($Member.id)          {$Member     = $Member.id}
+    process {
+        if   (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        if   ($Member.id)          {$memberID     = $Member.id}
         else {
-            try {$u = Get-GraphUser -User $Member
-                $Member     = $u.id
-                $membername = $u.displayName
+            try   {
+                $Member     = Get-GraphUser -User $Member
+                $memberid   = $Member.id
             }
             catch {throw "Could not get a user matching $Member"; return }
-            if (-not $Member) {throw "Could not get a member ID" ; return}
+            if (-not $Member) {throw "Could not get a member ID"; return }
         }
 
-        $settings  = @{'@odata.id'   = "https://graph.microsoft.com/v1.0/directoryObjects/$Member"   }
-        $json      = convertto-Json $settings
+        $settings  = @{'@odata.id' = "https://graph.microsoft.com/v1.0/directoryObjects/$memberID"   }
+        $json      = ConvertTo-Json $settings
         Write-Debug $json
-        if ($Force -or $PSCmdlet.shouldProcess($membername,"Add to Group")) {
-            Invoke-RestMethod @webParams -Body $json  }
+        if ($Force -or $PSCmdlet.shouldprocess($Member.displayname,"Add to Group")) {
+            Invoke-RestMethod @webparams -Body $json
+        }
     }
 }
 
-Function Remove-GraphGroupMember {
+function Remove-GraphGroupMember {
     <#
       .Synopsis
         Removes a user (or group) from a group/team
     #>
-    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
+    [cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
     [Alias("Remove-GraphTeamMember")]
-    Param(
+    param   (
         #The ID of the Group / team
         [parameter(Mandatory=$true, Position=0)]
         [Alias("Team")]
@@ -328,34 +355,43 @@ Function Remove-GraphGroupMember {
         #If specified the user will be removed without prompting for confirmation
         $Force
     )
-    Process {
-        if   ($Group.id)   {$Group   = $Group.id}
-        if   ($Member.id) {$Member = $Member.id}
+    process {
+        if     (-not $Script:WorkOrSchool) {
+                 Write-Warning -Message "This command only works when you are logged in with a work or school account."
+                 return
+        }
+        if     ($Group.id)           {$groupid = $Group.id}
+        elseif ($Group -is [string]) {$groupId = $Group }
+        else   {Write-Warning -Message "Could not resolve the group parameter."; Return}
+        if     ($Member.id) {
+                $memberid = $Member.id
+                Connect-MSGraph
+        }
         else {
             try {
-                $u =  Get-GraphUser -User $Member
-                $Member =$u.id
-                $userName = $u.displayName
+                $Member   = Get-GraphUser -User $Member
+                $memberid = $Member.id
             }
-            catch {throw "Could not get a user matching $Member"; return }
-            if (-not $Member) {throw "Could not get a member ID" ; return}
+            catch {throw "Could not get a user matching $Member";  return}
+            if (-not $Memberid) {throw "Could not get a member ID" ; return}
         }
+
         #https://docs.microsoft.com/en-us/graph/api/group-post-members?view=graph-rest-1.0
-        Connect-MSGraph
-        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-        $webParams = @{Method      = "Delete"
-                       URI         = "https://graph.microsoft.com/v1.0/groups/$Group/members/$Member/`$ref"
-                       Headers     = $Script:DefaultHeader
+        $webparams = @{Method      = 'Delete'
+                       URI         = "https://graph.microsoft.com/v1.0/groups/$groupid/members/$memberid/`$ref"
+                       Headers     =  $Script:DefaultHeader
                        contentType = 'application/json'
                     }
-        if ($Force -or $PSCmdlet.ShouldProcess($userName,"Remove from Group")) {Invoke-RestMethod @webParams }
+        if ($Force -or $PSCmdlet.Shouldprocess($member.displayName,"Remove from Group")) {
+            Invoke-RestMethod @webparams
+        }
     }
 }
 
-Function Get-GraphTeam {
+function Get-GraphTeam {
     <#
       .Synopsis
-        Gets information about an office 365 team
+        Gets information about a group and associated office 365 team
       .Description
         Takes a a team ID or team object as a parameter and gets information about the team
         The teams Apps, Calendar, Channels, Drive, Members or Planners can be requested.
@@ -383,9 +419,9 @@ Function Get-GraphTeam {
         > Get-GraphTeam -threads | where {[datetime]$_.lastDeliveredDateTime -gt [datetime]::Now.AddDays(-7) }
         Gets the teams conversation threads which have been updated in the last 7 days.
     #>
-    [cmdletbinding(DefaultParameterSetName="None")]
+    [cmdletbinding(DefaultparameterSetName="None")]
     [Alias("Get-GraphGroup")]
-    Param(
+    param   (
         #The name of a team.
         #One more Team IDs or team objects containing and ID. If omitted the current user's teams will be used.
         [parameter(ValueFromPipeline=$true, Position=0)]
@@ -394,63 +430,73 @@ Function Get-GraphTeam {
         #If specified the Team parameter is treated as a name not an ID
         [Switch]$ByName,
         #If specified returns the teams Apps
-        [Parameter(Mandatory=$true, ParameterSetName='Apps')]
+        [parameter(parameterSetName='Apps')]
         [switch]$Apps,
         #If specified gets the team's Calendar (a team only has one)
-        [Parameter(Mandatory=$true, ParameterSetName='Calendar')]
+        [parameter(Mandatory=$true, parameterSetName='Calendar')]
         [switch]$Calendar,
         #If specified gets the team's channels
-        [Parameter(Mandatory=$true, ParameterSetName='Channels')]
+        [parameter(parameterSetName='Channels')]
         [switch]$Channels,
         #If Specified, retrun team's conversations (usually better to use threads)
-        [Parameter(Mandatory=$true, ParameterSetName='Conversations' )]
+        [parameter(Mandatory=$true, parameterSetName='Conversations' )]
         [switch]$Conversations,
         #If specified gets the Team's one drive
-        [Parameter(Mandatory=$true, ParameterSetName='Drive')]
+        [parameter(Mandatory=$true, parameterSetName='Drive')]
         [switch]$Drive,
         #If specified returns the members of the team
-        [Parameter(Mandatory=$true, ParameterSetName='Members')]
+        [parameter(Mandatory=$true, parameterSetName='Members')]
         [switch]$Members,
         #If specified returns the Owners of the team
-        [Parameter(Mandatory=$true, ParameterSetName='Owners')]
+        [parameter(Mandatory=$true, parameterSetName='Owners')]
         [switch]$Owners,
         #If specified returns the team's notebook(s)
-        [Parameter(Mandatory=$true, ParameterSetName='Notebooks')]
+        [parameter(Mandatory=$true, parameterSetName='Notebooks')]
         [switch]$Notebooks,
         #if Specified, returns the teams Planners.
-        [Parameter(Mandatory=$true, ParameterSetName='Planners')]
+        [parameter(Mandatory=$true, parameterSetName='Planners')]
         [switch]$Plans,
         #If Specified, retrun team's threads
-        [Parameter(Mandatory=$true, ParameterSetName='Threads' )]
+        [parameter(Mandatory=$true, parameterSetName='Threads' )]
         [switch]$Threads,
         #if Specified, returns the teams site.
-        [Parameter(Mandatory=$true, ParameterSetName='Site')]
+        [parameter(Mandatory=$true, parameterSetName='Site')]
         [switch]$Site,
         #limits searches for appsby name.
-        [Parameter(ParameterSetName='Apps')]
+        [parameter(parameterSetName='Apps')]
         [String]$AppName,
         #limits searches for channels by name. Other's cant be filtered by name ...  perhaps notebooks can but a group only has one.
-        [Parameter(ParameterSetName='Channels')]
-        [String]$ChannelName
+        [parameter(parameterSetName='Channels')]
+        [String]$ChannelName,
+         #Field(s) to select: ID and displayname are always included
+        #The following are only available when getting a single group:
+        [ValidateSet('allowExternalSenders','autoSubscribeNewMembers','isSubscribedByMail', 'unseenCount',
+                     'assignedLicenses', 'classification', 'createdDateTime', 'description', 'groupTypes',
+                     'licenseProcessingState', 'mail', 'mailEnabled', 'mailNickname', 'onPremisesLastSyncDateTime',
+                     'onPremisesProvisioningErrors', 'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled',
+                     'preferredDataLocation', 'proxyAddresses', 'renewedDateTime', 'securityEnabled', 'visibility')]
+        [parameter(Mandatory=$true, parameterSetName='SelectFields')]
+        [string[]]$Select
+
     )
-    begin {
+    begin   {
         Connect-MSGraph
-        $webParams = @{Method = "Get"
+        $webparams = @{Method = "Get"
                        Headers = $Script:DefaultHeader
         }
     }
     process {
-        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        if     (-not $Script:WorkOrSchool)          {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
         if     ($ByName -and $Team -isnot [string]) {Write-Warning 'The team parameter does not look like a name'; return}
         elseif ($ByName)    {$Team = Get-GraphGroupList -Name $Team}
-        elseif (-not $Team) {$Team  = Get-GraphUser      -Teams }
+        elseif (-not $Team) {$Team = Get-GraphUser      -Teams }
         if     (-not $Team) {Write-Warning 'Could not Get a team from the parameters provided' ; return}
         foreach ($t in   $Team) {
             if  ($t.id) {$teamid = $t.id}
             else        {$teamid = $t }
             $groupURI = "https://graph.microsoft.com/v1.0/groups/$teamid"
             $teamURI  = "https://graph.microsoft.com/v1.0/teams/$teamid"
-            try {
+            try   {
                 #For each of the switches get the data from /groups{id}/whatever or /teams/{id}.whatever
                 #Add a type to PS Type names so we can format it, and add any properties we expect to want later.
                 if     ($Site)          {
@@ -474,7 +520,7 @@ Function Get-GraphTeam {
                     Write-Progress -Activity 'Getting Group Calendar'
                     $result = Invoke-RestMethod  @webparams -Uri  "$groupURI/calendar"
                     $result.pstypenames.Add("GraphCalendar")
-                    Add-Member -InputObject $result -MemberType NoteProperty -Name GroupID -Value $teamid
+                    Add-Member -InputObject $result -MemberType NoteProperty -Name groupID -Value $teamid
                     Write-Progress -Activity 'Getting Group Calendar' -Completed
                     return $result
                 }
@@ -495,7 +541,7 @@ Function Get-GraphTeam {
                     Write-Progress -Activity 'Getting Group Members' -Completed
                     return $users
                 }  #can do group ?$expand=Memebers, the others don't expand
-                elseif ($Owners)       {
+                elseif ($Owners)        {
                     Write-Progress -Activity 'Getting Group Owners'
                     $result = (Invoke-RestMethod  @webparams -Uri  "$groupURI/Owners")
                     $users  = $result.value  #do we need a  while ($result.'@odata.nextLink') { irm nextlink, add value to users} ??
@@ -524,16 +570,22 @@ Function Get-GraphTeam {
                 }
                 elseIf ($Plans)         {
                     Write-Progress -Activity 'Getting Group Planner Plans'
-                    $result = (Invoke-RestMethod  @webparams -Uri  "$groupURI/planner/plans") #would like to have expand details here but it only works with a single plan.
-                    $planList  = $result.value
+                    $result   = Invoke-RestMethod  @webparams -Uri  "$groupURI/planner/plans" #would like to have expand details here but it only works with a single plan.
+                    $planList = $result.value
                     while ($result.'@odata.nextLink') {
                         $result = Invoke-RestMethod  @webparams -Uri $result.'@odata.nextLink'
                         $planList += $result.value
                     }
+                    if (-not $planList) {
+                        Write-Host "The team $($Team.DisplayName) has not created any plans"
+                        return  
+                    }
                     $dirObjectsHash = @{}
-                    @() + $planList.owner + $planList.createdby.user.id  |
-                         Sort-Object -Unique | ForEach-Object  {
+                    if ($t.displayName) {$dirObjectsHash[$teamId] = $t.displayName}
+                    @() + $planList.owner + $planList.createdby.user.id  |ForEach-Object  {
+                        if (-not $dirObjectsHash[$_]) {
                             $dirObjectsHash[$_] = (Invoke-RestMethod  @webparams -Uri "https://graph.microsoft.com/v1.0/directoryobjects/$_").displayname
+                        }
                     }
                     foreach ($p in $planList) {
                         $p.pstypenames.add("GraphPlan")
@@ -549,7 +601,7 @@ Function Get-GraphTeam {
                     $threadList = $results.value #do we need a  while ($result.'@odata.nextLink') { irm nextlink, add value to threads} ??
                     foreach ($t in $threadList) {
                         $t.pstypenames.add("GraphThread")
-                        Add-Member -InputObject $t -MemberType NoteProperty -Name Team -Value $teamid
+                        Add-Member -InputObject $t -MemberType NoteProperty -Name Group -Value $teamid
                     }
                     Write-Progress -Activity 'Getting Group Conversation threads' -Completed
                     return $threadList
@@ -560,16 +612,17 @@ Function Get-GraphTeam {
                     $convList = $results.value #do we need a  while ($result.'@odata.nextLink') { irm nextlink, add value to convList} ??
                     foreach ($c in $convList) {
                         $c.pstypenames.add("GraphConversation")
-                        Add-Member -InputObject $c -MemberType NoteProperty -Name Team -Value $teamid
+                        Add-Member -InputObject $c -MemberType NoteProperty -Name Group -Value $teamid
                         foreach ($t in $c.threads) {
                             $t.pstypenames.add("GraphThread")
-                            Add-Member -InputObject $t -MemberType NoteProperty -Name Team -Value $teamid
+                            Add-Member -InputObject $t -MemberType NoteProperty -Name Group -Value $teamid
                         }
                     }
                     Write-Progress -Activity 'Getting Group Conversations' -Completed
                     return $convList
                 }
-                elseif ($Channels)      {
+                elseif ($Channels -or
+                        $ChannelName)   {
                     if   ($ChannelName) {
                         $uri =  "$teamURI/channels?`$filter=startswith(tolower(displayname), '$ChannelName')"
                     }
@@ -586,7 +639,8 @@ Function Get-GraphTeam {
                     Write-Progress -Activity 'Getting Team Channels' -Completed
                     return $chanList
                 }
-                elseif ($Apps)          {
+                elseif ($Apps -or
+                        $AppName)       {
                     Write-Progress -Activity 'Getting Team Apps'
                     if ($AppName) {
                         $uri = "$teamURI/installedApps" +
@@ -601,6 +655,10 @@ Function Get-GraphTeam {
                     foreach ($a in $appsList) {$a.pstypenames.add("GraphApp")}
                     Write-Progress -Activity 'Getting Team Apps' -Completed
                     return $appsList
+                }
+                elseif ($Select)        {
+                    $SelectList = (@('id','displayName') + $Select ) -join','
+                    Invoke-RestMethod  @webparams -Uri ($groupuri + '?$Select=' + $SelectList)
                 }
                 else                    {
                     Write-Progress -Activity 'Getting Group/Team information'
@@ -621,7 +679,7 @@ Function Get-GraphTeam {
                     else {
                         $g.pstypenames.Add("GraphGroup")
                         Write-Progress -Activity 'Getting Group/Team information' -Completed
-                        $g  #<= No return here, because we want to keep loopin
+                        $g  #<= No return here, because we want to keep looping
                     }
                 }
             }
@@ -636,113 +694,103 @@ Function Get-GraphTeam {
 }
 #>(irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/groupsettings/$($team.id)") ##may be empty
 
-Function Set-GraphTeam {
+function Set-GraphTeam {
     <#
       .Synopsis
         Updates the settings for a team
+      .Example
+        >Get-GraphTeam -byname accounts | Set-GraphTeam -AllowGiphy:$false
+        Gets a the team(s) with a name that begins with accounts, and turns off Giphy content
+        Note the use of -SwitchName:$false.
+
+
     #>
     [cmdletbinding()]
-    Param (
+    param (
         #The team to update either as an ID or a team object with and ID.
+        [Parameter(ValueFromPipeline=$true,Position=0)]
         $Team ,
         #Allow members to add or remove apps
-        [nullable[bool]]$AllowMemberAddRemoveApps,
+        [switch]$AllowMemberAddRemoveApps,
         #Allow members to create update or remove connectors
-        [nullable[bool]]$AllowMemberCreateUpdateRemoveConnectors,
+        [switch]$AllowMemberCreateUpdateRemoveConnectors,
         #Allow members to create update or remove Tabs
-        [nullable[bool]]$AllowMemberCreateUpdateRemoveTabs,
+        [switch]$AllowMemberCreateUpdateRemoveTabs,
         #Allow members to create or update Channels
-        [nullable[bool]]$AllowMemberCreateUpdateChannels,
+        [switch]$AllowMemberCreateUpdateChannels,
         #Allow members to delete Channels
-        [nullable[bool]]$AllowMemberDeleteChannels,
+        [switch]$AllowMemberDeleteChannels,
         #Allow guests to create or update Channels
-        [nullable[bool]]$AllowGuestCreateUpdateChannels,
+        [switch]$AllowGuestCreateUpdateChannels,
         #Allow guests to delete Channels
-        [nullable[bool]]$AllowGuestDeleteChannels,
+        [switch]$AllowGuestDeleteChannels,
         #Allow members to edit their own messages
-        [nullable[bool]]$AllowUserEditMessages,
+        [switch]$AllowUserEditMessages,
         #Allow members to delete their own messages
-        [nullable[bool]]$AllowUserDeleteMessages,
+        [switch]$AllowUserDeleteMessages,
         #Allow owners to delete mssages
-        [nullable[bool]]$AllowOwnerDeleteMessages,
+        [switch]$AllowOwnerDeleteMessages,
         #Allow mentions of teams in messages
-        [nullable[bool]]$AllowTeamMentions,
+        [switch]$AllowTeamMentions,
         #Allow mentions of channels in messages
-        [nullable[bool]]$AllowChannelMentions,
+        [switch]$AllowChannelMentions,
         #Allow giphy graphics
-        [nullable[bool]]$AllowGiphy,
+        [switch]$AllowGiphy,
         #Rating for giphy graphics; either moderate or strict
         [ValidateSet('moderate', 'strict')]
         [string]$GiphyContentRating,
         #Allow stickers and memes
-        [nullable[bool]]$AllowStickersAndMemes,
+        [switch]$AllowStickersAndMemes,
         #Allow Custom memes
-        [nullable[bool]]$AllowCustomMemes
+        [switch]$AllowCustomMemes
     )
     Connect-MSGraph
-    $webParams = @{Method      =  'PATCH'
+    $webparams = @{Method      =  'PATCH'
                   ContentType  =  'application/json'
                   Headers      =  $Script:DefaultHeader }
 
-    if ($Team.id) {$webParams['Uri'] = "https://graph.microsoft.com/v1.0/teams/$($Team.id)"}
-    else          {$webParams['Uri'] = "https://graph.microsoft.com/v1.0/teams/$Team"}
+    if     ($Team.id)          {$webparams['Uri'] = "https://graph.microsoft.com/v1.0/teams/$($Team.id)"}
+    elseif ($Team -is [string]) {$webparams['Uri'] = "https://graph.microsoft.com/v1.0/teams/$Team"}
+    else   {Write-Warning -Message 'Could not resolve the team'; return}
 
-    $settings = @{}
-    if ($PSBoundParameters.ContainsKey('AllowMemberAddRemoveApps') -or
-        $PSBoundParameters.ContainsKey('AllowMemberCreateUpdateChannels') -or
-        $PSBoundParameters.ContainsKey('AllowMemberCreateUpdateRemoveConnectors') -or
-        $PSBoundParameters.ContainsKey('AllowMemberCreateUpdateRemoveTabs') -or
-        $PSBoundParameters.ContainsKey('AllowMemberDeleteChannels')
-       ) {
-       $settings['memberSettings'] = @{}
-       if ($PSBoundParameters.ContainsKey('AllowMemberAddRemoveApps'))                {$settings.memberSettings.allowAddRemoveApps                = $AllowMemberAddRemoveApps}
-       if ($PSBoundParameters.ContainsKey('AllowMemberCreateUpdateChannels'))         {$settings.memberSettings.allowCreateUpdateChannels         = $AllowMemberCreateUpdateChannels}
-       if ($PSBoundParameters.ContainsKey('AllowMemberCreateUpdateRemoveConnectors')) {$settings.memberSettings.allowCreateUpdateRemoveConnectors = $AllowMemberCreateUpdateRemoveConnectors}
-       if ($PSBoundParameters.ContainsKey('AllowMemberCreateUpdateRemoveTabs'))       {$settings.memberSettings.allowCreateUpdateRemoveTabs       = $AllowMemberCreateUpdateRemoveTabs}
-       if ($PSBoundParameters.ContainsKey('AllowMemberDeleteChannels'))               {$settings.memberSettings.allowDeleteChannels               = $AllowMemberDeleteChannels}
+    $settings          = @{}
+    $memberSettings    = @{}
+    $guestSettings     = @{}
+    $messagingSettings = @{}
+    $funSettings       = @{}
+
+    if ($PSBoundparameters.ContainsKey('AllowMemberAddRemoveApps'))                {$memberSettings.allowAddRemoveApps                = [Bool]$AllowMemberAddRemoveApps}
+    if ($PSBoundparameters.ContainsKey('AllowMemberCreateUpdateChannels'))         {$memberSettings.allowCreateUpdateChannels         = [Bool]$AllowMemberCreateUpdateChannels}
+    if ($PSBoundparameters.ContainsKey('AllowMemberCreateUpdateRemoveConnectors')) {$memberSettings.allowCreateUpdateRemoveConnectors = [Bool]$AllowMemberCreateUpdateRemoveConnectors}
+    if ($PSBoundparameters.ContainsKey('AllowMemberCreateUpdateRemoveTabs'))       {$memberSettings.allowCreateUpdateRemoveTabs       = [Bool]$AllowMemberCreateUpdateRemoveTabs}
+    if ($PSBoundparameters.ContainsKey('AllowMemberDeleteChannels'))               {$memberSettings.allowDeleteChannels               = [Bool]$AllowMemberDeleteChannels}
+    if ($PSBoundparameters.ContainsKey('AllowGuestCreateUpdateChannels'))          {$guestSettings.allowCreateUpdateChannels          = [Bool]$AllowGuestCreateUpdateChannels}
+    if ($PSBoundparameters.ContainsKey('AllowGuestDeleteChannels'))                {$guestSettings.allowDeleteChannels                = [Bool]$AllowGuestDeleteChannels}
+    if ($PSBoundparameters.ContainsKey('AllowUserEditMessages'))                   {$messagingSettings.allowUserEditMessages          = [Bool]$AllowUserEditMessages}
+    if ($PSBoundparameters.ContainsKey('AllowUserDeleteMessages'))                 {$messagingSettings.allowUserDeleteMessages        = [Bool]$AllowUserDeleteMessages}
+    if ($PSBoundparameters.ContainsKey('AllowOwnerDeleteMessages'))                {$messagingSettings.allowOwnerDeleteMessages       = [Bool]$AllowOwnerDeleteMessages}
+    if ($PSBoundparameters.ContainsKey('AllowTeamMentions'))                       {$messagingSettings.allowTeamMentions              = [Bool]$AllowTeamMentions}
+    if ($PSBoundparameters.ContainsKey('AllowChannelMentions'))                    {$messagingSettings.allowChannelMentions           = [Bool]$AllowChannelMentions}
+    if ($PSBoundparameters.ContainsKey('AllowGiphy'))                              {$funSettings.allowGiphy                           = [Bool]$AllowGiphy}
+`   if ($PSBoundparameters.ContainsKey('GiphyContentRating'))                      {$funSettings.giphyContentRating                   = [Bool]$GiphyContentRating}
+    if ($PSBoundparameters.ContainsKey('AllowStickersAndMemes'))                   {$funSettings.allowStickersAndMemes                = [Bool]$AllowStickersAndMemes}
+    if ($PSBoundparameters.ContainsKey('AllowCustomMemes'))                        {$funSettings.allowCustomMemes                     = [Bool]$AllowCustomMemes}
+
+    if ($memberSettings.Count)    {$settings['memberSettings']    = $memberSettings}
+    if ($guestSettings.Count )    {$settings['guestSettings']     = $guestSettings}
+    if ($messagingSettings.Count) {$settings['messagingSettings'] = $messagingSettings}
+    if ($funSettings.Count)       {$settings['funSettings']       = $funSettings}
+
+    if ($settings.Count) {
+        $json = ConvertTo-Json $settings -Depth 10
+        Write-Debug $json
+
+        Invoke-RestMethod @webparams -Body $json
     }
-
-    if ($PSBoundParameters.ContainsKey('AllowGuestCreateUpdateChannels') -or
-        $PSBoundParameters.ContainsKey('AllowGuestDeleteChannels')
-       ) {
-        $settings['guestSettings'] = @{}
-        if ($PSBoundParameters.ContainsKey('AllowGuestCreateUpdateChannels'))         {$settings.guestSettings.allowCreateUpdateChannels          = $AllowGuestCreateUpdateChannels}
-        if ($PSBoundParameters.ContainsKey('AllowGuestDeleteChannels'))               {$settings.guestSettings.allowDeleteChannels                = $AllowGuestDeleteChannels}
-    }
-
-    if ($PSBoundParameters.ContainsKey('AllowUserEditMessages') -or
-        $PSBoundParameters.ContainsKey('AllowUserDeleteMessages') -or
-        $PSBoundParameters.ContainsKey('AllowOwnerDeleteMessages') -or
-        $PSBoundParameters.ContainsKey('AllowTeamMentions') -or
-        $PSBoundParameters.ContainsKey('AllowChannelMentions')
-       ) {
-        $settings['messagingSettings'] = @{}
-        if ($PSBoundParameters.ContainsKey('AllowUserEditMessages'))                  {$settings.messagingSettings.allowUserEditMessages          = $AllowUserEditMessages}
-        if ($PSBoundParameters.ContainsKey('AllowUserDeleteMessages'))                {$settings.messagingSettings.allowUserDeleteMessages        = $AllowUserDeleteMessages}
-        if ($PSBoundParameters.ContainsKey('AllowOwnerDeleteMessages'))               {$settings.messagingSettings.allowOwnerDeleteMessages       = $AllowOwnerDeleteMessages}
-        if ($PSBoundParameters.ContainsKey('AllowTeamMentions'))                      {$settings.messagingSettings.allowTeamMentions              = $AllowTeamMentions}
-        if ($PSBoundParameters.ContainsKey('AllowChannelMentions'))                   {$settings.messagingSettings.allowChannelMentions           = $AllowChannelMentions}
-    }
-
-    if ($PSBoundParameters.ContainsKey('AllowGiphy') -or
-        $PSBoundParameters.ContainsKey('GiphyContentRating') -or
-        $PSBoundParameters.ContainsKey('AllowStickersAndMemes') -or
-        $PSBoundParameters.ContainsKey('AllowCustomMemes')
-       ){
-        $settings['funSettings'] = @{}
-        if ($PSBoundParameters.ContainsKey('AllowGiphy'))                             {$settings.funSettings.allowGiphy                           = $AllowGiphy}
-        if ($PSBoundParameters.ContainsKey('GiphyContentRating'))                     {$settings.funSettings.giphyContentRating                   = $GiphyContentRating}
-        if ($PSBoundParameters.ContainsKey('AllowStickersAndMemes'))                  {$settings.funSettings.allowStickersAndMemes                = $AllowStickersAndMemes}
-        if ($PSBoundParameters.ContainsKey('AllowCustomMemes'))                       {$settings.funSettings.allowCustomMemes                     = $AllowCustomMemes}
-    }
-
-    $json = ConvertTo-Json $settings -Depth 10
-    Write-Debug $json
-
-   Invoke-RestMethod @webParams -Body $json
+    else {Write-Warning -Message "Nothing to set"}
 }
 
-Function Get-GraphGroupConversation {
+function Get-GraphGroupConversation {
     <#
       .Synopsis
         Gets details of group converstation from outlook, or its threads,
@@ -753,39 +801,57 @@ Function Get-GraphGroupConversation {
     #>
     [cmdletbinding()]
     [Alias("Get-GraphTeamConversation","Get-GraphConversation")]  #Strictly Conversations belong to a group in Outlook, not a Team in Microsoft teams, but let either name be used.
-    Param(
+    param(
         #The Conversation, either as an ID or an object.
-        [parameter(ValueFromPipeline=$true, Mandatory=$true, Position=0)]
+        [parameter(ValueFromPipeline=$true, Mandatory=$true, Position=0, ParameterSetName='OneConversation')]
         $Conversation,
         #The group where the conversation is found, either as an ID or as an object, if it can't be found from the conversation
+        [parameter(ParameterSetName='AllInTeam', Mandatory=$true )]
+        [parameter(ParameterSetName='OneConversation', Position=1)]
         [Alias("Team")]
         $Group,
-        #If specified selects the conversations threads, otherwise returns an object representing the conversation itself
+        #If specified selects the conversation's threads, otherwise an object representing the conversation itself is returned.
+        [parameter(ParameterSetName='OneConversation', Position=1)]
         [Switch]$Threads
     )
-    process {
-        if     ($Group.id)          {$Group = $Group.ID}
-        elseif ($Conversation.Team) {$Group = $Conversation.Team}
-        if     ($Conversation.id)   {$Conversation = $Conversation.id}
+    begin   {
         Connect-MSGraph
-        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-        $webParams = @{Method = "Get"
-                    Headers = $Script:DefaultHeader
+        $webparams = @{Method  = "Get"
+                       Headers = $Script:DefaultHeader
         }
-        if ($Threads) { (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/groups/$Group/conversations/$conversation/Threads").value |
-                            ForEach-Object {$_.pstypenames.add("GraphThread"); $_ }  |
-                            Add-Member -PassThru -MemberType NoteProperty -Name Team         -Value $Group |
-                            Add-Member -PassThru -MemberType NoteProperty -Name Conversation -Value $Conversation
+
+    }
+    process {
+        if ($Group  -and -not $Conversation) {
+            Get-GraphGroup -Group $Group -Conversations
+            return
+        }
+        if     (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        if     ($Conversation.Group)       {$groupID = $Conversation.Group}
+        elseif ($Group.id)                 {$groupId = $Group.ID}
+        elseif ($Group -is [String])       {$groupid = $Group}
+        else   {Write-Warning 'Could not resolve the group - please specify the group explicitly' ; return}
+        if     ($Conversation.id)          {$Conversation = $Conversation.id}
+
+        if ($Threads) {
+            $uri    = "https://graph.microsoft.com/v1.0/groups/$groupID/conversations/$conversation/Threads"
+            $result = Invoke-RestMethod @webparams -Uri $uri
+            foreach ($thread in $result.value) {
+                $thread.pstypenames.add("GraphThread")
+                Add-Member -InputObject $thread -MemberType NoteProperty -Name Group        -Value $GroupID
+                Add-Member -InputObject $thread -MemberType NoteProperty -Name Conversation -Value $Conversation
+            }
+            return $result.value
         }
         else     {
-            $c = (Invoke-RestMethod @webParams -Uri ("https://graph.microsoft.com/v1.0/groups/$Group/conversations/$conversation"  +'?$expand=Threads'))
+            $c = (Invoke-RestMethod @webparams -Uri ("https://graph.microsoft.com/v1.0/groups/$groupID/conversations/$conversation"  +'?$expand=Threads'))
             $c.pstypenames.add("GraphConversation")
-            return $c
+            Add-Member -PassThru -InputObject $c -MemberType NoteProperty -Name Group -Value $GroupID
         }
     }
 }
 
-Function Get-GraphGroupThread {
+function Get-GraphGroupThread {
     <#
       .Synopsis
         Gets a thread in a Group conversation in outlook, or its posts
@@ -798,92 +864,119 @@ Function Get-GraphGroupThread {
     #>
     [cmdletbinding()]
     [Alias("Get-GraphTeamThread")]
-    Param(
+    param   (
         #The group thread, either as an ID or as a thread object (which may have the team/group as property)
-        [parameter(ValueFromPipeline=$true, Mandatory=$true, Position=0)]
+        [parameter(ParameterSetName='SingleThread', Position=0, ValueFromPipeline=$true, Mandatory=$true)]
         $Thread,
         #The group holding the thread, if it can't be found drm -thread
         [Alias("Team")]
+        [parameter(ParameterSetName='AllGroupThreads', Mandatory=$true)]
+        [parameter(ParameterSetName='SingleThread', Position=1)]
         $Group,
         #If specified, returns the posts in the thread
+        [parameter(ParameterSetName='SingleThread')]
         [Switch]$Posts
     )
-
-    Process {
-        if     ($Thread.topic) {$Topic   = $Thread.topic} else {$topic = "-"}
-        if     ($Group.id)     {$Group   = $Group.ID}
-        elseif ($Thread.Team)  {$Group   = $Thread.Team}
-        if     ($Thread.id)    {$Thread  = $Thread.id}
+    begin   {
         Connect-MSGraph
-        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-        $webParams = @{Method  = "Get"
+        $webparams = @{Method  = "Get"
                        Headers = @{Authorization = $Script:AuthHeader ; "Prefer" ='outlook.body-content-type="text"' }
         }
-        if ($Posts) { (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/groups/$Group/Threads/$thread/posts").value |
-                            ForEach-Object {$_.pstypenames.add("GraphPost") ; $_ } |
-                            Add-Member -PassThru -MemberType NoteProperty -Name Team   -Value $Group  |
-                            Add-Member -PassThru -MemberType NoteProperty -Name Thread -Value $Thread |
-                            Add-Member -PassThru -MemberType NoteProperty -Name Topic  -Value $Topic
-
+    }
+    process {
+        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        If     ($Group -and -not $Thread) {
+            Get-GraphGroup -Group $Group -Threads
+            return
         }
-        else          {
-                 $t = (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/groups/$Group/Threads/$thread")
-                 $t.pstypenames.Add("GraphThread")
-                 return $t
+        if     ($Thread.Group)         {$groupid  = $Thread.group}
+        elseif ($Group.id)             {$groupid  = $Group.ID}
+        elseif ($Group -is [string])   {$groupid  = $Group}
+        else   {Write-Warning -Message 'Could not resolve group ID'; return}
+
+        if     ($Thread.topic)         {$Topic    = $Thread.topic} else {$topic = "-"}
+        if     ($Thread.id)            {$threadID = $Thread.id}
+        elseif ($Thread -is [string])  {$threadID = $Thread}
+        else   {Write-Warning -Message 'Could not resolve thread ID'; return}
+
+        if ($Posts) {
+            $results = (Invoke-RestMethod @webparams -Uri "https://graph.microsoft.com/v1.0/groups/$Groupid/Threads/$threadID/posts").value
+            foreach  ($post in $results) {
+                $Post.pstypenames.add("GraphPost")
+                Add-Member -InputObject $post -MemberType NoteProperty -Name Group  -Value $Groupid
+                Add-Member -InputObject $post -MemberType NoteProperty -Name Thread -Value $threadID
+                Add-Member -InputObject $post -MemberType NoteProperty -Name Topic  -Value $Topic
+            }
+            return $results
+        }
+        else        {
+            $t = (Invoke-RestMethod @webparams -Uri "https://graph.microsoft.com/v1.0/groups/$Groupid/Threads/$threadid")
+            $t.pstypenames.Add("GraphThread")
+            Add-Member -PassThru -InputObject $t -MemberType NoteProperty -Name Group -Value $Groupid
         }
     }
 }
 
-Function Add-GraphGroupThread {
+function Add-GraphGroupThread {
     <#
       .Synopsis
         Starts a new thread in a group in outlook.
     #>
-    [cmdletbinding(SupportsShouldProcess=$true, ConfirmImpact='Low')]
-    Param (
+    [cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='Low')]
+    param (
         #The group where the thread will be added
-        [Parameter(Mandatory=$true,Position=0)]
+        [parameter(Mandatory=$true,Position=0)]
         [Alias("Team")]
         $Group,
         #The subkect line for the thread
-        [Parameter(Mandatory=$true, Position=1)]
+        [parameter(Mandatory=$true, Position=1)]
         [Alias("Subject")]
         $ThreadTopic,
         #The Message body - text by default, specify -contentType if using HTML
-        [Parameter(Mandatory=$true, Position=2)]
+        [parameter(Mandatory=$true, Position=2)]
         [String]$Content,
         #The content type, (Text by default) or HTML
         [ValidateSet("Text","HTML")]
         [String]$ContentType = "Text",
-        #if Specified the message will be created without prompting.
-        [switch]$Force
+        #if Specified the message will be created without prompting; this is the default, unless $confirm preference has been changed
+        [switch]$Force,
+        #if Specified an object containing the Thread ID will be returned
+        [switch]$PassThru
     )
-
-    if    ($Group.ID) {$Group  = $Group.ID}
 
     Connect-MSGraph
     if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-    $webParams = @{ Headers     = $Script:DefaultHeader ;
-                    uri         =  "https://graph.microsoft.com/v1.0/groups/$Group/threads/";
-                    method      = "Post";
-                    contentType = "application/json"
+
+    if     ($Group.ID)           {$groupID  = $Group.ID}
+    elseif ($Group -is [String]) {$groupID  = $Group   }
+    else   {Write-Warning -Message 'Could not process Group parameter.'; return }
+
+    $webparams = @{ 'uri'         = "https://graph.microsoft.com/v1.0/groups/$groupID/threads/"
+                    'method'      = 'Post'
+                    'contentType' = 'application/json'
+                    'Headers'     = $Script:DefaultHeader
     }
-    $Settings = @{  topic       = $ThreadTopic;
-                    posts       = @( @{body= @{content=$Content; contentType=$ContentType}})}
-    if ($force -or $PSCmdlet.ShouldProcess($ThreadTopic,"Create New thread")) {
-        Invoke-RestMethod  @webparams -Body (ConvertTo-Json $settings -Depth 5 )
+    $Settings  = @{ 'topic'       = $ThreadTopic
+                    'posts'       = @( @{body= @{'content'     = $Content
+                                                 'contentType' = $ContentType}})
+    }
+    $json      = ConvertTo-Json $settings -Depth 5
+
+    if ($force -or $PSCmdlet.Shouldprocess($ThreadTopic,"Create New thread")) {
+        $t = Invoke-RestMethod  @webparams -Body $json
+        if ($PassThru) {return $t}
     }
 }
 
-Function Remove-GraphGroupThread {
+function Remove-GraphGroupThread {
     <#
       .Synopsis
         Removes a thread from a group in outlook
     #>
-    [cmdletbinding(SupportsShouldProcess=$true, ConfirmImpact='High')]
-    Param (
+    [cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='High')]
+    param (
         #The thread to remove, either as an ID or a thread object containing an ID, and possibly a group ID
-        [Parameter(Mandatory=$true,Position=0,ValueFromPipeline=$true)]
+        [parameter(Mandatory=$true,Position=0,ValueFromPipeline=$true)]
         $Thread,
         #The group from which the thread is to be removed, either as an ID or a group object containing an ID
         [Alias("Team")]
@@ -892,35 +985,53 @@ Function Remove-GraphGroupThread {
         [switch]$Force
     )
     process {
-        if     ($Thread.Team) {$Group  = $Thread.Team}
-        elseif    ($Group.ID) {$Group  = $Group.ID}
-
-        if       ($Thread.ID) {$Thread = $Thread.id  }
-
-        if (-not ($Thread -and $Group)) {throw "Could not find Group and Thread IDs from supplied parameters."; Return}
-
         Connect-MSGraph
         if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-        $webParams = @{Headers = $Script:DefaultHeader }
-        $uri =  "https://graph.microsoft.com/v1.0/groups/$Group/threads/$thread"
-        try   {$thread  = Invoke-RestMethod -Method Get -uri $uri @webParams }
-        catch             {throw "Could not get the thread to delete"; return}
+
+        if     ($Thread.group)        {$groupid  = $Thread.group}
+        elseif ($Group.ID)            {$groupid  = $Group.ID}
+        elseif ($Group -is [string])  {$groupid  = $Group}
+        else   {Write-Warning 'Could not resolve the group ID' ; return}
+
+        if     ($Thread.ID)           {$threadid = $Thread.id  }
+        elseif ($Thread -is [string]) {$threadid = $Thread.id  }
+        else   {Write-Warning 'Could not resolve the group ID' ; return}
+
+
+        $webparams = @{'Headers' = $Script:DefaultHeader
+                       'uri'    =  "https://graph.microsoft.com/v1.0/groups/$GroupID/threads/$threadID"
+        }
+        Write-Progress -Activity "Deleting thread" -Status "Checking existing thread"
+        try   {$thread  = Invoke-RestMethod -Method Get @webparams }
+        catch {
+            if ($_.exception.response.statuscode.value__ -eq 404) {
+                Write-warning 'Thread not found, it may have been deleted already'
+                return
+            }
+            else {
+                throw $_ ;
+                return
+            }
+        }
         if (-not $thread) {throw "Could not get the thread to delete"; return}
-        if ($PSCmdlet.ShouldProcess($thread.topic,"Delete thread")) {
-            Invoke-RestMethod -Method Delete -uri $uri @webParams
+        Write-Progress -Activity "Deleting thread" -Completed
+        if ($Force -or $PSCmdlet.Shouldprocess($thread.topic,"Delete thread")) {
+            Write-Progress -Activity "Deleting thread" -Status "Sending delete instruction"
+            Invoke-RestMethod -Method Delete  @webparams
+            Write-Progress -Activity "Deleting thread" -Completed
         }
     }
 }
 
-Function Send-GraphGroupReply {
+function Send-GraphGroupReply {
     <#
       .Synopsis
         Replies to a group's post in outlook.
     #>
-    [cmdletbinding(SupportsShouldProcess=$true, ConfirmImpact='Low')]
-    Param (
+    [cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='Low')]
+    param (
         #The Post being replied to, either as an ID or a post object containing an ID which may identify the thread and group
-        [Parameter(Mandatory=$true,Position=0)]
+        [parameter(Mandatory=$true,Position=0,ValueFromPipeline=$true)]
         $Post,
         #The tread containing the post (if not embedded in the post itself), as an ID or object, which may identify the group
         $Thread,
@@ -928,7 +1039,7 @@ Function Send-GraphGroupReply {
         [Alias("Team")]
         $Group,
         #The Message body - text by default, specify -contentType if using HTML
-        [Parameter(Mandatory=$true)]
+        [parameter(Mandatory=$true)]
         [String]$Content,
         #The type of content, text by default or HTML
         [ValidateSet("Text","HTML")]
@@ -936,81 +1047,117 @@ Function Send-GraphGroupReply {
         #if Specified the message will be created without prompting.
         [switch]$Force
     )
-
-    if       ($Post.Team) {$Group  = $Post.Team}
-    elseif ($Thread.Team) {$Group  = $Thread.Team}
-    elseif    ($Group.ID) {$Group  = $Group.ID}
-
-    if     ($Post.Thread) {$Thread = $Post.Thread}
-    elseif   ($Thread.ID) {$Thread = $Thread.id  }
-
-    if         ($Post.ID) {$Post   = $Post.ID}
-
-    if (-not ($Post -and $Thread -and $Group)) {throw "Could not find Group, Thread and Post IDs from supplied parameters."; Return}
-
     Connect-MSGraph
     if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-    $webParams = @{Headers = $Script:DefaultHeader }
-    $uri =  "https://graph.microsoft.com/v1.0/groups/$Group/threads/$thread"
-    try   {$thread  = Invoke-RestMethod -Method Get -uri $uri @webParams }
-    catch             {throw "Could not get the thread to post to"; return}
-    if (-not $thread) {throw "Could not get the thread to post to"; return}
-    if ($Force -or $PSCmdlet.ShouldProcess($thread.topic,"Reply to thread")) {
-        $uri = $uri + "/posts/$post/Reply"
-        $Settings = @{ Post = @{body= @{content=$Content; contentType=$ContentType}}}
-        Invoke-RestMethod -Method Post -Uri $URI  @webparams -Body (ConvertTo-Json $settings) -ContentType "application/json"
+
+
+    if     ($Post.Group)          {$groupID  = $Post.group}
+    elseif ($Thread.Group)        {$groupID  = $Thread.group}
+    elseif ($Group.ID)            {$groupID  = $Group.ID}
+    elseif ($Group -is [string])  {$groupID  = $Group}
+    else   {Write-warning -Message 'Could not resolve the group ID.' ; return}
+
+    if     ($Post.Thread)         {$threadID = $Post.Thread}
+    elseif ($Thread.ID)           {$threadID = $Thread.id  }
+    elseif ($Thread -is [String]) {$threadID = $Thread.id  }
+    else   {Write-warning -Message 'Could not resolve the Thread ID.' ; return}
+
+    if     ($Post.ID)             {$PostID   = $Post.ID}
+    elseif ($Post -is [String])   {$PostID = $Post  }
+    else   {Write-warning -Message 'Could not resolve the Post ID.' ; return}
+
+    if (-not ($PostID -and $threadID -and $groupID)) {throw "Could not find Group, Thread and Post IDs from supplied parameters."; Return}
+
+    $webparams = @{Headers = $Script:DefaultHeader }
+    $uri       =  "https://graph.microsoft.com/v1.0/groups/$groupID/threads/$threadID/posts/$postid"
+    Write-Progress -Activity 'Posting reply to thread' -Status 'Checking parent message'
+    try   {$thread  = Invoke-RestMethod -Method Get -uri $uri @webparams }
+    catch             {throw "Could not get the post to reply to"; return}
+    if (-not $thread) {throw "Could not get the Post to reply to"; return}
+    Write-Progress -Activity 'Posting reply to thread' -Completed
+
+    $Settings  = @{ Post = @{body= @{content=$Content; contentType=$ContentType}}}
+    $Json      = ConvertTo-Json $settings
+    Write-Debug $Json
+
+    if ($Force -or $PSCmdlet.Shouldprocess($thread.topic,"Reply to thread")) {
+        $uri     += "/Reply"
+        Write-Progress -Activity 'Posting reply to thread' -Status 'sending reply'
+        Invoke-RestMethod -Method Post -Uri $URI  @webparams -Body $Json -ContentType "application/json"
+        Write-Progress -Activity 'Posting reply to thread' -Completed
     }
 }
 
-Function Get-GraphChannel {
+function Get-GraphChannel {
     <#
       .Synopsis
         Gets details of a channel, or its Tabs or messages shown in Teams
       .Example
-         >get-graphuser -teams | where displayname -eq "Consultants" | get-graphteam -Channels | where displayname -eq "general" |
-                 Get-GraphChannel -Tabs |  ft @{n="Name";e={[System.Web.HttpUtility]::UrlDecode($_.displayname)}},@{n="AppName";e={$_.teamsApp.displayName}}
-        Gets teams for the current user, and selects the one named "Consultants", gets this team's channels, and selects the one
-        named "general"; gets this channels tabs and formats them as a table showing the tab name and application behind it.
+        >Get-GraphGroup -ByName consultants -ChannelName general | Get-GraphChannel -Tabs
+        Gets channels for the team(s) with a name beginning 'Consultants' and selects channel(s)
+        with a name beginning "general"; then gets the tabs shown in Teams for this channel
+      .Example
+        >Get-GraphGroup -ByName consultants -ChannelName general | Get-GraphChannel -Messages
+        This followes the same method for getting the Teams but this time returns messaes in the channel
+       .Example
+        >
+        >$chan = Get-GraphGroup -ByName consultants -ChannelName general
+        >Get-GraphChannel -Messages
+        >
+        This followes the same method for getting the Teams but this time returns messaes in the channel
     #>
-    [cmdletbinding(DefaultParameterSetName="None")]
+    [cmdletbinding(DefaultparameterSetName="None")]
     [Alias("Get-GraphTeamChannel")]
-    Param(
+    param(
         #The channel either as an ID or as a channel object (which may contain the team as a property)
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true, Position=0)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true, Position=0)]
         $Channel,
         #The ID of the team if it is not in the channel object.
         $Team,
         #If specified gets the channel's Tabs
-        [parameter(ParameterSetName="Tabs", Mandatory=$true)]
+        [parameter(parameterSetName="Tabs", Mandatory=$true)]
         [switch]$Tabs,
         #if Specified uses the beta api to get the channel's messages.
-        [parameter(ParameterSetName="Msgs", Mandatory=$true)]
+        [parameter(parameterSetName="Msgs")]
         [Alias("Msgs")]
-        [switch]$Messages
+        [switch]$Messages,
+        #If specified, returns the top n messages, otherwise the command will attempt to get all messages. The server may return more than the specified number.
+        [parameter(parameterSetName="Msgs")]
+        $Top
     )
-    process {
+    begin   {
         Connect-MSGraph
-        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-        $webParams = @{Method = "Get"
+        $webparams = @{Method = "Get"
                        Headers = $Script:DefaultHeader
         }
+    }
+    process {
+        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
         foreach ($ch in $channel) {
-            if ($ch.Team)      { $Team    = $ch.team }
-            elseif  ($Team.ID) { $Team    = $Team.ID      }
-            if ($ch.id  )      { $ch = $ch.ID   }
-            if (-not ($team -and $ch)) {Write-warning -Message "You need to provide a team ID and a Channel ID"; return}
-            elseif ($Messages) {
-                Write-progress -Activity 'Getting messages' -CurrentOperation "Reading $($ch.displayname) Messages"
-                $result = Invoke-RestMethod @webParams -Uri  "https://graph.microsoft.com/beta/teams/$Team/channels/$ch/messages"
-                $msgList  = $result.value
-                while ($result.'@odata.nextLink') {
-                    $result = Invoke-RestMethod  @webparams -Uri $result.'@odata.nextLink'
+            if     ($ch.Team)           {$teamID    = $ch.team }
+            elseif ($Team.ID)           {$teamID    = $Team.ID }
+            elseif ($Team -is [string]) {$teamID    = $Team    }
+            else   {Write-Warning -Message 'Could not resolve the team for this channel'; return}
+            if     ($ch.id  )           {$channelID = $ch.ID   }
+            elseif ($ch -is [string])   {$channelID = $ch      }
+            else   {Write-Warning -Message 'Could not resolve the channel ID'; return}
+            if (-not ($teamid -and $channelID)) {Write-warning -Message "You need to provide a team ID and a Channel ID"; return}
+            elseif ($Messages -or $Top) {
+                Write-progress -Activity 'Getting messages' -Status "Reading $($ch.displayname) Messages"
+                $uri      =  "https://graph.microsoft.com/beta/teams/$teamID/channels/$channelID/messages"
+                if ($Top) {$uri += '?$top=' + $Top }
+                $result   = Invoke-RestMethod @webparams -Uri $uri
+                $msgList  = @() + $result.value
+                while ($result.'@odata.nextLink' -and $result.'@odata.count' -gt 0 ) {
+                    Write-Verbose  $result.'@odata.count'
+                    Write-progress -Activity 'Getting messages' -Status "Reading $($ch.displayname) Messages" -CurrentOperation "$($msglist.count) so far"
+                    $result   = Invoke-RestMethod  @webparams -Uri $result.'@odata.nextLink'
                     $msgList += $result.value
                 }
                 $userHash = @{}
-                Write-progress -Activity 'Getting messages' -CurrentOperation "Expanding User information"
+                Write-progress -Activity 'Getting messages' -Status "Expanding User information"
                 $msglist.from.user.id | Sort-Object -Unique | foreach-object {
-                    $userHash[$_] = ( Invoke-RestMethod @webParams -Uri  "https://graph.microsoft.com/v1.0/directoryObjects/$_").displayName
+                    $userHash[$_] = ( Invoke-RestMethod @webparams -Uri  "https://graph.microsoft.com/v1.0/directoryObjects/$_").displayName
                 }
                 Write-progress -Activity 'Getting messages' -Completed
                 foreach ($msg in $msgList) {
@@ -1022,7 +1169,7 @@ Function Get-GraphChannel {
                 return $msgList
             }
             elseif ($Tabs)     {
-                $results = Invoke-RestMethod @webParams -Uri  "https://graph.microsoft.com/v1.0/teams/$Team/channels/$ch/tabs?`$expand=teamsApp"
+                $results = Invoke-RestMethod @webparams -Uri  "https://graph.microsoft.com/v1.0/teams/$teamID/channels/$channelID/tabs?`$expand=teamsApp"
                 $t       = $results.value
                 foreach ($tab in $t) {
                     $tab.pstypeNames.add('GraphTab')
@@ -1033,25 +1180,26 @@ Function Get-GraphChannel {
                 return $t
             }
             else               {
-                $result = Invoke-RestMethod @webParams -Uri  "https://graph.microsoft.com/v1.0/teams/$Team/channels/$ch"
+                $result = Invoke-RestMethod @webparams -Uri  "https://graph.microsoft.com/v1.0/teams/$teamID/channels/$channelId"
                 $result.pstypeNames.add("GraphChannel")
-                Add-Member -InputObject $result -MemberType NoteProperty -Name Team -Value $Team
-                return $result
+                Add-Member -InputObject $result -MemberType NoteProperty -Name Team -Value $teamID
+
+                $result
             }
         }
     }
 }
 
-Function New-GraphChannel {
+function New-GraphChannel {
     <#
       .Synopsis
         Adds a channel to a team
       .Description
         This requires the Group.ReadWrite.All scope.
     #>
-    [cmdletbinding(SupportsShouldProcess=$true)]
+    [cmdletbinding(SupportsShouldprocess=$true)]
     [Alias("Add-GraphTeamChannel")]
-    Param(
+    param(
         #The team where the channel will be added, either as an ID or a team object
         [parameter( Mandatory=$true, Position=0)]
         $Team,
@@ -1071,30 +1219,31 @@ Function New-GraphChannel {
         if (Get-GraphTeam -Channels $team | Where-Object -property displayname -eq $Name) {
             Write-warning -Message "Channel $Name already exists in this team"
         }
-        $webParams = @{Method = "POST"
+        $webparams = @{Method = "POST"
                     Headers = $Script:DefaultHeader
                     URI    = "https://graph.microsoft.com/v1.0/teams/$Team/channels"
                     ContentType = "application/json"
         }
         $Settings  = @{"displayName" = $Name}
         if ($Description) {$settings["description"] = $Description}
-        if ($PSCmdlet.ShouldProcess($Name,"Create channel")) {
-            $channel =  Invoke-RestMethod @webParams -body (ConvertTo-Json $settings)
+        if ($PSCmdlet.Shouldprocess($Name,"Create channel")) {
+            $channel =  Invoke-RestMethod @webparams -body (ConvertTo-Json $settings)
             $channel.psTypenames.add('GraphChannel')
             Add-Member -InputObject $channel -MemberType NoteProperty -Name Team -Value $Team
-            return $channel
+
+            $channel
         }
     }
 }
 
-Function Remove-GraphChannel {
+function Remove-GraphChannel {
     <#
       .Synopsis
         Removes a channel from a team
-    #>[cmdletbinding(SupportsShouldProcess=$true, ConfirmImpact='High')]
-    Param(
+    #>[cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='High')]
+    param(
         #The channel to delete; either as an ID, or a channel object
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true)]
         $Channel,
         #A team object or the ID of the team, if it can't be derived from the channel.
         $Team,
@@ -1114,28 +1263,27 @@ Function Remove-GraphChannel {
             throw "Could not get the channel" ; return
         }
         if (-not $c)  {throw "Could not get the channel" ; return }
-        if ($force -or $PSCmdlet.ShouldProcess($c.displayname, "Delete Channel")) {
+        if ($force -or $PSCmdlet.Shouldprocess($c.displayname, "Delete Channel")) {
             Connect-MSGraph
             Invoke-RestMethod -Method "Delete" -Headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/teams/$Team/channels/$Channel"
             }
         }
 }
 
-Function Add-GraphChannelThread {
+function Add-GraphChannelThread {
     <#
       .Synopsis
         Adds a new thread in a channel in Teams.
     #>
-
-    [cmdletbinding(SupportsShouldProcess=$true, ConfirmImpact='Low')]
-    Param(
+    [cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='Low')]
+    param(
         #The channel to post to either as an ID or a channel object.
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true)]
         $Channel,
         #A team object or the ID of the team, if it can't be derived from the channel.
         $Team,
         #The Message body - text by default, specify -contentType if using HTML
-        [Parameter(Mandatory=$true)]
+        [parameter(Mandatory=$true)]
         [String]$Content,
         #The format of the content, text by default , or HTML
         [ValidateSet("Text","HTML")]
@@ -1147,16 +1295,21 @@ Function Add-GraphChannelThread {
         [switch]$Force
     )
     process {
-        if ($Channel.Team) { $Team    = $Channel.team }
-        elseif  ($Team.id) { $Team    = $Team.ID}
-        if   ($Channel.id) { $Channel = $Channel.ID   }
+        if     ($Channel.Team)      {$teamID    = $Channel.team }
+        elseif ($Team.id)           {$teamID    = $Team.ID}
+        elseif ($Team -is [string]) {$teamID    = $Team}
+        else   {Write-Warning -Message 'Could not determine the team ID'; return}
 
-        try {$c = Get-GraphChannel -Channel $Channel -Team $Team }
+        if     ($Channel.id)           {$channelID = $Channel.ID   }
+        elseif ($Channel -is [string]) {$channelID = $channel  }
+        else   {Write-Warning -Message 'Could not determine the channel ID'; return}
+
+        try {$c = Get-GraphChannel -Channel $channelID -Team $teamID }
         Catch         {throw "Could not get the channel" ; return}
         if (-not $c)  {throw "Could not get the channel" ; return }
-        $webParams = @{ 'Method'      = 'POST'
+        $webparams = @{ 'Method'      = 'POST'
                         'Headers'     = $Script:DefaultHeader
-                        'URI'         = "https://graph.microsoft.com/beta/teams/$Team/channels/$channel/chatThreads"
+                        'URI'         = "https://graph.microsoft.com/beta/teams/$teamID/channels/$channelID/chatThreads"
                         'ContentType' = 'application/json'
         }
         $Settings = @{ rootMessage = @{body= @{content=$Content;}}}
@@ -1164,31 +1317,30 @@ Function Add-GraphChannelThread {
         else                         {$settings.rootMessage.body['contentType'] = 2}
         $json =  (ConvertTo-Json $settings)
         Write-Debug $json
-        if ($force -or $PSCmdlet.ShouldProcess("Create Message")) {
+        if ($force -or $PSCmdlet.Shouldprocess("Create Message")) {
             $result = Invoke-RestMethod @webparams  -Body $json
             If ($Passthru) {
-                $URI    = "https://graph.microsoft.com/beta/teams/$Team/channels/$channel/Messages/$($Result.id)"
+                $URI    = "https://graph.microsoft.com/beta/teams/$teamid/channels/$channelid/Messages/$($result.id)"
                 $msg    = Invoke-RestMethod -Uri $uri -Method Get -Header $Script:DefaultHeader
                 $msg.pstypenames.add('GraphTeammsg')
-                return $msg
-            }
 
+                $msg
+            }
         }
     }
 }
 # can get replies in a thread , but can't post to a reply. #  https://graph.microsoft.com/beta/teams/{group-id-for-teams}/channels/{channel-id}/messages/{message-id}/replies/{reply-id}
 # Doesn't seem to be a delete or a patch ?
 
-
-Function Add-GraphWikiTab {
+function Add-GraphWikiTab {
     <#
       .Synopsis
         Adds a wiki tab to a channel in teams
     #>
-    [CmdletBinding(SupportsShouldProcess=$true)]
+    [CmdletBinding(SupportsShouldprocess=$true)]
     param(
         #An ID or Channel object which may contain the team ID
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [parameter(Mandatory=$true, ValueFromPipeline=$true)]
         $Channel,
         #A team ID, or a team object if the team can't be found from the the channel
         $Team,
@@ -1202,13 +1354,15 @@ Function Add-GraphWikiTab {
     )
     Connect-MSGraph
     if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-    if  ($Channel.Team) {$Team    = $Channel.Team }
-    elseif   ($Team.id) {$Team    = $Team.id      }
-    elseif (-not $team) {throw "Could not determine the team from the channel. Please Specify the team explicitly."}
-    if    ($Channel.id) {$Channel = $Channel.id   }
-
-    $webParams = @{'Method'      = 'Post'
-                   'Uri'         = "https://graph.microsoft.com/beta/teams/$team/channels/$channel/tabs"
+    if     ($Channel.Team)         {$teamID  = $Channel.Team }
+    elseif ($Team.id)              {$teamID  = $Team.id      }
+    elseif ($Team -is [String])    {$teamID  = $Team}
+    else   {Write-Warning -Message 'Could not determine the team from the channel. Please Specify the team explicitly.'; return}
+    if     ($Channel.id)           {$channelID = $Channel.id }
+    elseif ($Channel -is [string]) {$channelID = $Channel    }
+    else   {Write-Warning -Message 'Could not determine the channel ID.'; return}
+    $webparams = @{'Method'      = 'Post'
+                   'Uri'         = "https://graph.microsoft.com/beta/teams/$teamID/channels/$channelID/tabs"
                    'Headers'     =  $Script:DefaultHeader
                    'ContentType' = 'application/json'
     }
@@ -1217,16 +1371,16 @@ Function Add-GraphWikiTab {
                     'TeamsAppId' = 'com.microsoft.teamspace.tab.wiki'
             })
     Write-Debug $json
-    if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Create wiki tab")) {
-        $result = Invoke-RestMethod @webParams -body $json
+    if ($Force -or $PSCmdlet.Shouldprocess($TabLabel,"Create wiki tab")) {
+        $result = Invoke-RestMethod @webparams -body $json
         if ($PassThru) {
             $result.pstypeNames.add('GraphTab')
             #Giving a type name formats things nicely, but need to set the name to be used when the tab is displayed
             Add-Member -InputObject $result -MemberType NoteProperty -Name teamsAppName -Value 'Wiki'
-            return $result
+
+            $result
         }
     }
 }
 # Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
 # https://products.office.com/en-us/microsoft-teams/appDefinitions.xml
-

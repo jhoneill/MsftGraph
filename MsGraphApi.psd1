@@ -20,6 +20,8 @@
   FormatsToProcess  =   'Graph.format.ps1xml'
 
   FunctionsToExport = @('Add-FileToGraphOneNote',
+                        'Add-GraphChannelThread',
+                        'Add-GraphEvent',
                         'Add-GraphGroupMember',
                         'Add-GraphGroupThread',
                         'Add-GraphListItem',
@@ -63,14 +65,12 @@
                         'Get-GraphTeam',
                         'Get-GraphUser',
                         'Get-GraphUserList',
-                        'New-Attendee',
                         'New-ContactAddress',   #All the different column types together!
+                        'New-EventAttendee',
                         'New-GraphChannel',
-                        'New-GraphChannelThread',
                         'New-GraphColumn','New-GraphBooleanColumn', 'New-GraphCalculatedColumn', 'New-GraphChoiceColumn','New-GraphCurrencyColumn', 'New-GraphDateTimeColumn',
                                           'New-GraphLookupColumn', 'New-GraphNumberColumn','New-GraphPersonOrGroupColumn','New-GraphTextColumn',
                         'New-GraphContact' ,
-                        'New-GraphEvent',
                         'New-GraphFolder',
                         'New-GraphGroup',
                         'New-GraphList',
@@ -95,15 +95,16 @@
                         'Send-GraphMailReply',
                         'Set-GraphContact',
                         'Set-GraphEvent',
+                        'Set-GraphGroup',
                         'Set-GraphListItem',
                         'Set-GraphPlanTask',
+                        'Set-GraphTeam',
                         'Set-GraphUser',
                         'Show-GraphFolder',
                         'Show-GraphSession',
                         'Update-GraphOneNotePage'
   )
-  AliasesToExport   = @('Add-GraphEvent',
-                        'Add-GraphTeamChannel',
+  AliasesToExport   = @('Add-GraphTeamChannel',
                         'Add-GraphTeamMember',
                         'Get-GraphConversation',
                         'Get-GraphGroup',

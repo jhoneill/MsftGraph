@@ -134,7 +134,7 @@ Function Connect-MSGraph {
         }
         $Script:RefreshToken  = $Response.refresh_token
         if ($setExpiry) { #if we're reading from a file: life in seconds is meaningless, don't set expiry or get the username either
-            $Script:TokenExpiry = (Get-Date).AddSeconds([int]$Response.expires_in -10 )
+            $Script:TokenExpiry = (Get-Date).AddSeconds([int]$Response.expires_in -60 )
             if ($Response.access_token) {
                 Write-Progress -Activity "Authenticating" -Status "Getting Token from Server" -PercentComplete 50
                 $Script:GraphUser = (Invoke-RestMethod -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/me/")
@@ -184,7 +184,7 @@ Function Connect-MSGraph {
     #>
     #scenario A.  we have a  current token.
     if ($Script:AccessToken -and ((Get-Date) -lt $Script:TokenExpiry) ) { #  if
-        Write-Verbose  "Already have a current access token."
+        Write-Verbose  -Message ('Existing Access Token is good for {0:N0} seconds.' -f ($Script:TokenExpiry.Subtract([datetime]::Now).totalseconds))
         if     ($PassThru)  {return $script:AccessToken}
         elseif ($CheckOnly) {return $true}
         else                {return}
@@ -271,7 +271,8 @@ Function Get-GraphOrganization  {
   }
   $org = (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/organization"    ).value
   foreach ($o in $org) {$o.pstypenames.Add("GraphOrganization")}
-  return $org
+  
+  $org
 }
 
 Function Get-GraphSKUList {
@@ -292,7 +293,8 @@ Function Get-GraphSKUList {
     }
     $subscribedSkus =  (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/subscribedSkus"    ).value
     foreach ($s in $subscribedSkus) {$s.pstypenames.Add("GraphSKU")}
-    return $subscribedSkus
+    
+    $subscribedSkus
 }
 
 Function Get-GraphSKU {
@@ -406,7 +408,7 @@ Function Show-GraphSession {
         if (-not $Script:SavePath) {"Token is not being saved between sessions."}
         elseif (Test-Path -Path $Script:SavePath) {"Token has been saved."}
         'Token supports these scopes:'
-        $Script:AuthorizedScope | ForEach-Object {"    $_"}
+        $Script:AuthorizedScope -join ", "
     }
     Else {"Not Logged on" }
 }
@@ -473,7 +475,8 @@ Function Get-GraphSignInLog {
         Add-Member -InputObject $r -MemberType ScriptProperty -Name Date    -Value {[datetime]$this.createdDateTime}
     }
     Write-Progress -Activity 'Getting Sign-in Auditlog'-Completed
-    return $records
+    
+    $records
 }
 
 
@@ -515,7 +518,8 @@ Function Get-GraphDirectoryLog {
         Add-Member -InputObject $r -MemberType MemberSet      -Name PSStandardMembers -Value $PSStandardMembers
     }
     Write-Progress -Activity 'Getting Directory Audits log' -Completed
-    return $records
+    
+    $records
 }
 
 
