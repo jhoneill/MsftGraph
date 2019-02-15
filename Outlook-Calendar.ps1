@@ -342,7 +342,7 @@ function New-EventAttendee       {
         [ValidateSet('required', 'optional', 'resource')]
         $AttendeeType = 'required',
         [Parameter(ValueFromPipeline=$true,ParameterSetName='PipedStrings',Mandatory=$true)]
-        $InputObject 
+        $InputObject
     )
     @{ 'type'= $AttendeeType ; 'emailAddress' = (New-MailAddress -Mail:$mail -DisplayName:$DisplayName )}
 }
@@ -369,7 +369,7 @@ function Add-GraphEvent          {
       .Example
         >
         >$Chris = New-Attendee -Mail Chris@Contoso.com -display 'Chris Cross' optional
-        >$Phil  = New-Attendee -Mail Phil@Contoso.com  
+        >$Phil  = New-Attendee -Mail Phil@Contoso.com
         >Add-GraphEvent -subject "Phase II planning" -Start "2019-02-02 14:00" -End "2019-02-02 14:30" -Attendees $chris,$phil
         Creates a meeting with a two additonal attendee. The first command creates an optional attendee with a display name
         the second creates an attendee with no displayed name and the default 'required' type
@@ -501,7 +501,7 @@ function Add-GraphEvent          {
     if ($PassThru) {
         #send back the new appoinment and give it a type so it will get formatted.
         $result.pstypeNames.add('GraphEvent')
-        
+
         $result
     }
 }

@@ -107,8 +107,8 @@
 
     }
     process {
-        #To catch being piped to with -erroraction SilentlyContinue and a failure to get the drive in the begin block. 
-        if ($null -eq $drive) {return}  
+        #To catch being piped to with -erroraction SilentlyContinue and a failure to get the drive in the begin block.
+        if ($null -eq $drive) {return}
 
         #region Getting a single item (file or folder) by ID or by path.
         # Make something we can insert in a REST URI
@@ -122,7 +122,7 @@
             try   {$item = Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/$Drive/$ItemID" }
             catch {
                 if ($_.exception.response.statuscode.value__ -eq 404) {
-                     Write-Warning -Message "Item Not found" ; return 
+                     Write-Warning -Message "Item Not found" ; return
                 }
                 #we got something other than a 404 error
                 else {Write-Warning -Message $_.exception.tostring() ; return }
@@ -141,21 +141,21 @@
         elseif ($FolderPath -and $FolderPath -Match '^/?root:') {$FolderID =  $FolderPath -replace '^/?(.*?)[:/]*$',       '$1:' }
         elseif ($FolderPath )                                   {$FolderID =  $FolderPath -replace '^/?(.*?)[:/]*$', 'root:/$1:' }
         elseif ($SpecialFolder)                                 {$FolderID = "special/$SpecialFolder"                            }
-      
+
         if ($FolderID -or $SharedWithMe -or $Recent) {
             if     ($FolderID -and $Search)     {$webParams['URI']=  "https://graph.microsoft.com/v1.0/$Drive/$FolderID/search(q='$search')?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file"}
-            elseif ($FolderID             )     {$webParams['URI'] = "https://graph.microsoft.com/v1.0/$Drive/$FolderID/children?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file" } 
-            elseif ($SharedWithMe -and $search) {}  #can these be combined ? 
+            elseif ($FolderID             )     {$webParams['URI'] = "https://graph.microsoft.com/v1.0/$Drive/$FolderID/children?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file" }
+            elseif ($SharedWithMe -and $search) {}  #can these be combined ?
             elseif ($SharedWithMe             ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/me/Drive/SharedWithMe"        }
-            elseif ($Search                   ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/me/drive/search(q='$Search')" }  #me or $drive 
+            elseif ($Search                   ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/me/drive/search(q='$Search')" }  #me or $drive
             elseif ($Recent                   ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/$Drive/recent"                }  #Me or $drive
-            try    {$children = (Invoke-RestMethod @WebParams).value }               
+            try    {$children = (Invoke-RestMethod @WebParams).value }
             catch  {
                     if ($_.exception.response.statuscode.value__ -eq 404) {
-                          Write-Warning -Message "Not found" ;return 
+                          Write-Warning -Message "Not found" ;return
                     }
                     else {Write-Warning -Message $_.exception.tostring() ; return}
-            } 
+            }
             if ($Subfolders) {$children.where({$_.folder}) | Sort-Object -Property name}
         }
         #endregion
@@ -174,7 +174,7 @@
         if (-not $children) { Write-Host  "Folder exists, but is empty."}
         else  {
                 foreach ($c in $children ) {$c.pstypenames.Add("GraphDriveItem")  }
-                
+
                 $children  | Sort-Object -Property @{e={$null -eq $_.folder}},name
         }
         #endregion
