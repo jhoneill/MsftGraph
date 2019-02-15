@@ -168,7 +168,7 @@ function New-GraphGroup {
     }
 }
 <#
-See also https://docs.microsoft.com/e#n-gb/graph/api/team-post?view=graph-rest-beta
+See also https://docs.microsoft.com/en-gb/graph/api/team-post?view=graph-rest-beta
 
 POST https://graph.microsoft.com/beta/teams
 Content-Type: application/json
