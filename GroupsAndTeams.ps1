@@ -578,7 +578,7 @@ function Get-GraphTeam {
                     }
                     if (-not $planList) {
                         Write-Host "The team $($Team.DisplayName) has not created any plans"
-                        return  
+                        return
                     }
                     $dirObjectsHash = @{}
                     if ($t.displayName) {$dirObjectsHash[$teamId] = $t.displayName}

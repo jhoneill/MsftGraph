@@ -347,11 +347,11 @@ function New-GraphList                {
     )
     if     ($Site.ID)           {$siteID = $Site.id}
     elseif ($site -is [string]) {$siteID = $site }
-    else   {Write-Warning -Message 'Could not determine the site ID'; Return} 
+    else   {Write-Warning -Message 'Could not determine the site ID'; Return}
     Connect-MSGraph
     $WebParams = @{ 'URI'         = "https://graph.microsoft.com/v1.0/sites/$siteID/lists"
                     'Method'      = 'Post'
-                    'Headers'     =  $DefaultHeader  
+                    'Headers'     =  $DefaultHeader
                     'ContentType' = 'application/json'
     }
     $settings  = @{
@@ -379,7 +379,7 @@ function New-GraphList                {
     $json = ConvertTo-Json $settings  -Depth 10
     Write-Debug $Json
     if ($Force -or $PSCmdlet.ShouldProcess($DisplayName,"Add list to site $($site.name)")) {
-        $result = Invoke-RestMethod @WebParams -body $json 
+        $result = Invoke-RestMethod @WebParams -body $json
         Add-Member -InputObject $result -MemberType NoteProperty -Name SiteID -Value $siteID
         $result.pstypeNames.add('GraphList')
         return $result
@@ -931,7 +931,7 @@ function Get-GraphSiteColumn   {
     begin {
         Connect-MSGraph
         if (-not $script:RootSiteColumns) {
-            Write-Progress -Activity "Getting list of columns for the root site" 
+            Write-Progress -Activity "Getting list of columns for the root site"
             $script:RootSiteColumns = (Invoke-RestMethod -Method Get -Uri "https://graph.microsoft.com/v1.0/sites/root/columns" -Headers $DefaultHeader).value
             Write-Progress -Activity "Getting list of columns for the root site" -Completed
         }

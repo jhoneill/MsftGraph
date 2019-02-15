@@ -121,7 +121,7 @@ function New-GraphTeamPlan       {
                            Contenttype = "application/json"
                            Body        = (ConvertTo-Json $settings)
             }
-            Write-Debug $webParams.Body 
+            Write-Debug $webParams.Body
             if ($Force -or  $PSCmdlet.ShouldProcess($P,"Add Team Planner")) {
                 $result = Invoke-RestMethod @webParams -ErrorAction Stop
                 $result.pstypenames.add("GraphPlan")
@@ -204,7 +204,7 @@ function Add-GraphPlanBucket     {
       .Synopsis
         Adds a task-bucket to an exsiting plan
       .Example
-        > Add-GraphPlanBucket -Plan $NewTeamplan -Name 'Backlog', 'To-Do','Not Doing' 
+        > Add-GraphPlanBucket -Plan $NewTeamplan -Name 'Backlog', 'To-Do','Not Doing'
         Creates 3 buckets in the same plan.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
@@ -224,7 +224,7 @@ function Add-GraphPlanBucket     {
                         'URI'         = "https://graph.microsoft.com/v1.0/planner/buckets"
                         'Headers'     = $Script:DefaultHeader
                         'Contenttype' = "application/json"
-                        
+
         }
         $orderHint = " !"
     }
@@ -238,7 +238,7 @@ function Add-GraphPlanBucket     {
             Write-Debug $json
             if ($force -or $PSCmdlet.ShouldProcess($Name,"Add Bucket to plan $($Plan.title)")){
             $null = Invoke-RestMethod @webParams -Body $json
-            $orderHint = " " + $orderHint + "!" 
+            $orderHint = " " + $orderHint + "!"
             }
         }
 
@@ -463,7 +463,7 @@ function Add-GraphPlanTask       {
             Write-Progress -Activity 'Adding Task' -Completed
             if ($Passthru) {
                 $task.pstypenames.add("GraphTask")
-                
+
                 $task
             }
         }
