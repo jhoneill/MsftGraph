@@ -7,7 +7,7 @@ function Get-GraphUserList{
         Get-GraphUserList - filter "Department eq 'Finance'""
     #>
     [cmdletbinding(DefaultparameterSetName="None")]
-   param(
+    param(
         [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones', 'city',
                     'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'department',
                     'displayName', 'givenName', 'id', 'imAddresses', 'jobTitle', 'legalAgeGroupClassification',
@@ -20,7 +20,7 @@ function Get-GraphUserList{
                     'surname', 'usageLocation', 'userPrincipalName', 'userType')]
         #Names of the fields to return for each user.
         [string[]]$Select,
-        #Order by clause for the query
+        #Order by clause for the query - most fields result in an error and it can't be combined with some other query values.
         [string]$OrderBy,
         [parameter(Mandatory=$true, parameterSetName='FilterByName')]
          #If specified searches for users whose first name, surname, displayname, mail address or UPN start with that name.
@@ -60,9 +60,11 @@ function Get-GraphUserList{
             $result   =  Invoke-RestMethod @webparams -Uri $result.'@odata.nextLink'
             $users   += $result.value
     }
-    foreach ($u in $users) {$u.pstypenames.Add("GraphUser") }
+    if (-not $Select) {
+        foreach ($u in $users) {$u.pstypenames.Add("GraphUser") }
+    }
     Write-Progress "Getting the List of users" -Completed
-    
+
     $users
 }
 
@@ -70,14 +72,25 @@ function Get-GraphUser {
     <#
       .Synopsis
         Gets information from the MS-Graph API about the a user (current user by default)
+      .Description
+        Queries https://graph.microsoft.com/v1.0/me or https://graph.microsoft.com/v1.0/name@domain
+        or https://graph.microsoft.com/v1.0/<<guid>> for information about a user.
+        Getting a user returns a default set of properties only (businessPhones, displayName, givenName,
+        id, jobTitle, mail, mobilePhone, officeLocation, preferredLanguage, surname, userPrincipalName).
+        Use -select to get the other properties.
+        Most options need consent to use the Directory.Read.All or Directory.AccessAsUser.All scopes.
+        Some options will also work with user.read; and the following need consent which is task specific
+        Calendars needs Calendars.Read, OutLookCategries needs MailboxSettings.Read, PlannerTasks needs
+        Group.Read.All, Drive needs Files.Read (or better), Notebooks needs either Notes.Create or
+        Notes.Read (or better).
       .Example
         get-graphuser -MemberOf | ft displayname, description, mail, id
         Shows the name description, email address and internal ID for the groups this user is a direct member of
       .Example
         (get-graphuser -Drive).root.children.name
-        Gets the user's one drive. The drive object has a root property which is represents the drives root
-        directory, and this has a children property which is a collection of the objects in the root directory.
-        This command shows the names of the objects in the root directory.
+        Gets the user's one drive. The drive object has a .root property which is represents its
+        root-directory, and this has a .children property which is a collection of the objects
+        in the root directory. So this command shows the names of the objects in the root directory.
     #>
     [cmdletbinding(DefaultparameterSetName="None")]
     param   (
@@ -162,14 +175,13 @@ function Get-GraphUser {
         #   Https://graph.microsoft.com/beta/me/Activities"         needs UserActivity.ReadWrite.CreatedByApp permission
         #   https://graph.microsoft.com/v1.0/me/activities/recent
         #   https://graph.microsoft.com/v1.0/me/createdobjects
-        #(Invoke-RestMethod -Method POST -Headers @{Authorization = "Bearer $script:AccessToken"} -Uri "https://graph.microsoft.com/v1.0/me/getmemberobjects"  -body '{"securityEnabledOnly": false}' -  ).value
+        #(Invoke-RestMethod -Method POST -Headers @{Authorization = "Bearer $script:AccessToken"} -Uri "https://graph.microsoft.com/v1.0/me/getmemberobjects"  -body '{"securityEnabledOnly": false}'  ).value
 
         #It would be nice if we could apply filter and orderby to some of these, but for some they are ignored and for others they cause errors.
 
-        #for everything Except -Site we can define a URI and either return the Value Propety of the result, or the whole result.
-
-        # Site needs special handling. Get the user's MySite. Convert it into a graph URL and get that, expand drives subSites and lists, and add formatting types
         Write-Progress -Activity 'Getting user information'
+        # For everything Except -Site we can define a URI and return either the whole result or just its Value propety.
+        # Site needs special handling. Get the user's MySite. Convert it into a graph URL and get that, expand drives subSites and lists, and add formatting types
         if     ($Site) {
             $uri    = "https://graph.microsoft.com/v1.0/$userID`?`$select=mysite "
             $result = Invoke-RestMethod @webparams -Uri $uri
@@ -194,10 +206,9 @@ function Get-GraphUser {
         elseif ($MailboxSettings  ) { $uri = "https://graph.microsoft.com/v1.0/$userID/MailboxSettings" ; $returnTheValue = $false}
         elseif ($Manager          ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Manager"         ; $returnTheValue = $false}
         elseif ($Drive            ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Drive"           ; $returnTheValue = $false
-                                      if ($WorkOrSchool) {$uri += '?$expand=root($expand=children)'}                              }
+                 if ($WorkOrSchool) { $uri +='?$expand=root($expand=children)'}                                                    }
         elseif ($Groups -or
-                $SecurityGroups   ) { $uri = "https://graph.microsoft.com/v1.0/$userID/getMemberGroups"} #special handler no need for $return the value
-
+                $SecurityGroups   ) { $uri = "https://graph.microsoft.com/v1.0/$userID/getMemberGroups"} #special handler no need for ReturnTheValue
         elseif ($OutlookCategories) { $uri = "https://graph.microsoft.com/v1.0/$userID/Outlook"   +
                                                                             '/MasterCategories'         ; $returnTheValue = $true }
         elseif ($Calendars        ) { $uri = "https://graph.microsoft.com/v1.0/$userID/Calendars" +
@@ -273,7 +284,7 @@ function Get-GraphUser {
                 }
         }
         Write-Progress -Activity 'Getting user information' -Completed
-        
+
         $results
     }
 }
@@ -284,6 +295,10 @@ function Set-GraphUser{
         Sets properties of  a user (the current user by default)
       .Example
         Set-GraphUser -Birthday "31 march 1965"  -Aboutme "Lots to say" -PastProjects "Phoenix","Excalibur" -interests "Photography","F1" -Skills "PowerShell","Active Directory","Networking","Clustering","Excel","SQL","Devops","Server builds","Windows Server","Office 365" -Responsibilities "Design","Implementation","Audit"
+        Sets the current user, giving lists for projects, interests and skills
+      .Description
+        Needs consent to use the User.ReadWrite, User.ReadWrite.All, Directory.ReadWrite.All,
+        or Directory.AccessAsUser.All scope.
     #>
     [cmdletbinding(SupportsShouldprocess=$true)]
     param (
@@ -352,10 +367,12 @@ function Set-GraphUser{
 function Find-GraphPeople {
     <#
        .Synopsis
-          Searches people in your inbox / contancts / directory
+          Searches people in your inbox / contacts / directory
        .Example
           Find-GraphPeople -Topic timesheet -First 6
           Returns the top 6 results for people you have discussed timesheets with.
+        .Description
+            Requires consent to use either the People.Read or the People.Read.All scope
     #>
     [cmdletbinding(DefaultparameterSetName='Default')]
     param (
@@ -392,7 +409,7 @@ function Find-GraphPeople {
             Add-Member -InputObject $response -MemberType ScriptProperty -Name mobilephone    -Value {$This.phones.where({$_.type -eq 'mobile'}).number -join ', '}
             Add-Member -InputObject $response -MemberType ScriptProperty -Name businessphones -Value {$This.phones.where({$_.type -eq 'business'}).number }
             Add-Member -InputObject $response -MemberType ScriptProperty -Name Score          -Value {$This.scoredEmailAddresses[0].relevanceScore }
-            Add-Member -InputObject $response -MemberType AliasProperty  -Name emailaddresses -Value scoredEmailAddresses 
+            Add-Member -InputObject $response -MemberType AliasProperty  -Name emailaddresses -Value scoredEmailAddresses
         }
 
         $result.value
