@@ -138,6 +138,7 @@ Function Connect-MSGraph {
             if ($Response.access_token) {
                 Write-Progress -Activity "Authenticating" -Status "Getting Token from Server" -PercentComplete 50
                 $Script:GraphUser = (Invoke-RestMethod -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/me/")
+                $Script:GraphUser.pstypenames.Add('GraphUser')
                 Write-Verbose ($action + $Script:GraphUser.UserPrincipalName)
                 $Organization     = (Invoke-RestMethod -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/organization/").Value
                 if ($Organization.id) {
@@ -252,27 +253,87 @@ Function Connect-MSGraph {
     }
 }
 
-Function Get-GraphOrganization  {
-  <#
-    .Synopsis
-        Gets a summary of organization information from MSGraph
-    .Description
-        Can use msonline\Get-MsolCompanyInformation instead
-    .Example
-        >(Get-GraphOrganization).verifiedDomains | ft
-        Displays a list of domains in the current subscription
-  #>
-  [cmdletbinding(DefaultParameterSetName="None")]
-  Param(
-  )
-  Connect-MSGraph
-  $webParams = @{Method = "Get"
-                 Headers = $Script:DefaultHeader
-  }
-  $org = (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/organization"    ).value
-  foreach ($o in $org) {$o.pstypenames.Add("GraphOrganization")}
+Function Show-GraphSession {
+    <#
+        .Synopsis
+            Returns Basic information about the current sesssion
+    #>
+    [CmdletBinding()]
+    Param(
+        [Parameter(ParameterSetName='Who')]
+        [switch]$Who,
+        [Parameter(ParameterSetName='Scopes')]
+        [switch]$Scopes
+    )
+    if (-not $script:AccessToken)   {
+        Write-Warning -Message "Not Logged on"
+    }
+    elseif ($Scopes) {
+        $Script:AuthorizedScope
+    }
+    elseif ($Who) {
+        $Script:GraphUser
+    }
+    else {
+        if ($Script:WorkOrSchool)  {'{0} logged on with an Azure AD Account from {1} (Tenant ID {2}).'  -f $Script:GraphUser.UserPrincipalName, $script:TenantName , $script:TenantId }
+        else                       {'{0} logged on with a Windows Live account.'                        -f $Script:GraphUser.UserPrincipalName}
+        'Access token has an expiry time of: {0}' -f $Script:TokenExpiry
+        if ($script:RefreshToken)  {"Refresh token is present."}
+        if (-not $Script:SavePath) {"Token is not being saved between sessions."}
+        elseif (Test-Path -Path $Script:SavePath) {"Token has been saved."}
+        'Token supports these scopes:'
+        $Script:AuthorizedScope -join ", "
+    }
+}
 
-  $org
+Function Get-GraphOrganization  {
+    <#
+      .Synopsis
+        Gets a summary of organization information from MSGraph
+      .Description
+        Can use msonline\Get-MsolCompanyInformation instead
+        This needs consent to use either the User.Read or the Directory.Read.All scope
+      .Example
+        >(Get-GraphOrganization).verifiedDomains
+        Displays a list of domains in the current subscription
+    #>
+    [cmdletbinding(DefaultParameterSetName="None")]
+    Param(
+    )
+    Connect-MSGraph
+    $webParams = @{ 'uri'     = 'https://graph.microsoft.com/v1.0/organization'
+                    'Method'  = 'Get'
+                    'Headers' = $Script:DefaultHeader
+    }
+    $result = Invoke-RestMethod @webParams
+    foreach ($org in $result.value) {
+        $org.pstypenames.Add('GraphOrganization')
+        foreach ($d in $org.verifieddomains) {
+            $d.pstypenames.add('GraphDomain')
+        }
+    }
+
+    $result.value
+}
+
+Function Get-GraphDomain {
+    <#
+      .synopsis
+        Gets domains in the current tenant
+      .Description
+        Requires consent to use at least the Directory.Read.All scope
+    #>
+    [cmdletbinding()]
+    param (
+    )
+    Connect-MSGraph
+    # if user is an admin, can add /NameReferences /serviceConfigurationRecords or /verificationDnsRecords to URI
+    $result = Invoke-RestMethod  -Method get -Uri "https://graph.microsoft.com/v1.0/domains"  -headers $Script:DefaultHeader
+    foreach ($r in $result.value) {
+        $r.psTypeNames.add('GraphDomain')
+    }
+    $result.value
+    #    -Uri   "https://graph.microsoft.com/v1.0/domains/{domain-name}/domainNameReferences" -Method Get -headers $Script:DefaultHeader
 }
 
 Function Get-GraphSKUList {
@@ -280,7 +341,8 @@ Function Get-GraphSKUList {
       .Synopsis
         Gets the SKUs organization an organization has subscribed to
       .Description
-        Eqiv of  msonline\Get-MsolAccountSku
+        Equivalent to  msonline\Get-MsolAccountSku
+        Requires consent to the Directory.Read.All or the Directory.AccessAsUser.All scope
       .Example
         >Get-GraphSKUList | where {($_.prePaidUnits.enabled - $_.consumedunits) -lt 10}
         Lists SKUs where the number of licenses consumed is getting close to the number purchased.
@@ -291,7 +353,7 @@ Function Get-GraphSKUList {
     $webParams = @{Method = "Get"
                    Headers = $Script:DefaultHeader
     }
-    $subscribedSkus =  (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/subscribedSkus"    ).value
+    $subscribedSkus =  (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/subscribedSkus").value
     foreach ($s in $subscribedSkus) {$s.pstypenames.Add("GraphSKU")}
 
     $subscribedSkus
@@ -300,7 +362,7 @@ Function Get-GraphSKUList {
 Function Get-GraphSKU {
     <#
       .Synopsis
-        Gets a the SKUs organization an organization has subscribed to
+        Gets details of SKUs organization an organization has subscribed to
       .Example
         Get-GraphSKUList | where skupartnumber -match "enterprise" | Get-GraphSKU -ServicePlans | sort servicePlanName | format-table
         Finds "Enterprise" SKUS and displays their service plans in alphabetical order.
@@ -317,19 +379,23 @@ Function Get-GraphSKU {
         Connect-MSGraph
     }
     Process {
+        $webParams = @{'Method'  = "Get"
+                       'Headers' = $Script:DefaultHeader
+        }
         foreach ($s in $sku) {
-            $webParams = @{Method = "Get"
-                        Headers = $Script:DefaultHeader
-            }
-            if ($s.id) {$webParams["uri"] = "https://graph.microsoft.com/v1.0/subscribedSkus/$($s.id)" }
-            else       {$webParams["uri"] = "https://graph.microsoft.com/v1.0/subscribedSkus/$s" }
+            if     ($s.id)          {$webParams["uri"] = "https://graph.microsoft.com/v1.0/subscribedSkus/$($s.id)" }
+            elseif ($s -is [String]){$webParams["uri"] = "https://graph.microsoft.com/v1.0/subscribedSkus/$s" }
+            else   {Write-Warning -Message 'Could not find the SKU ID from the parameter'; return}
 
             $result  = Invoke-RestMethod @webParams
             $result.pstypenames.Add("GraphSKU")
-            foreach($s in $result.ServicePlans) {$s.pstypenames.Add("GraphServicePlan") }
-            if ($ServicePlans) {
-                $result.servicePlans | Add-Member -PassThru -MemberType NoteProperty -Name "skuPartNumber" -Value $result.skuPartNumber}
-            else {return $result }
+            foreach($s in $result.ServicePlans) {
+                $s.pstypenames.Add("GraphServicePlan")
+                Add-Member -InputObject $s -MemberType NoteProperty -Name "skuPartNumber" -Value $result.skuPartNumber
+            }
+
+            if ($ServicePlans) {$result.ServicePlans}
+            else               {$result }
         }
     }
 }
@@ -376,57 +442,21 @@ Function Get-GraphReport {
         if ($report -match 'Counts$|Pages$|Storage$') {Write-Warning -Message 'Reports ending with Counts, Pages or Storage do not support date filtering' ; return }
         if ($report -match '^Office365Activation')    {Write-Warning -Message 'Office365Activation Reports do not support any filtering.'  ; return }
         if ($report -eq    'MailboxUsageDetail')      {Write-Warning -Message 'MailboxUsageDetail does not support date filtering.' ; return}
-        $webParams['Uri'] = 'https://graph.microsoft.com/beta/reports/get{0}(date={1:yyyy-MM-dd})' -f $Report , $Date  }
+        $webParams['Uri'] = "https://graph.microsoft.com/beta/reports/get{0}(date={1:yyyy-MM-dd})" -f $Report , $Date
+    }
     elseif ($Period)  {
         if ($report -match '^Office365Activation')    {Write-Warning -Message 'Office365Activation Reports do not support any filtering.'  ; return }
-        $webParams['Uri'] = 'https://graph.microsoft.com/beta/reports/get{0}(period=''{1}'')'      -f $Report , $Period
+        $webParams['Uri'] = "https://graph.microsoft.com/beta/reports/get{0}(period='{1}')"        -f $Report , $Period
     }
     else              {
       if ($report -notmatch '^Office365Activation')  {
-        $webParams['Uri'] = 'https://graph.microsoft.com/beta/reports/get{0}(period=''d7'')'       -f $Report
+        $webParams['Uri'] = "https://graph.microsoft.com/beta/reports/get{0}(period='d7')"         -f $Report
       }
       else {
-        $webParams['Uri'] = 'https://graph.microsoft.com/beta/reports/get{0}'                      -f $Report
+        $webParams['Uri'] = "https://graph.microsoft.com/beta/reports/get{0}"                      -f $Report
       }
     }
     (Invoke-RestMethod @webParams).substring(3) | ConvertFrom-Csv
-
-}
-
-Function Show-GraphSession {
-    <#
-        .Synopsis
-            Returns Basic information about the current sesssion
-    #>
-    [CmdletBinding()]
-    Param()
-    if ($script:AccessToken)   {
-        if ($Script:WorkOrSchool)  {'{0} logged on with an Azure AD Account from {1} (Tenant ID {2}).'  -f $Script:GraphUser.UserPrincipalName, $script:TenantName , $script:TenantId }
-        else                       {'{0} logged on with a Windows Live account.'                        -f $Script:GraphUser.UserPrincipalName}
-        'Access token has an expiry time of: {0}' -f $Script:TokenExpiry
-        if ($script:RefreshToken)  {"Refresh token is present."}
-        if (-not $Script:SavePath) {"Token is not being saved between sessions."}
-        elseif (Test-Path -Path $Script:SavePath) {"Token has been saved."}
-        'Token supports these scopes:'
-        $Script:AuthorizedScope -join ", "
-    }
-    Else {"Not Logged on" }
-}
-
-Function Get-GraphDomain {
-    <#
-      .synopsis
-        Gets domains in the current tenant
-    #>
-    [cmdletbinding()]
-    param (
-        #$NameReferences #needs user to be privilidged. Gets users in the domain
-        #ServiceRecords
-        #Verification DnsRecords
-    )
-    Connect-MSGraph
-    (Invoke-RestMethod  -Method get -Uri "https://graph.microsoft.com/v1.0/domains"  -headers $Script:DefaultHeader).value
-    #    -Uri   "https://graph.microsoft.com/v1.0/domains/{domain-name}/domainNameReferences" -Method Get -headers $Script:DefaultHeader
 }
 
 Function Get-GraphSignInLog {
@@ -529,8 +559,8 @@ Function Get-GraphDirectoryLog {
  (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/groupsettingTemplates").value | ft displayname,description -wrap -aut
  (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices").value | ft approximateLastSignInDateTime,displayName,operatingsystem,operatingsystemversion
  (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/registeredOwners").value
- (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/me/owneddevices").value | ft displayname,operatingsystemversion,trusttype
  (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/memberof").value
+ (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/me/owneddevices").value | ft displayname,operatingsystemversion,trusttype
 #>
 
 Connect-MSGraph

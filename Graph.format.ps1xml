@@ -167,6 +167,58 @@
             </TableControl>
         </View>
         <View>
+            <Name>Domain</Name><ViewSelectedBy><TypeName>GraphDomain</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>Name</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Type</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Default</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Initial</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Capabilities</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <ScriptBlock>$(if ($_.name){$_.name} else {$_.id})</ScriptBlock>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$(if ($_.type){$_.type} else {$_.authenticationType})</ScriptBlock>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>isDefault</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>isInitial</PropertyName>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>$(if ($_.capabilities){$_.capabilities -join ', '} else {$_.supportedServices -join ', '})</ScriptBlock>
+                            </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
             <Name>Office 365 Service plan</Name><ViewSelectedBy><TypeName>GraphServicePlan</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />

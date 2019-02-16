@@ -38,6 +38,7 @@
                         'Find-GraphPeople',
                         'Get-GraphChannel',
                         'Get-GraphContactList',
+                        'Get-GraphDomain',
                         'Get-GraphDirectoryLog',
                         'Get-GraphDrive',
                         'Get-GraphEvent',
