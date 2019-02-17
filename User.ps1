@@ -220,7 +220,7 @@ function Get-GraphUser {
 
         try   {
             if ($Groups -or $SecurityGroups) {
-                $uri          = "https://graph.microsoft.com/v1.0/$userID/getMemberGroups"
+                # uri already points to "https://graph.microsoft.com/v1.0/$userID/getMemberGroups"
                 if  ($SecurityGroups) {$body = '{  "securityEnabledOnly": true  }'}
                 else                  {$body = '{  "securityEnabledOnly": false }'}
 

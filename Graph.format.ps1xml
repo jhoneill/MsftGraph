@@ -423,8 +423,8 @@
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <ScriptBlock>$_.Owner.User.DisplayName</ScriptBlock>
-                                <Alignment>Right</Alignment>
+                                <ScriptBlock>$_.Owner.User.DisplayName + $_.Owner.Group.DisplayName </ScriptBlock>
+                                <Alignment>Left</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
                                 <ScriptBlock>$_.quota.state</ScriptBlock>
@@ -969,11 +969,11 @@
                       <Alignment>left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                      <Label>CreatedDateTime</Label>
+                      <Label>Created</Label>
                       <Alignment>left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                      <Label>MessageType</Label>
+                      <Label>Isreply</Label>
                       <Alignment>left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
@@ -998,11 +998,11 @@
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <ScriptBlock>([datetime]($_.createdDateTime)).tostring("g")</ScriptBlock>
+                                <ScriptBlock>$_.created.tostring("g")</ScriptBlock>
                                 <Alignment>Left</Alignment>
                            </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>messageType</PropertyName>
+                                <ScriptBlock>$_.replyToId -as [bool]</ScriptBlock>                                
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>

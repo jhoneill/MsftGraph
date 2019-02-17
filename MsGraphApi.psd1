@@ -37,6 +37,7 @@
                         'Expand-GraphTask',
                         'Find-GraphPeople',
                         'Get-GraphChannel',
+                        'Get-GraphChannelReply',
                         'Get-GraphContactList',
                         'Get-GraphDomain',
                         'Get-GraphDirectoryLog',

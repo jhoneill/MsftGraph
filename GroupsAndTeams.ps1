@@ -666,7 +666,7 @@ function Get-GraphTeam {
                 elseif ($Channels -or
                         $ChannelName)   {
                     if ($ChannelName) {
-                        $uri =  "$teamURI/channels?`$filter=startswith(tolower(displayname), '$ChannelName')"
+                        $uri =  "$teamURI/channels?`$filter=startswith(tolower(displayname), '$($ChannelName.ToLower())')"
                     }
                     else {
                         $uri =  "$teamURI/channels"
@@ -694,7 +694,10 @@ function Get-GraphTeam {
                     }
                     $results  = (Invoke-RestMethod  @webparams -Uri $uri)
                     $appsList = $results.value
-                    foreach ($a in $appsList) {$a.pstypenames.add("GraphApp")}
+                    foreach ($a in $appsList) {
+                        $a.pstypenames.add("GraphApp")
+                        Add-Member -InputObject $a -MemberType NoteProperty -Name Team -Value $teamid
+                    }
                     Write-Progress -Activity 'Getting Team Apps' -Completed
                     $appsList
                 }
@@ -1157,6 +1160,52 @@ function Send-GraphGroupReply {
     }
 }
 
+Function Get-ChannelMessagesByURI {
+    <#
+      .synopsis
+        Helper function to add get and expand messages or replies to messages
+    #>
+    param (
+        [parameter(Position=0,ValueFromPipeline=$true)]
+        $URI
+    )
+    begin   {
+        Connect-MSGraph
+        $webparams = @{Method = "Get"
+                        Headers = $Script:DefaultHeader
+        }
+    }
+    process {
+
+        Write-progress -Activity 'Getting messages' -Status "Reading $($ch.displayname) Messages"
+        $result   = Invoke-RestMethod @webparams -Uri $uri
+        $msgList  = @() + $result.value
+        while ($result.'@odata.nextLink' -and $result.'@odata.count' -gt 0 ) {
+            Write-Verbose  $result.'@odata.count'
+            Write-progress -Activity 'Getting messages' -Status "Reading $($ch.displayname) Messages" -CurrentOperation "$($msglist.count) so far"
+            $result   = Invoke-RestMethod  @webparams -Uri $result.'@odata.nextLink'
+            $msgList += $result.value
+        }
+        $userHash = @{}
+        Write-progress -Activity 'Getting messages' -Status "Expanding User information"
+        $msglist.from.user.id | Sort-Object -Unique | foreach-object {
+            $userHash[$_] = ( Invoke-RestMethod @webparams -Uri  "https://graph.microsoft.com/v1.0/directoryObjects/$_").displayName
+        }
+        Write-progress -Activity 'Getting messages' -Completed
+        foreach ($msg in $msgList) {
+            $msg.pstypeNames.add("GraphTeamMsg")
+            if ($msg.from.user.id) {
+                Add-Member -InputObject $msg -MemberType NoteProperty -Name FromUserName -Value $userHash[$msg.from.user.id]
+            }
+            Add-Member     -InputObject $msg -MemberType NoteProperty -Name Created      -Value ([datetime]$msg.createdDateTime)
+            Add-Member     -InputObject $msg -MemberType NoteProperty -Name team         -Value $teamID
+            Add-Member     -InputObject $msg -MemberType NoteProperty -Name channel      -Value $channelID
+        }
+
+        $msgList | sort-object -Property Created
+    }
+}
+
 function Get-GraphChannel {
     <#
       .Synopsis
@@ -1221,30 +1270,10 @@ function Get-GraphChannel {
             else   {Write-Warning -Message 'Could not resolve the channel ID'; return}
             if (-not ($teamid -and $channelID)) {Write-warning -Message "You need to provide a team ID and a Channel ID"; return}
             elseif   ($Messages -or $Top) {
-                Write-progress -Activity 'Getting messages' -Status "Reading $($ch.displayname) Messages"
                 $uri      =  "https://graph.microsoft.com/beta/teams/$teamID/channels/$channelID/messages"
                 if ($Top) {$uri += '?$top=' + $Top }
-                $result   = Invoke-RestMethod @webparams -Uri $uri
-                $msgList  = @() + $result.value
-                while ($result.'@odata.nextLink' -and $result.'@odata.count' -gt 0 ) {
-                    Write-Verbose  $result.'@odata.count'
-                    Write-progress -Activity 'Getting messages' -Status "Reading $($ch.displayname) Messages" -CurrentOperation "$($msglist.count) so far"
-                    $result   = Invoke-RestMethod  @webparams -Uri $result.'@odata.nextLink'
-                    $msgList += $result.value
-                }
-                $userHash = @{}
-                Write-progress -Activity 'Getting messages' -Status "Expanding User information"
-                $msglist.from.user.id | Sort-Object -Unique | foreach-object {
-                    $userHash[$_] = ( Invoke-RestMethod @webparams -Uri  "https://graph.microsoft.com/v1.0/directoryObjects/$_").displayName
-                }
-                Write-progress -Activity 'Getting messages' -Completed
-                foreach ($msg in $msgList) {
-                    $msg.pstypeNames.add("GraphTeamMsg")
-                    if ($msg.from.user.id) {
-                        Add-Member -InputObject $msg -MemberType NoteProperty -Name FromUserName -Value $userHash[$msg.from.user.id]
-                    }
-                }
-                return $msgList
+                Get-ChannelMessagesByURI -URI $uri
+                return
             }
             elseif   ($Tabs)     {
                 $results = Invoke-RestMethod @webparams -Uri  "https://graph.microsoft.com/v1.0/teams/$teamID/channels/$channelID/tabs?`$expand=teamsApp"
@@ -1328,6 +1357,11 @@ function Remove-GraphChannel {
     <#
       .Synopsis
         Removes a channel from a team
+      .Description
+        This requires the Group.ReadWrite.All scope.
+      .Example
+        >Get-GraphTeam -ByName Developers -ChannelName "Project Firebird" | Remove-GraphChannel
+        Finds a channel by name from a named team , and removes it.
     #>
     [Cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='High')]
     param(
@@ -1363,6 +1397,13 @@ function Add-GraphChannelThread {
     <#
       .Synopsis
         Adds a new thread in a channel in Teams.
+      .Description
+        This uses BETA functionality.
+      .Example
+        >
+        >$General = Get-GraphTeam $newTeam -ChannelName "General"
+        >Add-GraphChannelThread -Channel $General -Content "Project Firebird now has its own channel."
+        This adds a message t
     #>
     [Cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='Low')]
     param(
@@ -1418,14 +1459,125 @@ function Add-GraphChannelThread {
         }
     }
 }
-# can get replies in a thread , but can't post to a reply.
-#  https://graph.microsoft.com/beta/teams/{group-id-for-teams}/channels/{channel-id}/messages/{message-id}/replies/{reply-id}
-# Doesn't seem to be a delete or a patch ?
+
+# can get replies in a thread , but can't send a reply, delete or update a thread
+
+function Get-GraphChannelReply {
+    <#
+      .Synopsis
+        Returns replies to messages in Teams channels
+      .Description
+        Access to channel messages is currently in the BETA API
+        It is possible to start a new thread, but not to reply to the thread.
+      .Example
+        >Get-GraphChannel $General -Messages | Get-GraphChannelReply -PassThru
+        The GraphAPI does not return replies when requesting messages
+        from a channel in Teams. By piping the messages to Get-GraphChannelReply
+        it is possible to get the replies; and if -Passthru is specified
+        the messages will returned, followed by their replies.
+        So if $General is a channel object, the first message and the its first
+        reply might be output like this.
+
+        From          Created          Isreply Deleted Importance Content
+        ----          -------          ------- ------- ---------- -------
+        James O'Neill 17/02/2019 11:42 False   False   normal     Project Firebird now has its own channel.
+        James O'Neill 17/02/2019 13:06 True    False   normal     And the channel has its own planner
+
+    #>
+    [Cmdletbinding()]
+    param (
+        #The Message to reply to as an ID or a message object containing an ID (and possibly the team and channel ID)
+        [Parameter(Position=0,ValueFromPipeline)]
+        $Message,
+        #If the Message does not contain the channel, the channel either as an ID or an object containing an ID and possibly the team ID
+        $Channel,
+        #If the message or channel parameters don't included the team ID, the team either as an ID or an objec containing the ID
+        $Team,
+        #If specified returns the message, followed by its replies. (Otherwise , only the replies are returned)
+        [switch]$PassThru
+    )
+    #Is the team ID in the message, channel or team parameter ? Is the channel in the message parameter, and is message an object or ID?
+    if     ($Message.team)         {$teamid    = $Message.team}
+    elseif ($Channel.team)         {$teamid    = $Channel.team}
+    elseif ($Team.id)              {$teamid    = $team.id}
+    elseif ($Team -is [string])    {$teamid    = $team}
+    else   {Write-Warning 'Could not determine the team ID for the message.'; return}
+    if     ($Message.channel)      {$channelid = $Message.channel}
+    elseif ($Channel.id)           {$channelid = $channel.id}
+    elseif ($Channel -is [string]) {$channelid = $Channel}
+    else   {Write-Warning 'Could not determine the Channel ID for the message.'; return}
+    if     ($Message.ID)           {$msgID     = $Message.ID}
+    elseif ($Message -is [string]) {$msgID     = $Message }
+    else   {Write-Warning 'Could not determine the ID for the message.'; return}
+
+    if ($PassThru) {$Message}
+    Get-ChannelMessagesByURI -URI "https://graph.microsoft.com/beta/teams/$teamid/channels/$channelid/Messages/$msgID/replies"
+}
+
+#code for send reply is included here but not exported in the PSD1 file. It is described at
+#https://docs.microsoft.com/en-us/graph/api/channel-post-messagereply?view=graph-rest-beta
+#but calling it gives  (501) Not Implemented.
+function Send-GraphChannelReply {
+    <#
+      .Synopsis
+        Posts a reply to a message in a Teams channel
+    #>
+    [Cmdletbinding(SupportsShouldProcess=$true)]
+    param (
+        #The Message to reply to as an ID or a message object containing an ID (and possibly the team and channel ID)
+        $Message,
+        #If the Message does not contain the channel, the channel either as an ID or an object containing an ID and possibly the team ID
+        $Channel,
+        #If the message or channel parameters don't included the team ID, the team either as an ID or an objec containing the ID
+        $Team,
+        #The Message body - text by default, specify -contentType if using HTML
+        [Parameter(Mandatory=$true)]
+        [String]$Content,
+        #The format of the content, text by default , or HTML
+        [ValidateSet("Text","HTML")]
+        [String]$ContentType = "Text",
+        #Normally the reply is added 'silently'. If passthru is specified, the new message will be returned.
+        [Alias('PT')]
+        [switch]$Passthru,
+        #if Specified the message will be created without prompting.
+        [switch]$Force
+    )
+    if     ($Message.team)         {$teamid    = $Message.team}
+    elseif ($Channel.team)         {$teamid    = $Channel.team}
+    elseif ($Team.id)              {$teamid    = $team.id}
+    elseif ($Team -is [string])    {$teamid    = $team}
+    else   {Write-Warning 'Could not determine the team ID for the message.'; return}
+    if     ($Message.channel)      {$channelid = $Message.channel}
+    elseif ($Channel.id)           {$channelid = $channel.id}
+    elseif ($Channel -is [string]) {$channelid = $Channel}
+    else   {Write-Warning 'Could not determine the Channel ID for the message.'; return}
+    if     ($Message.ID)           {$msgID     = $Message.ID}
+    elseif ($Message -is [string]) {$msgID     = $Message }
+    else   {Write-Warning 'Could not determine the ID for the message.'; return}
+
+    $uri =  "https://graph.microsoft.com/beta/teams/$teamid/channels/$channelid/Messages/$msgID"
+    try   {$null = Invoke-RestMethod -Method Get -Headers $DefaultHeader -Uri $uri }
+    catch {Write-Warning -Message 'Those parameters did correspond to a message. Cannot Continue.'; return}
+
+    $Settings =  @{body= @{content=$Content;}}
+    if ($ContentType -eq 'HTML') {$settings.body['contentType'] = 1}
+    else                         {$settings.body['contentType'] = 2}
+    $json =  (ConvertTo-Json $settings)
+    Write-Debug $json
+    if ($force -or $PSCmdlet.Shouldprocess("Post Reply")) {
+        Invoke-RestMethod -Method 'POST' -Header $Script:DefaultHeader -Uri "$uri/replies" -ContentType 'application/json' -Body $json
+    }
+}
 
 function Add-GraphWikiTab {
     <#
       .Synopsis
         Adds a wiki tab to a channel in teams
+      .Example
+        >Add-GraphWikiTab -Channel $Channel -TabLabel Wiki
+        Channel contains an object representing a channel in teams,
+        this adds a Wiki to it. The Wiki will need to be initialized
+        when the tab is first opened
     #>
     [CmdletBinding(SupportsShouldprocess=$true)]
     param(
