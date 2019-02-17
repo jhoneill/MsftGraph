@@ -86,6 +86,8 @@
         $webParams = @{Method  = "Get"
                        Headers = $Script:DefaultHeader
         }
+    }
+    process {
         #region Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
         if     ($Drive.id)               {$drive = "drives/$($drive.id)"}
@@ -105,11 +107,6 @@
         }
         #endregion
 
-    }
-    process {
-        #To catch being piped to with -erroraction SilentlyContinue and a failure to get the drive in the begin block.
-        if ($null -eq $drive) {return}
-
         #region Getting a single item (file or folder) by ID or by path.
         # Make something we can insert in a REST URI
         if     ($ItemID   -and $ItemID -Match '^/?items')   {$ItemID =  $ItemID  -replace '^/?(.*)/?$',            '$1' } #Allow "items/{id}" Strip off any leading or trailing /
@@ -117,7 +114,7 @@
         elseIf ($Itempath -in @("root:", "/", "root:/") )   {$ItemID = 'root' }                                           #Convert "root:", "/" or root:/" to "root"
         elseif ($ItemPath -and $ItemPath -Match '^/?root:') {$ItemID =  $ItemPath -replace '^/?(.*?)[:/]*$',       '$1:'} #Allow "[/]root:{path}" strip any leading / or trailing / or : and append ":"
         elseif ($ItemPath )                                 {$ItemID =  $ItemPath -replace '^/?(.*?)[:/]*$', 'root:/$1:'} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
-        #if we had and item ID or built an itemID string as from the path, get the item, add a type and return it/
+        #if we had an item ID or built an itemID string from the path, get the item, add a type and return it
         if     ($ItemID ) {
             try   {$item = Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/$Drive/$ItemID" }
             catch {
@@ -131,7 +128,7 @@
             return $item
         }
         #endregion
-        #region Getting collections of items either in special folders by name, normal folders by path/id recent items, or shared with me.
+        #region Getting collections of items either in special folders by name, normal folders by path/id, recent items, or items "shared with me".
         #if we got a folder path or ID, search for its items; first make make sure we can insert it into the URL
         if    (($search) -and -not
                ($FolderID   -or $FolderPath) )                  {$FolderID = 'root'}                                               #If We were asked to search but not told where, choose "root"
@@ -170,7 +167,7 @@
         #endregion
 
         #The above will either have left a collection of items in $children, or explictly returned a result.
-        #region return any collection of items - filtered to subfolders, or not , as required. Tell the user if the folder is empty but send nothing to the pipeline
+        #region return any collection of items - filtered to subfolders if required. Tell the user if the folder is empty but send nothing to the pipeline
         if (-not $children) { Write-Host  "Folder exists, but is empty."}
         else  {
                 foreach ($c in $children ) {$c.pstypenames.Add("GraphDriveItem")  }
@@ -194,19 +191,33 @@ function New-GraphFolder {
     <#
       .synopsis
         Creates a new folder on OneDrive.
-      .Description
+      .description
         By default this will create a new folder on the user's one drive, and if the no Parent ID is specified
         the folder will be created in the root of the drive.
+      .Example
+        >New-GraphFolder -Path '/Documents/Project-x'
+        Creates a new folder named "Project x" in the current users Documents folder
+       .Example
+        >New-GraphFolder -Path 'root:/Documents/Project-Y'
+        Creates a new folder named "Project Y" in the current users Documents folder
+        Note that tab completion will change /Projects/ to root:/Projects
+      .Example
+        >
+        >$drive = Get-GraphTeam -ByName Consultants -Drive
+        >New-GraphFolder -Drive $drive -Path 'root:/Documents/Project Firebird/Planning'
+        Gets the drive for the Consultants team; and adds a subfolder under documents.
+        As in the previous examples root:/ is how tab completion would render the path, but
+        '/Documents/Project Firebird/Planning' works just as well.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         #The name for the new folder
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
+        [Alias('FolderPath')]
         [string]$Path,
         #The drive hold the new folder - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
         [Parameter()]
         $Drive = 'me/Drive'
-
     )
     begin {
         Connect-MSGraph
@@ -218,8 +229,7 @@ function New-GraphFolder {
         elseif ($Drive -notmatch './.')  {$drive = "drives/$drive"      }
         #Strip leading and trailing / from $drive so it fits in the URI template.
         $Drive = $Drive -replace '/$','' -replace '^/',''
-
-            try   {
+        try   {
             $driveObj  =  (Invoke-RestMethod @webParams -Method GET -Uri "https://graph.microsoft.com/v1.0/$Drive")
             $global:drivecache[$driveObj.id] = $driveObj.name
         }
@@ -228,21 +238,19 @@ function New-GraphFolder {
         }
     }
     process {
-
-
-        $settings    = @{name = $path -replace '^.*/(.+?)/?$' , '$1'  #Strip any leading or trailing / keep everything after the last /
-                        folder=@{} ;
-                       '@microsoft.graph.conflictBehavior'= 'fail'
+        $settings   = @{'name'  = $path -replace '^.*/(.+?)/?$' , '$1'  #Strip any leading or trailing / keep everything after the last /
+                        'folder' = @{} ;
+                        '@microsoft.graph.conflictBehavior'= 'fail'
         }
-        $parentpath    =  $path -replace '^/?(.*)/.+?/?$' , '$1'  #Strip any leading or trailing / and everything after the last /
+        #Strip any leading or trailing / and everything after the last /
+        $parentpath = $path -replace '^/?(.*)/.+?/?$' , '$1'
 
-        If     ($parentpath -in @("", "root:", "/", "root:/") )   {$parentpath = 'root' }                                           #Convert "root:", "/" or root:/" to "root"
+        if     ($parentpath -in @("", "root:", "/", "root:/") )   {$parentpath = 'root' }                                           #Convert "root:", "/" or root:/" to "root"
         elseif ($parentpath -Match '^/?root:')                    {$parentpath =  $parentpath -replace '^/?(.*?)[:/]*$',       '$1:'} #Allow "[/]root:{path}" strip any leading / or trailing / or : and append ":"
         else                                                      {$parentpath =  $parentpath -replace '^/?(.*?)[:/]*$', 'root:/$1:'} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
 
         $body = ConvertTo-Json $settings
-        Write-Verbose $body
-
+        Write-Debug $body
         if ($PSCmdlet.ShouldProcess($parentPath, "Create new OneDrive folder '$($settings.Name)'")) {
             try {
                 $newFolder = Invoke-RestMethod @webParams -Method Post -uri "https://graph.microsoft.com/v1.0/$Drive/$parentPath/children" -ContentType "application/json" -Body $body
@@ -255,7 +263,6 @@ function New-GraphFolder {
                 }
                 else {throw $_ }
             }
-
         }
     }
 }
@@ -264,6 +271,17 @@ function Show-GraphFolder {
     <#
       .synopsis
         Opens a OneDrive folder in a browser
+      .Example
+        Show-GraphFolder -Path 'root:/Documents'
+        Opens the documents folder from the current user's drive in the default browser
+        Note that root:/documents is how tab completion will render the path, but
+        /documents is equally valid
+      .Example
+        >
+        >$drive = Get-GraphTeam -ByName Consultants -Drive
+        >Show-GraphFolder -Path 'root:/Documents' -drive $drive
+        Finds the drive for the consultants team, and opens its
+        documents folder in the default browser
     #>
     [CmdletBinding(DefaultParameterSetName='FolderName')]
     param(
@@ -273,17 +291,19 @@ function Show-GraphFolder {
         [String]$Path,
         #If Specified gets the  folder by folder ID
         [Parameter(Mandatory=$true, ParameterSetName='FolderID')]
-        [String]$FolderID
+        [String]$FolderID,
+        #The Drive containing the path .
+        $Drive = 'me/Drive'
     )
     process {
         if ($Path.weburl)     {Start-Process $Path.weburl ; return}
         elseif ($Path.id)     {$FolderID = $Path.id}
         elseif ($Path)        {
-            $item = Get-GraphDrive -ItemPath $Path
+            $item = Get-GraphDrive -ItemPath $Path -Drive $Drive
             if ($item.weburl) {Start-Process $item.weburl ; return}
         }
         if ($FolderID) {
-            $item = Get-GraphDrive -ItemID $FolderID
+            $item = Get-GraphDrive -ItemID $FolderID -Drive $Drive
             if ($item.weburl) {Start-Process $item.weburl ; return}
         }
    }
@@ -292,7 +312,14 @@ function Show-GraphFolder {
 function Copy-ToGraphFolder {
     <#
       .synopsis
-        Copies a file from the local computer to one drive
+        Copies filse from the local computer to one drive
+      .example
+        >
+        >$teamdrive = Get-GraphTeam -ByName Consultants -Drive
+        >dir *.xlsx |  Copy-ToGraphFolder -Drive $teamdrive -Destination 'root:/Documents'
+        The first command gets the drive for a team; the second finds
+        .xlsx files in the current directory, and copies them to the Documents folder
+        on the team's drive.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
@@ -431,7 +458,15 @@ function Copy-ToGraphFolder {
 function Copy-FromGraphFolder {
     <#
       .Synopsis
-        Copies a file from one drive to the local computer
+        Copies files from OneDrive to the local computer
+      .Example
+        >Copy-FromGraphFolder -Path 'root:/Scripts/Type-Info.xlsx' -Destination c:\temp
+        Copies a single file from a "scripts" directory on the user's drive to c:\temp.
+      .Example
+        >
+        >$drive = Get-GraphTeam -ByName Consultants -Drive
+        >Get-GraphDrive -Drive $drive -FolderPath 'root:/Documents/Project Firebird/Planning' | Copy-FromGraphFolder -Destination c:\temp
+        Gets all the files in a folder on a teams drive and copies them to C:\Temp.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(

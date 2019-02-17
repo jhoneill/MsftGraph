@@ -264,10 +264,13 @@ function Get-GraphUser {
                 elseif ($MailboxSettings ) { $r.pstypenames.Add('GraphMailboxSettings')}
                 elseif ($Photo           ) { $r.pstypenames.Add('GraphPhoto')}
                 elseif ($Drive           ) { $r.pstypenames.Add('GraphDrive')}
-                elseif ($Calendars       ) { $r.pstypenames.Add('GraphCalendar')}
                 elseif ($LicenseDetails  ) { $r.pstypenames.Add('GraphLicense')}
                 elseif ($PlannerTasks    ) { $r.pstypenames.Add('GraphTask')}
-                elseif ($Notebooks      )  {
+                elseif ($Calendars       ) {
+                    $r.pstypenames.Add('GraphCalendar')
+                    Add-Member -InputObject $r -MemberType NoteProperty -Name CalendarPath -Value "$userID/Calendars/$($r.id)"
+                }
+                elseif ($Notebooks       ) {
                     $r.pstypenames.Add('GraphOneNoteBook')
                     #Section fetched this way won't have parentNotebook, so make sure it is available when needed
                     $bookobj =new-object -TypeName psobject -Property @{'id'=$r.id; 'displayname'=$r.displayName; 'Self'=$r.self}

@@ -562,7 +562,8 @@ function Get-GraphTeam {
                     Write-Progress -Activity 'Getting Group Calendar'
                     $result = Invoke-RestMethod  @webparams -Uri  "$groupURI/calendar"
                     $result.pstypenames.Add("GraphCalendar")
-                    Add-Member -InputObject $result -MemberType NoteProperty -Name groupID -Value $teamid
+                    Add-Member -InputObject $result -MemberType NoteProperty -Name GroupID      -Value $teamid
+                    Add-Member -InputObject $result -MemberType NoteProperty -Name CalendarPath -Value "groups/$teamid/Calendar"
                     Write-Progress -Activity 'Getting Group Calendar' -Completed
                     $result
                 }

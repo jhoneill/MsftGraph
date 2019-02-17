@@ -1,20 +1,17 @@
 ﻿function Get-GraphReminderView   {
     <#
       .Synopsis
-        Returns a view of items with reminder sets across all a users calendars.
+        Returns a view of items with reminders set across all a users calendars.
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
     param(
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
          [string]$User,
-
         #Time zone to rennder event times. By default the time zone of the local machine will me use
         $Timezone = $(tzutil.exe /g),
-
         #Number of days of calendar to fetch from today
         [int]$Days =30 ,
-
-        #The neumber of events to fetch. Must be greater than zero, and capped at 1000
+        #The number of events to fetch. Must be greater than zero, and capped at 1000
         [ValidateRange(1,1000)]
         [int]$Top
     )
@@ -56,62 +53,72 @@ function Get-GraphEvent          {
       .Synopsis
         Get the  events in a calendar
       .Description
-        Depending on the parameters specified the calendar can be
-           * A Specific calendar for a group, if the group and calendar are specified
-             (group ID can be a calendar property)
-           * The default calendar for a group, if only group is provided)
-           * A specific calendar for a specific user, if user and calendar are specified
+        Depending on the parameters the events my come from
+           * A specified calendar (retrieved by get-graphGroup or Get-GraphUser)
+           * The default calendar for a group, (if only -group is provided)
            * The default calendar for a specific user, if only user is specified
-           * A specific calendar for the currrent user, if only calandar is specified
            * The default calendar for the current user if no user, group, or calendar is specified.
            The request can specify the first n events in the calendar, or a number of days into
-           the future, or specify the subject line.
+           the future, or specify the subject line or a custom filter.
+      .Example
+        >
+        >$team = Get-GraphTeam -ByName consultants
+        >Get-GraphEvent -Team $team
+        Finds the team (group) named "Consultants", and gets events in the team's calendar.
+        Note that the because "team" and "group" are used interchangably the parameter is
+        named "Group" with an alias of "Team"
       .Example
         >
         >get-graphuser -Calendars | where name -match "holidays" |
-             get-graphevent -days 365 -order "start/datetime desc" -select start,subject |
-                ft subject, @{n="when";e={([datetime]$_.start.datetime).tostring("d")}}
+             get-graphevent -days 365 -order "start/datetime desc" -select start,end, subject |
+                format-table subject, when
         Gets the user's calendars and selects the national holidays one;
-        gets the events from this calendar for the next 365 days sorts them to
-        soonest last and selects only the date and subject; displays these in a table
-        showing start in the local short-date format.
+        gets the events from this calendar for the next 365 days, sorting them to
+        soonest last and selecting only the dates and subject; 'when' is calculated from s
+        tart and end, so it is available to the format table command at the end of the pipeline.
       .Example
-        >Get-GraphEvent -user james@contoso.com -filter "isorganizer eq false"
-        Gets events from the specified users calendar where they are not the organizer
+        >Get-GraphEvent -user alex@contoso.com -filter "isorganizer eq false"
+        Gets events from the specified user's calendar where they are not the organizer;
+        this requires access to have been granted access to the calendar by its owener.
       .Example
         >Get-GraphEvent  -filter "isorganizer eq false" -OrderBy start/datetime
-        This uses the same filter but sorts the results at the server before they are
-        returned. Note that some fields like 'start' are record types, and one of
-        their propperties, as in this case, may need to be specified to perform a sort.
+        This uses the same filter as the previous example but sorts the results at the
+        server before they are returned. Note that some fields like 'start' are record types,
+        and one of their propperties, as in this case, may need to be specified to perform
+        a sort, and the syntax is property/ChildProperty.
       .Example
         >
         >$userTimezone = (Get-GraphUser -MailboxSettings).timezone
         >Get-GraphEvent -Days 150 -TimeZone $userTimezone -Filter "showas eq 'free'"
-        The first command gets the current user's time zone, and the second requests
-        items for the next 150 days where the time is shown as Free, displaying using that time zone
+        The first command gets the current user's preferred time zone, which may not
+        match the local computer, and the second requests items for the next 150 days,
+         where the time is shown as Free, displaying using that time zone
       .Example
         >Get-graphEvent -filter "start/dateTime ge '2019-04-01T08:00'"   | ft
         Gets the events in the signed-in user's default calendar which start after April 1 2019
-        format-table will pick up the default display properties. .
+        format-table will pick up the default display properties (Subject, When, Where and ShowAs)
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
     param(
-        #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
-        [Parameter( Mandatory=$true, ParameterSetName="User",ValueFromPipelineByPropertyName=$true)]
+        #UserID as a guid or User Principal name, whose calendar should be fetched.
+        [Parameter( Mandatory=$true, ParameterSetName="User"          ,ValueFromPipelineByPropertyName=$true)]
         [Parameter( Mandatory=$true, ParameterSetName="UserAndSubject",ValueFromPipelineByPropertyName=$true)]
-        [Parameter( Mandatory=$true, ParameterSetName="UserAndFilter",ValueFromPipelineByPropertyName=$true)]
+        [Parameter( Mandatory=$true, ParameterSetName="UserAndFilter" ,ValueFromPipelineByPropertyName=$true)]
         [string]$User,
 
-        #A sepecific calendar belonging to a user.
-        [Parameter( ParameterSetName="User",ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
+        #A sepecific calendar
+        [Parameter( Mandatory=$true, ParameterSetName="Cal",           ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [Parameter( Mandatory=$true, ParameterSetName="CalAndSubject", ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [Parameter( Mandatory=$true, ParameterSetName="CalAndFilter",  ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [Parameter( ParameterSetName="User",          ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         [Parameter( ParameterSetName="UserAndSubject",ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [Parameter( ParameterSetName="UserAndFilter",ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [Parameter( ParameterSetName="UserAndFilter", ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
         $Calendar,
 
         #Group ID or a Group object with an ID, whose calendar should be fetched
-        [Parameter(Mandatory=$true, ParameterSetName="GroupID",ValueFromPipelineByPropertyName=$true)]
+        [Parameter(Mandatory=$true, ParameterSetName="GroupID"        ,ValueFromPipelineByPropertyName=$true)]
         [Parameter(Mandatory=$true, ParameterSetName="GroupAndSubject",ValueFromPipelineByPropertyName=$true)]
-        [Parameter(Mandatory=$true, ParameterSetName="GroupAndFilter",ValueFromPipelineByPropertyName=$true)]
+        [Parameter(Mandatory=$true, ParameterSetName="GroupAndFilter" ,ValueFromPipelineByPropertyName=$true)]
         [Alias("Team")]
         $Group,
 
@@ -137,13 +144,15 @@ function Get-GraphEvent          {
         [string]$OrderBy,
 
         #If specified, fetch events where the subject line begins with
-        [Parameter(Mandatory=$true, ParameterSetName='Subject',ValueFromPipelineByPropertyName=$true)]
-        [Parameter(Mandatory=$true, ParameterSetName="UserAndSubject",ValueFromPipelineByPropertyName=$true )]
+        [Parameter(Mandatory=$true, ParameterSetName='CalAndSubject',  ValueFromPipelineByPropertyName=$true)]
+        [Parameter(Mandatory=$true, ParameterSetName="UserAndSubject", ValueFromPipelineByPropertyName=$true)]
         [Parameter(Mandatory=$true, ParameterSetName="GroupAndSubject",ValueFromPipelineByPropertyName=$true)]
         [string]$Subject,
 
         #A custom selection filter
-        [Parameter(Mandatory=$true, ParameterSetName="UserAndFilter",ValueFromPipelineByPropertyName=$true )]
+        [Parameter(Mandatory=$true, ParameterSetName="CurrentFilter", ValueFromPipelineByPropertyName=$true)]
+        [Parameter(Mandatory=$true, ParameterSetName="CalAndFilter",  ValueFromPipelineByPropertyName=$true)]
+        [Parameter(Mandatory=$true, ParameterSetName="UserAndFilter", ValueFromPipelineByPropertyName=$true)]
         [Parameter(Mandatory=$true, ParameterSetName="GroupAndFilter",ValueFromPipelineByPropertyName=$true)]
         [string]$Filter
     )
@@ -154,7 +163,10 @@ function Get-GraphEvent          {
     if ($TimeZone) {$webParams.Headers["Prefer"]="Outlook.timezone=""$TimeZone"""}
 
     #region figure out which calendar to get. The API doesn't have v1.0/calendars/id, have to do group/calendar user/calendar or user/calendarS/id
-    if     ($user -and $Calendar) { #get a specific calendar for a specific user
+    if     ($Calendar -and $Calendar.CalendarPath) {
+        $uri = "https://graph.microsoft.com/v1.0/$($Calendar.CalendarPath)"
+    }
+    elseif ($User -and $Calendar)   { #get a specific calendar for a specific user
         if ($User.ID)     {$User     = $User.ID}
         If ($Calendar.id) {$Calendar = $Calendar.ID}
         $uri = "https://graph.microsoft.com/v1.0/users/$user/calendars/$Calendar"
@@ -205,19 +217,21 @@ function Get-GraphEvent          {
         $defaultProperties = @('Subject','When','Where','ShowAs')
         $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultProperties)
         $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
-        $whensb = { if (  ([datetime]$this.eventStartTime.datetime).AddDays(1) -eq ([datetime]$this.eventEndTime.datetime  )) {
-                          ([datetime]$this.eventStartTime.datetime).ToShortDateString()
+        $whensb = { if (  ([datetime]$this.start.datetime).AddDays(1) -eq ([datetime]$this.End.datetime  )) {
+                          ([datetime]$this.start.datetime).ToShortDateString()
                     }
-                    else {([datetime]$this.eventStartTime.datetime).ToString("g") + ' to ' +  ([datetime]$this.eventEndTime.datetime  ).ToString("g") + $this.eventEndTime.timezone}
+                    else {([datetime]$this.Start.datetime).ToString("g") + ' to ' +  ([datetime]$this.End.datetime  ).ToString("g") + $this.End.timezone}
         }
         foreach ($e in $eventlist) {
             $e.pstypeNames.add('GraphEvent')
+            Add-Member -InputObject $e -MemberType ScriptProperty -Name StartDateTime     -Value {[datetime]$this.start.dateTime}
+            Add-Member -InputObject $e -MemberType ScriptProperty -Name EndDateTime       -Value {[datetime]$this.end.dateTime}
             Add-Member -InputObject $e -MemberType ScriptProperty -Name When              -Value $whenSB
             Add-Member -InputObject $e -MemberType ScriptProperty -Name Where             -Value {$this.location.displayname}
             Add-Member -InputObject $e -MemberType MemberSet      -Name PSStandardMembers -Value $PSStandardMembers
         }
 
-        return $result.value
+        $eventlist
     }
     else {Write-Warning -Message "No events were found."}
     #endregion
@@ -513,7 +527,7 @@ function Set-GraphEvent          {
       .link
         Get-GraphEvent
       .Example
-        a
+        TBC
     #>
     [cmdletbinding(SupportsShouldProcess=$true,DefaultParameterSetName='None')]
     param (
