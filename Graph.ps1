@@ -258,7 +258,7 @@ Function Show-GraphSession {
         .Synopsis
             Returns Basic information about the current sesssion
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName='None')]
     Param(
         [Parameter(ParameterSetName='Who')]
         [switch]$Who,
