@@ -74,8 +74,8 @@ function Get-GraphEvent          {
                 format-table subject, when
         Gets the user's calendars and selects the national holidays one;
         gets the events from this calendar for the next 365 days, sorting them to
-        soonest last and selecting only the dates and subject; 'when' is calculated from s
-        tart and end, so it is available to the format table command at the end of the pipeline.
+        soonest last and selecting only the dates and subject; 'when' is calculated from
+        start and end, so it is available to the format table command at the end of the pipeline.
       .Example
         >Get-GraphEvent -user alex@contoso.com -filter "isorganizer eq false"
         Gets events from the specified user's calendar where they are not the organizer;
@@ -92,7 +92,7 @@ function Get-GraphEvent          {
         >Get-GraphEvent -Days 150 -TimeZone $userTimezone -Filter "showas eq 'free'"
         The first command gets the current user's preferred time zone, which may not
         match the local computer, and the second requests items for the next 150 days,
-         where the time is shown as Free, displaying using that time zone
+        where the time is shown as Free, displaying using that time zone
       .Example
         >Get-graphEvent -filter "start/dateTime ge '2019-04-01T08:00'"   | ft
         Gets the events in the signed-in user's default calendar which start after April 1 2019

@@ -1,10 +1,9 @@
 ﻿#Most functions for this are in files based on the application where they would surface
 # OneDrive, OneNote, Outlook-Calendar, Outlook-Contacts, Outlook-Mail, Planner, SharePoint, Teams.
-# The ones here don't belong to an application.
-#Write-Host -ForegroundColor Red "Using the default / sample app ID. You should edit the .PSM1 file and either replace the ID with your own, or remove this message"
-#$Script:ClientID  = "bf546ecc-067d-4030-9edd-7b0d74913411"  #You can also try  "1950a258-227b-4e31-a9cf-717495945fc2"  # Well known client ID for PowerShell
-$Script:ClientID   = "0bdc25d3-eec9-40cf-a8b2-d0108c3d38f5"  # Defined in My AD, use your own.
-$script:Tenant     = 'e6af5578-6d03-49e0-af3b-383cf5ec0b5f'  # "mobulaconsulting.com"
+# Those in this file don't belong to an application.
+Write-Host -ForegroundColor Red "Using the default / sample app ID. You should edit the .PSM1 file and either replace the ID with your own, or remove this message"
+$Script:ClientID  = "bf546ecc-067d-4030-9edd-7b0d74913411"  #You can also try  "1950a258-227b-4e31-a9cf-717495945fc2"  # Well known client ID for PowerShell
+#$script:Tenant    = Guid-for-your-tennant if the Client ID is set up as below
 
 <#
     You can create an app in Azure AD or at https://apps.dev.microsoft.com/
