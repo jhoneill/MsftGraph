@@ -124,7 +124,7 @@ Function Connect-MSGraph {
               Export-Clixml -Path $Script:SavePath  -InputObject $Response -Depth 5
               Write-Verbose -Message "Saving response to $Script:SavePath"
         }
-        else {Write-Verbose -Message "Response will not be saved"}
+        else {Write-Verbose -Message "Coverting but not saving"}
         if ($Response.access_token) {
             $Script:AccessToken     = $Response.access_token
             $Script:AuthHeader      = 'Bearer ' + $Response.access_token
