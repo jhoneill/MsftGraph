@@ -100,7 +100,6 @@ Function Connect-MSGraph {
         [pscredential]$Credential,
         #If specified creates prompts for a login for a temporary session (a login which doesn't save the token or use an existing saved one)
         [Switch]$Temp
-
     )
 
     Function Convert-AuthResponse {
@@ -561,6 +560,9 @@ Function Get-GraphDirectoryLog {
  (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/memberof").value
  (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/me/owneddevices").value | ft displayname,operatingsystemversion,trusttype
 #>
+
+Get-PSCallStack | Out-File -Append ~\graph.txt
+
 
 Connect-MSGraph
 $Global:AccessToken = $script:AccessToken

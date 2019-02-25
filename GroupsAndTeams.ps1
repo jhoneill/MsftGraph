@@ -731,7 +731,7 @@ function Get-GraphTeam {
             }
             catch {
                 if ($_.exception -match"403\) Forbidden") {
-                    Write-warning -Message "Server returned a 403 (Forbidden) error ; you must be a memeber of the team to view some things [admin does not give access]. "
+                    Write-warning -Message "Server returned a 403 (Forbidden) error; you must be a memeber of the team $($t.displayname) to view some things [admin does not give access]. "
                 }
                 else {throw $_  }
             }

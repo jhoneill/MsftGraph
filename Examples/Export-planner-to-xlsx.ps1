@@ -1,13 +1,11 @@
-﻿Param (
+﻿#requires -modules msftGraph, importExcel
+Param (
     $excelPath = '.\Planner-Export.xlsx',
     $TeamName  = 'Consultants',
     $PlanName  = 'PlanName'
 )
 
-ipmo C:\Users\mcp\Documents\WindowsPowerShell\MSGraphAPI\msgraph.psd1
-ipmo C:\Users\mcp\documents\github\importexcel\ImportExcel.psd1       -Force
-
-$myteam       = Get-GraphUser -Teams -Name $TeamName                         # assumes user is 'me'
+$myteam       = Get-GraphTeam -ByName $TeamName           #need to be a member of the team, not just an owner !
 $teamplanner  = Get-GraphTeam $myteam -Plans | where title -eq 'Team Planner'  # my team's planner named 'team planner'
 $teamMembers  = Get-GraphTeam $myteam -Members
 $teamMembers  | foreach-object -begin {$MemberHash = @{}} -Process {$memberhash[$_.id] =$_.mail}
@@ -55,7 +53,7 @@ Set-ExcelRange -Range $plansheet.Column(16)   -Hidden
 Set-ExcelRange -Range $planSheet.cells['C:D'] -Width 11 -NumberFormat 'Short Date'
 Set-ExcelRange -Range $planSheet.cells -VerticalAlignment Center
 #if name, description and/or checklist are too wide, make them narrower
-if ($planSheet.Column(1).Width -gt 35) { 
+if ($planSheet.Column(1).Width -gt 35) {
     Set-ExcelRange -Range $planSheet.cells['A:A'] -Width 35 -WrapText #Title
 }
 if ($planSheet.Column(7).Width -gt 20) {
@@ -66,7 +64,7 @@ if ($planSheet.Column(8).Width -gt 20) {
 }
 if ($planSheet.Column(9).Width -gt 35) {
     $linksRange = "i2:i" + $PlanSheet.Dimension.end.row
-    Set-ExcelRange -Range $planSheet.Cells[$linksRange] -FontSize 8 
+    Set-ExcelRange -Range $planSheet.Cells[$linksRange] -FontSize 8
     Set-ExcelRange -Range $planSheet.cells['i:i'] -Width 35 -WrapText #Links
 }
 #Put a data bar on the percent complete; make sure it goes 0-100 not min value to max value
@@ -76,7 +74,7 @@ $databar.LowValue.type   = [OfficeOpenXml.ConditionalFormatting.eExcelConditiona
 $databar.HighValue.type  = [OfficeOpenXml.ConditionalFormatting.eExcelConditionalFormattingValueObjectType]::Num
 $databar.LowValue.Value  = 0
 $databar.HighValue.Value = 100
-#endregion 
+#endregion
 
 #Create Validation rules. Bucket Name and user must come from the values page, 6 Categories must be Yes or blank, Percentage is an integer from 0 to 100
 $VParams = @{WorkSheet = $PlanSheet; ShowErrorMessage=$true; ErrorStyle='stop'; ErrorTitle='Invalid Data' }

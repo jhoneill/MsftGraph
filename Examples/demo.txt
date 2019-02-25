@@ -1,4 +1,4 @@
-﻿ipmo C:\Users\mcp\Documents\WindowsPowerShell\MSGraphAPI\msgraph.psd1 -Force
+﻿
 $myteam = Get-GraphUser -Teams -Name consultants
 $myteam
 $myteamSite = Get-GraphTeam $myteam -Site
