@@ -226,12 +226,15 @@ Function Connect-MSGraph {
                 if ($Script:uri -match "error=[^&]*|code=[^&]*") {$form.Close() }
             }
             #Create a web browser control pointing at the Auth URI - which will contain the ClientID and be told to send back a code ...
+            $pid            | Get-date  | Out-File -Append ~\graph.txt
+            Get-date        | Out-File -Append ~\graph.txt
+            Get-PSCallStack | Out-File -Append ~\graph.txt
             $web      = New-Object -TypeName System.Windows.Forms.WebBrowser -Property @{Width=600;Height=720;Url=($AuthUri) }
             $form     = New-Object -TypeName System.Windows.Forms.Form       -Property @{Width=800;Height=820}
             $web.Add_DocumentCompleted($DocComp) #Add the event handler to the web control
             $form.Controls.Add($web)             #Add the control to the form
             $form.Add_Shown({$form.Activate()})
-            $form.ShowDialog() | Out-Null
+           # $form.ShowDialog() | Out-Null
 
             #$URI will be set by the event handler ... so did we get a code - meaning the user logged in OK - or did we get an error ?
             if     ( $uri -match "error=([^&]*)") {Write-Warning ("Logon returned an error of " + $Matches[1]); return}

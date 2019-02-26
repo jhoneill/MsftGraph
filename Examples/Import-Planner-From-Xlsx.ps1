@@ -1,11 +1,11 @@
-﻿param (
+﻿#requires -modules msftGraph, importExcel
+
+param (
     $excelPath = '.\planner-Import.xlsx',
     $TeamName  =  'Consultants'  ,
     $PlanName  =  'Team Planner'
 )
 
-ipmo ImportExcel
-ipmo C:\Users\mcp\Documents\WindowsPowerShell\MSGraphAPI\msgraph.psd1  
 
 Write-Progress -Activity 'Importing plan' -Status 'Getting information about the plan, its team, and the team members'
 $myteam              = Get-GraphUser -Teams -Name $TeamName                        # assumes user is 'me'
@@ -18,8 +18,8 @@ $existingteamMembers | foreach-object -begin {$memberMailHash = @{}; $memberIDHa
                                               if ($_.id) {$memberIDHash[$_.id]  =  $_.mail  }
                        }
 
-$importedTeamMembers = Import-Excel -Path $excelPath   -WorksheetName values -StartColumn 12
-#If any team members have no ID  and mail is not in the hash of existing users ...
+$importedTeamMembers = Import-Excel -Path $excelPath -WorksheetName values -StartColumn 12
+#If any team members have no ID, and mail is not in the hash of existing users ...
 # ...Look them up (assume for this demo mail = upn) and add them to the team.
 $importedTeamMembers.Where({$mail -and -not $_.id -and -not $memberMailHash[$_.Mail]})  | ForEach-Object {
     Write-Progress -Activity 'Importing plan' -Status "Processing new team member '$($_.mail)'"
@@ -34,12 +34,12 @@ $importedTeamMembers.Where({$mail -and -not $_.id -and -not $memberMailHash[$_.M
 #endregion
 
 #region ensure the plan's 6 category labels match the ones in the sheet
-#6 category lables are at I1:N1 in the Plan sheet; Import with no header so they will be P1..P6 as properties on an object. Makes that into 6 objects with a name and value
+#6 category lables are at I1:N1 in the Plan sheet; Import with no header so they will be P1..P6 as properties on an object. Make that into 6 objects with a name and value
 Write-Progress -Activity 'Importing plan' -Status 'Checking categories'
 $importedCategories  = (Import-Excel -path $excelPath -WorksheetName 'Plan' -NoHeader -StartColumn 10 -EndRow 1 -EndColumn 14).psobject.Properties | Sort-Object name
 #Transform categories returned by the server into hash table of p1..P6 --> name;  to compare with the imported ones
-$existingCategories  = Get-GraphPlan $teamplanner -Details | Select-Object -expand categorydescriptions
-$existingCategories.psobject.Properties | foreach -begin {$catHash = @{} } -Process {$catHash[($_.name -replace 'category','p')] = $_.value}
+$existingCategories  = Get-GraphPlan $teamplanner -Details | Select-Object -ExpandProperty categorydescriptions
+$existingCategories.psobject.Properties | ForEach-Object -begin {$catHash = @{} } -Process {$catHash[($_.name -replace 'category','p')] = $_.value}
 
 #for our 6 imported categories check them against the corresponding entry in catHash; if different pop in a hash table that can be splatted into Set-GraphplanDetails
 $importedCategories.where({$catHash[($_.name)] -ne $_.value}) |
@@ -62,7 +62,7 @@ $newbuckets          = $importedBuckets.where({-not $bucketHash[$_.bucketName]})
 
 #Buckets with an ID but no match in the hash table must have been reanmed, and those without an ID are new...
 foreach ($bucket in $newbuckets.where({$_.id}) ) {
-    Write-Progress -Activity 'Importing plan' -Status 'Renaming bucket to ' -CurrentOperation $bucket.bucketName 
+    Write-Progress -Activity 'Importing plan' -Status 'Renaming bucket to ' -CurrentOperation $bucket.bucketName
     Rename-GraphPlanBucket -Bucket $bucket.id -NewName $bucket.bucketName -Verbose
     $bucketHash[$bucket.bucketName] =$bucket.id
 }
@@ -94,13 +94,13 @@ $existingTasks       = Get-GraphPlan $teamplanner -FullTasks |
                                 @{n="Category6"      ; e={if($_.appliedCategories.Category6) {'Yes'} else {$null}  } } ,
                                 @{n="Task"           ; e={$_.id } }
 
-Write-Progress -Activity 'Importing plan' -Completed # it isn't from the progress message point of view it is. 
+Write-Progress -Activity 'Importing plan' -Completed # it isn't from the progress message point of view it is.
 $existingTasks | foreach-object -Begin {$taskHash = @{}} -Process {$taskHash[$_.task] = $true }
 #Import the tasks from the sheet. The Category names will be customized so use our own header names, so make them usable,  And pull other columns to match add-GraphPlanTask , Set-GraphPlanTask commands
 $importedTasks = Import-Excel -Path $excelPath -WorksheetName 'Plan' -HeaderName Title, Bucket, StartDate, DueDate, PercentComplete, AssigneeMail, Checklist, Description, Links, Category1, Category2, Category3, Category4, Category5, Category6,Task  |
                     ForEach-Object {
                         if ($_.AssigneeMail) {Add-Member -InputObject $_ -MemberType NoteProperty -Name AssignTo -Value $memberMailHash[$_.AssigneeMail]}
-                        else                 {Add-Member -InputObject $_ -MemberType NoteProperty -Name AssignTo -Value ""} 
+                        else                 {Add-Member -InputObject $_ -MemberType NoteProperty -Name AssignTo -Value ""}
                         Add-Member -InputObject $_ -MemberType NoteProperty -Name CategoryNumbers -value $(foreach ($n in (1..6)) {if ($_."Category$n" -eq 'Yes') {$n} }) -PassThru
                     } | Sort-Object -Property Task
 
@@ -114,5 +114,5 @@ $comparison | Select-Object  @{n='Side';e={if ($_.sideindicator -eq "<=") {'Exis
           'PercentComplete', @{n='Asignee';e={$memberIDHash[$_.assignto]}}, 'Checklist', 'Description', 'Links',
           'Category1', 'Category2', 'Category3', 'Category4', 'Category5', 'Category6' | Out-GridView -Title 'Review the changes - import may overwrite newer data on the server'
 
-$Comparison.Where({$_.sideindicator -eq '=>'})  |  Set-GraphPlanTask -Confirm 
+$Comparison.Where({$_.sideindicator -eq '=>'})  |  Set-GraphPlanTask -Confirm
 

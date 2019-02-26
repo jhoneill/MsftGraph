@@ -6,16 +6,16 @@
 #>
 
 Param (
-    $ExcelFile   = 'C:\temp\temp.xlsx'
+    $ExcelFile   = 'C:\temp\tempchart.xlsx',
     $Destination = 'root:/Documents'
 
 )
-#Remove old file
-Remove-Item     $ExcelFile -ea SilentlyContinue
+#Remove old files
+Remove-Item   C:\temp\graph.png,  $ExcelFile -ea SilentlyContinue
 
 #Get some trivial data - the names and lengths of PowerShell files in this module.
 #Export it to Excel and chart it
-$excel = Get-ChildItem  (split-path (get-module msgraph) -Parent ) -Include *.ps1| Select-Object name,length |
+$excel = Get-ChildItem -path (get-module msftgraph).ModuleBase  -Recurse -Include *.ps1 | Select-Object name,length |
     Export-Excel -PassThru -ChartType BarClustered -AutoNameRange -Path $ExcelFile
 Add-ExcelChart -Worksheet $excel.Sheet1 -ChartType ColumnClustered -XRange "Name" -YRange "Length" -column 4 -SeriesHeader "file size"
 Close-ExcelPackage $excel

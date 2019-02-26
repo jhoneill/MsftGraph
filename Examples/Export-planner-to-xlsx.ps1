@@ -2,11 +2,11 @@
 Param (
     $excelPath = '.\Planner-Export.xlsx',
     $TeamName  = 'Consultants',
-    $PlanName  = 'PlanName'
+    $PlanName  = 'Team Planner'
 )
 
-$myteam       = Get-GraphTeam -ByName $TeamName           #need to be a member of the team, not just an owner !
-$teamplanner  = Get-GraphTeam $myteam -Plans | where title -eq 'Team Planner'  # my team's planner named 'team planner'
+#need to be a member of the team, not just an owner !
+$teamplanner  = Get-GraphTeam -ByName $TeamName -Plans | where title -eq $PlanName  # my team's planner named 'team planner'
 $teamMembers  = Get-GraphTeam $myteam -Members
 $teamMembers  | foreach-object -begin {$MemberHash = @{}} -Process {$memberhash[$_.id] =$_.mail}
 
@@ -17,7 +17,7 @@ $excelPackage = Get-GraphPlan -Plan $teamplanner -buckets |
 
 $excelPackage = $teamMembers | Select @{n='User';e={$_.displayName}},Jobtitle,mail,ID |
         Export-Excel -ExcelPackage $excelPackage  -worksheetname Values -StartColumn 12 -BoldTopRow -AutoSize -PassThru
-#Hide IDs: we can spot new team members if they don't have an ID. and  if a bucket is renamed in the spreadsheet, we can update it if we have the ID
+#Hide IDs: we can spot new team members if they don't have an ID. and if a bucket is renamed in the spreadsheet, we can update it if we have the ID
 Set-Excelrange -Range $excelPackage.Workbook.Worksheets['Values'].Column(15) -Hidden
 Set-Excelrange -Range $excelPackage.Workbook.Worksheets['Values'].Column(3) -Hidden
 #endregion
@@ -77,10 +77,14 @@ $databar.HighValue.Value = 100
 #endregion
 
 #Create Validation rules. Bucket Name and user must come from the values page, 6 Categories must be Yes or blank, Percentage is an integer from 0 to 100
-$VParams = @{WorkSheet = $PlanSheet; ShowErrorMessage=$true; ErrorStyle='stop'; ErrorTitle='Invalid Data' }
-Add-ExcelDataValidationRule @VParams -Range 'B2:B1001' -ValidationType List    -Formula 'values!$a$2:$a$1000'         -ErrorBody "You must select an item from the list.`r`nYou can add to the list on the values page" #Bucket
-Add-ExcelDataValidationRule @VParams -Range 'F2:F1001' -ValidationType List    -Formula 'values!$M$2:$M$1000'         -ErrorBody 'You must select an item from the list'                # Assign to
-Add-ExcelDataValidationRule @VParams -Range 'J2:o1001' -ValidationType List    -ValueSet @('yes','YES','Yes')         -ErrorBody "Select Yes or leave blank for no"                     # Categories
-Add-ExcelDataValidationRule @VParams -Range 'E2:E1001' -ValidationType Integer -Operator between -Value 0 -Value2 100 -ErrorBody 'Percentage must be a whole number between 0 and 100'  # Percent complete
-
+if (-not (Get-Command -Name Add-ExcelDataValidationRule -ErrorAction SilentlyContinue ) ) {
+    Write-Warning -Message 'A newer version of the ImportExcel Module is needed to add validation rules'
+}
+else {
+    $VParams = @{WorkSheet = $PlanSheet; ShowErrorMessage=$true; ErrorStyle='stop'; ErrorTitle='Invalid Data' }
+    Add-ExcelDataValidationRule @VParams -Range 'B2:B1001' -ValidationType List    -Formula 'values!$a$2:$a$1000'         -ErrorBody "You must select an item from the list.`r`nYou can add to the list on the values page" #Bucket
+    Add-ExcelDataValidationRule @VParams -Range 'F2:F1001' -ValidationType List    -Formula 'values!$M$2:$M$1000'         -ErrorBody 'You must select an item from the list'                # Assign to
+    Add-ExcelDataValidationRule @VParams -Range 'J2:o1001' -ValidationType List    -ValueSet @('yes','YES','Yes')         -ErrorBody "Select Yes or leave blank for no"                     # Categories
+    Add-ExcelDataValidationRule @VParams -Range 'E2:E1001' -ValidationType Integer -Operator between -Value 0 -Value2 100 -ErrorBody 'Percentage must be a whole number between 0 and 100'  # Percent complete
+}
 Close-ExcelPackage -ExcelPackage $excelPackage -Show
