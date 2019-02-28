@@ -140,7 +140,7 @@
 
   PrivateData = @{
        PSData    = @{
-           Tags       = @('Microsoft Graph', 'MSGraph', 'Office365', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner')
+           Tags       = @('MicrosoftGraph', 'MSGraph', 'Office365', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner')
            Category   = 'Scripting office Online'
            ProjectUri = 'https://github.com/jhoneill/MsftGraph'
            LicenseUri = 'https://github.com/jhoneill/MsftGraph/blob/master/LICENSE'
