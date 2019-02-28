@@ -1,11 +1,22 @@
 ﻿@{
-  Description       =   'Module to work with Office 365 and Microsoft accounts'
+  Description       =   @'
+  Module to work the Microsoft Graph API with both Office 365 and Microsoft accounts
+  it contains over 80 functions to
+  * Navigate, upload to and download from OneDrive
+  * Navigate, manipulate pages and sections in OneNote Notebooks
+  * Create and manage groups and teams, and Post to Teams and their channels
+  * Create, read and write plans in team plans.
+  * Read and write calendar events, and contacts in Outlook,
+  * Read and send mail messages
+  * Work with Sharepoint lists
+'@
   Copyright         =   '(c) 2019 James O''Neill. All rights reserved.'
   Author            =   'James O''Neill'
   CompanyName       =   'Mobula Consulting'
 
   GUID              =   'f564c0f9-7d96-4452-a715-679dc47c20cc'
-  ModuleVersion     =   '0.1'
+  ModuleVersion     =   '1.0'
+
   NestedModules     = @('Graph.ps1',
                         'GroupsAndTeams.ps1',
                         'OneDrive.ps1',
@@ -18,7 +29,6 @@
                         'User.ps1'
   )
   FormatsToProcess  =   'Graph.format.ps1xml'
-
   FunctionsToExport = @('Add-FileToGraphOneNote',
                         'Add-GraphChannelThread',
                         'Add-GraphEvent',
@@ -27,7 +37,6 @@
                         'Add-GraphListItem',
                         'Add-GraphOneNotePage',
                         'Add-GraphOneNoteTab',
-                        'Add-GraphPlanBucket',
                         'Add-GraphPlannerTab',
                         'Add-GraphPlanTask',
                         'Add-GraphWikiTab',
@@ -77,6 +86,7 @@
                         'New-GraphGroup',
                         'New-GraphList',
                         'New-GraphOneNoteSection',
+                        'Add-GraphPlanBucket',
                         'New-GraphTeamPlan',
                         'New-Recipient',
                         'New-RecurrencePattern',
@@ -127,16 +137,13 @@
                         'BooleanColumn',
                         'ListColumn'
   )
+
   PrivateData = @{
        PSData    = @{
-           Tags     = @('Microsoft Graph', 'MSGraph', 'Office365', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner')
-           Category =   'Scripting office Online'
-
-            # A URL to the license for this module.
-            # LicenseUri = ''
-
-            # A URL to the main website for this project.
-            # ProjectUri = ''
+           Tags       = @('Microsoft Graph', 'MSGraph', 'Office365', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner')
+           Category   = 'Scripting office Online'
+           ProjectUri = 'https://github.com/jhoneill/MsftGraph'
+           LicenseUri = 'https://github.com/jhoneill/MsftGraph/blob/master/LICENSE'
         } # End of PSData hashtable
   }
 
@@ -154,5 +161,4 @@
 
   # HelpInfo URI of this module
   # HelpInfoURI = ''
-
 }
