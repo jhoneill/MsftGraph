@@ -344,6 +344,13 @@ function Add-FileToGraphOneNote  {
         specify a contentType of "multipart/form-data; boundary={MARKER}"
       .INPUTS
         A file to be sent to OneNote
+      .example
+        >
+        >Add-FileToGraphOneNote -Path .\Modules\MsftGraph\Examples\upload.jpg -Title "Demo" -Section $notebook.sections[0] `
+                  -PreContent "<h1>QR Code for the GIT repo</h1>" -PostContent "<b>Share and Enjoy</b>" -PassThru
+
+        $Notebook holds a notebook object with one or more section(s). The command adds a page in the first section,
+        titles it "Demo", and puts upload.jpg on it with formatted text before and after the image.
       .link
         Add-GraphOneNotePage.
     #>

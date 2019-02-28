@@ -199,12 +199,12 @@ function Set-GraphPlanDetails    {
     if ($Force -or $PSCmdlet.ShouldProcess($PlanTitle,"Update Plan Details")) {Invoke-RestMethod @webParams }
 }
 
-function Add-GraphPlanBucket     {
+function New-GraphPlanBucket     {
     <#
       .Synopsis
-        Adds a task-bucket to an exsiting plan
+        Creates a task-bucket in an exsiting plan
       .Example
-        > Add-GraphPlanBucket -Plan $NewTeamplan -Name 'Backlog', 'To-Do','Not Doing'
+        > New-GraphPlanBucket -Plan $NewTeamplan -Name 'Backlog', 'To-Do','Not Doing'
         Creates 3 buckets in the same plan.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
@@ -234,14 +234,16 @@ function Add-GraphPlanBucket     {
         elseif ($Plan -is [String]) {$planid = $Plan}
         else   {Write-Warning 'Could not get the plan ID' ; return }
         foreach ($bucketName in $name) {
-            $json        = (convertto-json ([ordered]@{"planId"=$Planid; "name"=$bucketName; "orderHint"= $orderHint}))
+            $json      = (ConvertTo-Json ([ordered]@{"planId"=$Planid; "name"=$bucketName; "orderHint"= $orderHint}))
             Write-Debug $json
             if ($force -or $PSCmdlet.ShouldProcess($Name,"Add Bucket to plan $($Plan.title)")){
-            $null = Invoke-RestMethod @webParams -Body $json
+            $bucket    = Invoke-RestMethod @webParams -Body $json
+            $bucket.pstypenames.add("GraphBucket")
             $orderHint = " " + $orderHint + "!"
+
+            $bucket
             }
         }
-
     }
 }
 
