@@ -138,6 +138,7 @@ function Set-GraphPlanDetails    {
         Sets the category labels on a Plan
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification="Detail would be incorrect")]
     Param(
         #The ID of the Plan or a Plan object with an ID property.
         [Parameter(Mandatory=$true, Position=0)]
@@ -750,6 +751,9 @@ function Set-GraphTaskDetails    {
 
     #>
     [CmdletBinding(SupportsShouldProcess=$true)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification="Detail would be incorrect")]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification="False positives when initializing variable in begin block")]
+
     param (
         #ID of a task or a task object contining an ID
         [Parameter(Mandatory=$true,ValueFromPipeline=$true)]

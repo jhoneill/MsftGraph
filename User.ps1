@@ -378,6 +378,7 @@ function Find-GraphPeople {
             Requires consent to use either the People.Read or the People.Read.All scope
     #>
     [cmdletbinding(DefaultparameterSetName='Default')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification="Person would be incorrect")]
     param (
         #Text to use in a 'Topic' Search. Topics are not pre-defined, butinferred using machine learning based on your conversation history (!)
         [parameter(ValueFromPipeline=$true,Position=0,parameterSetName='Default',Mandatory=$true)]

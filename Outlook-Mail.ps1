@@ -1,9 +1,12 @@
-﻿function Get-GraphMailTips       {
+﻿[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Scope='Function', Target='New*')]
+param()
+function Get-GraphMailTips       {
     <#
       .synopsis
         Gets mail tips for one or more users (is their mailbox full, are auto-replies on etc)
     #>
     [cmdletbinding()]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification="MailTip would be incorrect")]
     param(
         #mail addresses
         [Parameter(Mandatory=$true)]
@@ -181,7 +184,7 @@ function New-MailAddress         {
     )
     $recip = @{address=$Mail}
     if ($DisplayName) {$recip['name'] = $DisplayName}
-    
+
     $recip
 }
 

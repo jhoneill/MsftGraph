@@ -41,6 +41,8 @@
         In this case the drive ID could be ommitted because the default is to use the user's home drive
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Write-warning could be used, but the is informational non-output.')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Drive cache is intended to be accessible outside the module.')]
     param   (
         #The drive to examine - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
         [parameter(ValueFromPipeline=$true)]
@@ -210,6 +212,7 @@ function New-GraphFolder {
         '/Documents/Project Firebird/Planning' works just as well.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Drive cache is intended to be accessible outside the module.')]
     param(
         #The name for the new folder
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
@@ -446,7 +449,7 @@ function Copy-ToGraphFolder {
                 else                               {Write-Verbose -Message "Have an upload session until $($SessionConnection.expirationDateTime)" }
                 $oldprogressPref    = $ProgressPreference
                 $ProgressPreference = 'SilentlyContinue'
-                $result             = Invoke-RestMethod -Method Put -Uri $UploadSession.uploadUrl -InFile $uploadItem.FullName -ContentType "application/octet-stream" -header @{"Content-Range"=$RangeText}
+                $result             = Invoke-RestMethod -Method Put -Uri $UploadSession.uploadUrl -InFile $uploadItem.FullName -ContentType "application/octet-stream" -Headers @{"Content-Range"=$RangeText}
                 $ProgressPreference =$oldprogressPref
             }
             $result.pstypenames.Add("GraphDriveItem")

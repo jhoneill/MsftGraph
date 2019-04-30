@@ -462,6 +462,8 @@ function Get-GraphTeam {
         Gets the teams conversation threads which have been updated in the last 7 days.
     #>
     [Cmdletbinding(DefaultparameterSetName="None")]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',  Justification='Write-warning could be used, but the is informational non-output.')]
+
     [Alias("Get-GraphGroup")]
     param   (
         #The name of a team.
@@ -751,7 +753,7 @@ function Set-GraphTeam {
         Gets a the team(s) with a name that begins with accounts, and turns off Giphy content
         Note the use of -SwitchName:$false.
     #>
-    [Cmdletbinding()]
+    [Cmdletbinding(SupportsShouldProcess=$true)]
     param (
         #The team to update either as an ID or a team object with and ID.
         [Parameter(ValueFromPipeline=$true,Position=0)]
@@ -795,9 +797,19 @@ function Set-GraphTeam {
                   ContentType  =  'application/json'
                   Headers      =  $Script:DefaultHeader }
 
-    if     ($Team.id)           {$webparams['Uri'] = "https://graph.microsoft.com/v1.0/teams/$($Team.id)"}
-    elseif ($Team -is [string]) {$webparams['Uri'] = "https://graph.microsoft.com/v1.0/teams/$Team"}
+    Write-Progress -Activity "Updating Team" -Status "Checking team is valid"
+    if     ($Team.id)           {
+        $group =  Invoke-RestMethod -method get "https://graph.microsoft.com/v1.0/groups/$($Team.id)" -Headers $DefaultHeader
+    }
+    elseif ($Team -is [string]) {
+        $group =  Invoke-RestMethod -method get "https://graph.microsoft.com/v1.0/groups/$Team" -Headers $DefaultHeader
+    }
     else   {Write-Warning -Message 'Could not resolve the team'; return}
+    if ($group.id -and $group.displayName -and $group.resourceProvisioningOptions -contains 'Team') {
+        $webparams['Uri'] = "https://graph.microsoft.com/v1.0/teams/$($group.id)"
+    }
+    else   {Write-Warning -Message 'Could not resolve the team'; return}
+    Write-Progress -Activity "Updating Team" -Completed
 
     $settings          = @{}
     $memberSettings    = @{}
@@ -830,8 +842,11 @@ function Set-GraphTeam {
     if ($settings.Count) {
         $json = ConvertTo-Json $settings -Depth 10
         Write-Debug $json
-
-        Invoke-RestMethod @webparams -Body $json
+        if ($PSCmdlet.ShouldProcess($group.displayName,'Update Team settings')) {
+            Write-Progress -Activity "Updating Team" -CurrentOperation $group.displayName -Status "Committing changes"
+            Invoke-RestMethod @webparams -Body $json
+            Write-Progress -Activity "Updating Team" -Completed
+        }
     }
     else {Write-Warning -Message "Nothing to set"}
 }
@@ -1452,7 +1467,7 @@ function Add-GraphChannelThread {
             $result = Invoke-RestMethod @webparams  -Body $json
             If ($Passthru) {
                 $URI    = "https://graph.microsoft.com/beta/teams/$teamid/channels/$channelid/Messages/$($result.id)"
-                $msg    = Invoke-RestMethod -Uri $uri -Method Get -Header $Script:DefaultHeader
+                $msg    = Invoke-RestMethod -Uri $uri -Method Get -Headers $Script:DefaultHeader
                 $msg.pstypenames.add('GraphTeammsg')
 
                 $msg
@@ -1566,7 +1581,7 @@ function Send-GraphChannelReply {
     $json =  (ConvertTo-Json $settings)
     Write-Debug $json
     if ($force -or $PSCmdlet.Shouldprocess("Post Reply")) {
-        Invoke-RestMethod -Method 'POST' -Header $Script:DefaultHeader -Uri "$uri/replies" -ContentType 'application/json' -Body $json
+        Invoke-RestMethod -Method 'POST' -Headers $Script:DefaultHeader -Uri "$uri/replies" -ContentType 'application/json' -Body $json
     }
 }
 

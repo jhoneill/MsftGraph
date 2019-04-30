@@ -1,4 +1,9 @@
-﻿#Most functions for this are in files based on the application where they would surface
+﻿
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Write host used for colored information message telling user to make a change and remove the message')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Initialization clears drive cache and makes access token available outside the module')]
+
+param()
+#Most functions for this are in files based on the application where they would surface
 # OneDrive, OneNote, Outlook-Calendar, Outlook-Contacts, Outlook-Mail, Planner, SharePoint, Teams.
 # Those in this file don't belong to an application.
 Write-Host -ForegroundColor Red "Using the default / sample app ID. You should edit the .PSM1 file and either replace the ID with your own, or remove this message"
@@ -88,6 +93,7 @@ Function Connect-MSGraph {
         Returns the accesstoken, and uses it to call the graph API to get the current users details
     #>
     [cmdletbinding()]
+    [Outputtype([bool])]
     param (
         #If Specified disposes of any existing connection and creates a new one
         [Switch]$ForceNew,
@@ -260,6 +266,7 @@ Function Show-GraphSession {
             Returns Basic information about the current sesssion
     #>
     [CmdletBinding(DefaultParameterSetName='None')]
+    [OutputType([String])]
     Param(
         [Parameter(ParameterSetName='Who')]
         [switch]$Who,

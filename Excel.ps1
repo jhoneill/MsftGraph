@@ -6,8 +6,8 @@ Function GetWorkbook {
 Function GetWorksheet {
     $worksheet = (Invoke-RestMethod -Uri  "$fileuri/workbook/worksheets/sheet1?$`expand=tables,charts,names" -method get -Headers @{Authorization = "Bearer $AccessToken"})
 
-    $worksheet.names | ft Scope, Type, Name,value,visible,Comment
-    >$worksheet.charts | ft name, left,top,width,height
+    $worksheet.names | Format-Table Scope, Type, Name,value,visible,Comment
+    $worksheet.charts | Format-Table name, left,top,width,height
 
 }
 
@@ -16,4 +16,4 @@ Function GetChart {
 
 }
 
-Function Set-Chart {}
+#Function Set-Chart {}

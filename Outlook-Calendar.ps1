@@ -29,9 +29,9 @@
 
     $webParams['uri'] =  $uri -f [datetime]::Today, [datetime]::Today.AddDays(30)
     $result = Invoke-RestMethod @webParams
-    $defaultProperties = @('Subject','When','Reminder')
-    $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultProperties)
-    $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
+    [string[]]$defaultProperties = @('Subject','When','Reminder')
+    $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet -ArgumentList 'DefaultDisplayPropertySet',$defaultProperties
+    $psStandardMembers = [System.Management.Automation.PSMemberInfo[]] @($defaultDisplayPropertySet)
     $whensb = { if (  ([datetime]$this.eventStartTime.datetime).AddDays(1) -eq ([datetime]$this.eventEndTime.datetime  )) {
                       ([datetime]$this.eventStartTime.datetime).ToShortDateString()
                 }
@@ -263,6 +263,8 @@ function New-RecurrencePattern   {
         12 months.
     #>
     [cmdletbinding()]
+    [outputType([system.collections.hashtable])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
     param (
 
         # Event repeats on the every day or every [-interval] days
@@ -345,6 +347,8 @@ function New-EventAttendee       {
         Creats a new meeting attendee, with a mail address and the type of attendance.
     #>
     [cmdletbinding(DefaultParameterSetName='Default')]
+    [outputType([system.collections.hashtable])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
     param(
         # The recipient's email address, e.g Alex@contoso.com
         [Parameter(Position=0, ValueFromPipelineByPropertyName=$true,ParameterSetName='Default',Mandatory=$true)]

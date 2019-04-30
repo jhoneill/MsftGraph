@@ -93,6 +93,8 @@ function New-ContactAddress {
         It can then be used like this. Set-GraphContact $pavel -BusinessAddress $fabrikamAddress
     #>
     [cmdletbinding()]
+    [outputType([system.collections.hashtable])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
     param (
         #Street address. This can contain carriage returns for a district, e.g. "101 London Road`r`nBotley"
         [String]$Street,

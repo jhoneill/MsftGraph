@@ -1,4 +1,6 @@
-﻿function Get-GraphSite                {
+﻿[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Scope='Function', Target='New*')]
+param()
+function Get-GraphSite                {
     <#
       .Synopsis
         Gets details of a sharepoint site, or its lists, drives or subsites
@@ -285,6 +287,8 @@ GET /sites/{site-id}/lists/{list-id}/items/{item-id}/versions
 #>
 
 function New-GraphList                {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PS', '')]
+
     <#
       .Synopsis
         Creates a new sharepoint list
@@ -295,7 +299,7 @@ function New-GraphList                {
         collection of columns. There is no PATCH or DELETE support so there there are is
         no Set- or Remove- function to go with the New-
       .Example
-        >$site            = Get-GraphUser -Teams -Name Consultants | Get-GraphTeam -site
+        >$site            = Get-GraphTeam -ByName Consultants -site
         >$textcolumndef   = New-GraphTextColumn -TextType plain
         >$column1         = New-GraphColumn -Name Author -ColumnDefinition $textcolumndef
         >$numberColumnDef = New-GraphNumberColumn
@@ -641,8 +645,10 @@ function New-GraphBooleanColumn       {
     #>
     [CmdletBinding()]
     [Alias('BooleanColumn')]
+    [OutputType([System.Collections.Hashtable])]
     param (
     )
+
     return @{'boolean' = @{} }
 }
 
@@ -655,6 +661,7 @@ function New-GraphCalculatedColumn    {
     #>
     [CmdletBinding()]
     [Alias('CalculatedColumn')]
+    [OutputType([System.Collections.Hashtable])]
     param (
         #The formula used to calculate the value.
         $Formula ,
@@ -667,7 +674,7 @@ function New-GraphCalculatedColumn    {
     )
     $columnSettings = @{
         'formula'                        = $Formula
-        'ouputType'                      = $OutputType
+        'OutputType'                      = $OutputType
     }
     if ($OutputType -eq 'dateTime') {
         $columnSettings['format']        = $Format
@@ -684,6 +691,7 @@ function New-GraphChoiceColumn        {
     #>
     [CmdletBinding()]
     [Alias('ChoiceColumn')]
+    [OutputType([System.Collections.Hashtable])]
     param (
         #The list of values available for this column..
         [Parameter(Mandatory=$true,Position=0)]
@@ -710,6 +718,7 @@ function New-GraphCurrencyColumn      {
     #>
     [CmdletBinding()]
     [Alias('CurrencyColumn')]
+    [OutputType([System.Collections.Hashtable])]
     param (
         $Locale = (Get-Culture)
     )
@@ -732,6 +741,7 @@ function New-GraphDateTimeColumn      {
     #>
     [CmdletBinding()]
     [Alias('DateTimeColumn')]
+    [OutputType([System.Collections.Hashtable])]
     param (
         #Should the value be presented as a date only or a date and time
         [ValidateSet( 'dateOnly', 'dateTime')]
@@ -755,6 +765,7 @@ function New-GraphLookupColumn        {
     #>
     [CmdletBinding()]
     [Alias('LookupColumn')]
+    [OutputType([System.Collections.Hashtable])]
     param (
         #The unique identifier of the lookup source list.
         [Parameter(Mandatory=$true,Position=0)]
@@ -790,6 +801,7 @@ function New-GraphNumberColumn        {
     #>
     [CmdletBinding()]
     [Alias('NumberColumn')]
+    [OutputType([System.Collections.Hashtable])]
     param (
         #How the value should be presented in the UX, number by default, the only other choice is percentage
         [ValidateSet('number', 'percentage')]
@@ -824,6 +836,7 @@ function New-GraphPersonOrGroupColumn {
     #>
     [CmdletBinding()]
     [Alias('PersonColumn')]
+    [OutputType([System.Collections.Hashtable])]
     param (
         #If Specified allows multiple/users to be specified
         [switch]$MultipleSelection,
@@ -855,6 +868,7 @@ function New-GraphTextColumn          {
     #>
     [CmdletBinding()]
     [Alias('TextColumn')]
+    [OutputType([System.Collections.Hashtable])]
     param (
         #Text is single line unless multiline is specified.
         [Switch]$MultiLine,
@@ -885,6 +899,7 @@ function New-GraphTextColumn          {
 
 function New-GraphContentType  {
     [cmdletbinding()]
+    [OutputType([System.Collections.Hashtable])]
     param (
         #The ID of the contenttype
         [parameter(Mandatory=$true)]

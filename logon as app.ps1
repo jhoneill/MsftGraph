@@ -22,4 +22,4 @@ $oauthAPP  = Invoke-RestMethod -Method Post -Uri $URI -Body @{
 }
 
 
-$Defaultheader = @{Authorization="$($oauthapp.token_type) $($oauthapp.access_token)"}
+$Script:Defaultheader = @{Authorization="$($oauthapp.token_type) $($oauthapp.access_token)"}
