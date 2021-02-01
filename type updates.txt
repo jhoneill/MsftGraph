@@ -1,0 +1,29 @@
+#type updates to do
+
+# don't have Microsoft.Graph.PowerShell.Models.MicrosoftGraphServicePlanInfo GraphServicePlan
+             Microsoft.Graph.PowerShell.Models.MicrosoftGraphProfilePhoto  ??GraphPhoto  ??
+             Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization # GraphOrganization     -->
+             Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTaskList
+                     Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTaskList
+            Microsoft.Graph.PowerShell.Models.MicrosoftGraphPresence
+
+
+Done
+# GraphUser             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser
+# GraphThread           -->  Microsoft.Graph.PowerShell.Models.MicrosoftGraphConversationThread
+# GraphTeam             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphTeam
+# GraphTask             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerTask
+# GraphSite             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphSite
+# GraphSKU              --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphSubscribedSku
+# GraphPlan             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerPlan
+# GraphOneNoteSection   -->Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteSection
+# GraphOneNoteBook      --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphNotebook
+# GraphMailboxSettings  --> Microsoft.Graph.PowerShell.Models.IMicrosoftGraphMailboxSettings# GraphLicense          --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphLicenseDetails
+# GraphList             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphList
+# GraphGroup            --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphGroup
+# GraphDriveItem        --> Microsoft.Graph.PowerShell.Models.Microsoft
+# GraphDrive            --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphDrive
+# GraphDomain           --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphVerifiedDomain
+# GraphContact (always?)--> Microsoft.Graph.PowerShell.Models.MicrosoftGraphPerson
+# GraphColumn           --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphColumnDefinition
+# GraphCalendar         --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphCalendar

@@ -9,10 +9,10 @@
                      $global:DriveCache[$_.parentReference.driveId] + ( $_.parentReference.path -replace "^.*/root"," - Path: /root")
                     </ScriptBlock></ExpressionBinding>
                     <NewLine/>
-                </CustomItem> 
+                </CustomItem>
             </Frame></CustomItem></CustomEntry></CustomEntries></CustomControl>
         </Control>
-          <Control>
+        <Control>
             <Name>SharePointLists-GroupingFormat</Name>
             <CustomControl><CustomEntries><CustomEntry><CustomItem><Frame>
                 <LeftIndent>8</LeftIndent>
@@ -21,13 +21,13 @@
                      ( "URLs under " + $_.parentUrl )
                     </ScriptBlock></ExpressionBinding>
                     <NewLine/>
-                </CustomItem> 
+                </CustomItem>
             </Frame></CustomItem></CustomEntry></CustomEntries></CustomControl>
         </Control>
     </Controls>
     <ViewDefinitions>
         <View>
-            <Name>Office 365 Licences</Name><ViewSelectedBy><TypeName>GraphLicense</TypeName></ViewSelectedBy>
+            <Name>Office 365 Licences</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphLicenseDetails</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -63,9 +63,9 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>              
+        </View>
         <View>
-            <Name>Office 365 SKU</Name><ViewSelectedBy><TypeName>GraphSKU</TypeName></ViewSelectedBy>
+            <Name>Office 365 SKU</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphSubscribedSku</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -113,17 +113,17 @@
                             </TableColumnItem>
                             <TableColumnItem>
                            	    <ScriptBlock>
-                                    $_.prepaidunits.enabled 
+                                    $_.prepaidunits.enabled
                                 </ScriptBlock>
                             </TableColumnItem>
                             <TableColumnItem>
                            	    <ScriptBlock>
-                                    $_.prepaidunits.suspended 
+                                    $_.prepaidunits.suspended
                                 </ScriptBlock>
                             </TableColumnItem>
                             <TableColumnItem>
                            	    <ScriptBlock>
-                                    $_.prepaidunits.warning 
+                                    $_.prepaidunits.warning
                                 </ScriptBlock>
                             </TableColumnItem>
                             <TableColumnItem>
@@ -167,7 +167,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Domain</Name><ViewSelectedBy><TypeName>GraphDomain</TypeName></ViewSelectedBy>
+            <Name>Domain</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphVerifiedDomain</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -260,9 +260,9 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>   
+        </View>
         <View>
-            <Name>Graph Calendars</Name><ViewSelectedBy><TypeName>GraphCalendar</TypeName></ViewSelectedBy>
+            <Name>Graph Calendars</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphCalendar</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -310,7 +310,7 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>  
+        </View>
         <View>
             <Name>Graph Devices</Name><ViewSelectedBy><TypeName>GraphDevice</TypeName></ViewSelectedBy>
             <TableControl>
@@ -381,7 +381,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Drives</Name><ViewSelectedBy><TypeName>GraphDrive</TypeName></ViewSelectedBy>
+            <Name>Graph Drives</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDrive</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -442,17 +442,17 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>            
+        </View>
         <View>
-            <Name>Graph Files</Name><ViewSelectedBy><TypeName>GraphDriveItem</TypeName></ViewSelectedBy>
+            <Name>Graph Files</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDriveItem</TypeName></ViewSelectedBy>
             <GroupBy>
                 <ScriptBlock>$_.parentReference.path</ScriptBlock>
-                <CustomControlName>OneDriveItems-GroupingFormat</CustomControlName>  
+                <CustomControlName>OneDriveItems-GroupingFormat</CustomControlName>
             </GroupBy>
                 <TableControl>
                   <TableHeaders>
                     <TableColumnHeader>
-                      <Label>Mode</Label> 
+                      <Label>Mode</Label>
                       <Alignment>left</Alignment>
                        <Width>15</Width>
                    </TableColumnHeader>
@@ -498,7 +498,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Mailbox Settings</Name><ViewSelectedBy><TypeName>GraphMailboxSettings</TypeName></ViewSelectedBy>
+            <Name>Graph Mailbox Settings</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.IMicrosoftGraphMailboxSettings</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -537,7 +537,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Users</Name><ViewSelectedBy><TypeName>GraphUser</TypeName></ViewSelectedBy>
+            <Name>Graph Users</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -568,7 +568,7 @@
                     <TableColumnHeader>
                         <Label>UPN</Label>
                         <Alignment>Left</Alignment>
-                    </TableColumnHeader>          
+                    </TableColumnHeader>
                 </TableHeaders>
                 <TableRowEntries>
                     <TableRowEntry>
@@ -602,14 +602,14 @@
                                 <PropertyName>userPrincipalName</PropertyName>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
-                            
+
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
         </View>
         <View>
-            <Name>Graph Groups</Name><ViewSelectedBy><TypeName>GraphGroup</TypeName></ViewSelectedBy>
+            <Name>Graph Groups</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphGroup</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -644,7 +644,7 @@
                     <TableColumnHeader>
                         <Label>Mail</Label>
                         <Alignment>Left</Alignment>
-                    </TableColumnHeader>          
+                    </TableColumnHeader>
                 </TableHeaders>
                 <TableRowEntries>
                     <TableRowEntry>
@@ -682,14 +682,14 @@
                                 <PropertyName>Mail</PropertyName>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
-                            
+
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>                       
+        </View>
         <View>
-            <Name>Graph Tasks</Name><ViewSelectedBy><TypeName>GraphTask</TypeName></ViewSelectedBy>
+            <Name>Graph Tasks</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerTask</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -712,11 +712,11 @@
                    <TableColumnHeader>
                         <Label>Due Date/Time</Label>
                         <Alignment>Left</Alignment>
-                    </TableColumnHeader> 
+                    </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>Completed Date/Time</Label>
                         <Alignment>Left</Alignment>
-                    </TableColumnHeader>          
+                    </TableColumnHeader>
                 </TableHeaders>
                 <TableRowEntries>
                     <TableRowEntry>
@@ -746,12 +746,12 @@
                                 <ScriptBlock>([datetime]$_.completedDateTime).tostring("g")</ScriptBlock>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
-                            
+
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>  
+        </View>
         <View>
             <Name>Graph Extended Tasks</Name><ViewSelectedBy><TypeName>GraphExtendedTask</TypeName></ViewSelectedBy>
             <ListControl>
@@ -762,7 +762,7 @@
                     <label>Plan</label>
                     <PropertyName>PlanTitle</PropertyName>
                   </ListItem>
-                  <ListItem> 
+                  <ListItem>
                     <Label>Bucket</Label>
                      <PropertyName>Bucketname</PropertyName>
                   </ListItem>
@@ -777,7 +777,7 @@
                   <ListItem>
                     <Label>Assignees</Label>
                      <PropertyName>Assignees</PropertyName>
-                  </ListItem>         
+                  </ListItem>
                   <ListItem>
                     <label>Created</label>
                     <ScriptBlock>([datetime]($_.createdDateTime)).tostring("g")</ScriptBlock>
@@ -797,11 +797,11 @@
                   <ListItem>
                     <Label>% Complete</Label>
                     <PropertyName>percentComplete</PropertyName>
-                  </ListItem>  
+                  </ListItem>
                   <ListItem>
                     <Label>Categories</Label>
                     <ScriptBlock>$_.appliedCategories.psobject.Properties.where({$_.value -eq $true}).name -join "; "</ScriptBlock>
-                  </ListItem> 
+                  </ListItem>
                   <ListItem>
                     <Label>Checklist</Label>
                     <ScriptBlock>$_.checklist.psobject.Properties.value.title -join "; "</ScriptBlock>
@@ -809,18 +809,18 @@
                   <ListItem>
                     <Label>Check list items</Label>
                       <PropertyName>checklistItemCount</PropertyName>
-                  </ListItem>  
+                  </ListItem>
                   <ListItem>
                     <Label>References</Label>
                         <PropertyName>referenceCount</PropertyName>
                   </ListItem>
-                </ListItems>    
+                </ListItems>
               </ListEntry>
             </ListEntries>
           </ListControl>
-        </View>  
+        </View>
         <View>
-            <Name>Graph Plans</Name><ViewSelectedBy><TypeName>GraphPlan</TypeName></ViewSelectedBy>
+            <Name>Graph Plans</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerPlan</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -857,9 +857,9 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>           
+        </View>
         <View>
-            <Name>Graph Buckets</Name><ViewSelectedBy><TypeName>GraphBucket</TypeName></ViewSelectedBy>
+            <Name>Graph Buckets</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerBucket</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -888,9 +888,9 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>        
+        </View>
         <View>
-            <Name>Graph Channels</Name><ViewSelectedBy><TypeName>GraphChannel</TypeName></ViewSelectedBy>
+            <Name>Graph Channels</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphChannel</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -919,7 +919,7 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>         
+        </View>
         <View>
             <Name>Graph Tabs</Name><ViewSelectedBy><TypeName>GraphTab</TypeName></ViewSelectedBy>
             <TableControl>
@@ -958,7 +958,7 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View> 
+        </View>
         <View>
             <Name>Graph Team messages</Name><ViewSelectedBy><TypeName>GraphTeamMsg</TypeName></ViewSelectedBy>
             <TableControl>
@@ -987,7 +987,7 @@
                     <TableColumnHeader>
                         <Label>Content</Label>
                         <Alignment>Left</Alignment>
-                    </TableColumnHeader>                    
+                    </TableColumnHeader>
                 </TableHeaders>
                 <TableRowEntries>
                     <TableRowEntry>
@@ -1002,7 +1002,7 @@
                                 <Alignment>Left</Alignment>
                            </TableColumnItem>
                             <TableColumnItem>
-                                <ScriptBlock>$_.replyToId -as [bool]</ScriptBlock>                                
+                                <ScriptBlock>$_.replyToId -as [bool]</ScriptBlock>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
@@ -1012,7 +1012,7 @@
                             <TableColumnItem>
                                 <PropertyName>Importance</PropertyName>
                                 <Alignment>Left</Alignment>
-                           </TableColumnItem>                           
+                           </TableColumnItem>
                             <TableColumnItem>
                                 <ScriptBlock>$_.body.content</ScriptBlock>
                                 <Alignment>Left</Alignment>
@@ -1021,9 +1021,9 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View> 
+        </View>
         <View>
-            <Name>Graph Teams</Name><ViewSelectedBy><TypeName>GraphTeam</TypeName></ViewSelectedBy>
+            <Name>Graph Teams</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphTeam</TypeName></ViewSelectedBy>
             <ListControl>
             <ListEntries>
               <ListEntry>
@@ -1032,7 +1032,7 @@
                     <label>Display Name</label>
                     <PropertyName>displayName</PropertyName>
                   </ListItem>
-                  <ListItem> 
+                  <ListItem>
                     <Label>Description</Label>
                      <PropertyName>description</PropertyName>
                   </ListItem>
@@ -1059,11 +1059,11 @@
                   <ListItem>
                     <Label>Members May Delete Channels</Label>
                     <ScriptBlock>$_.memberSettings.allowDeleteChannels</ScriptBlock>
-                  </ListItem>  
+                  </ListItem>
                   <ListItem>
                     <Label>Guests May Delete Channels</Label>
                     <ScriptBlock>$_.guestSettings.allowDeleteChannels</ScriptBlock>
-                  </ListItem>  
+                  </ListItem>
                   <ListItem>
                     <Label>Members May Add/RemoveApps</Label>
                     <ScriptBlock>$_.memberSettings.allowAddRemoveApps</ScriptBlock>
@@ -1095,11 +1095,11 @@
                   <ListItem>
                     <Label>Allow Channel Mentions</Label>
                     <ScriptBlock>$_.messagingSettings.allowChannelMentions</ScriptBlock>
-                  </ListItem>  
+                  </ListItem>
                   <ListItem>
                     <Label>Allow Giphy</Label>
                     <ScriptBlock>$_.funSettings.allowGiphy</ScriptBlock>
-                  </ListItem> 
+                  </ListItem>
                   <ListItem>
                     <Label>Giphy Content Rating</Label>
                     <ScriptBlock>$_.funSettings.giphyContentRating</ScriptBlock>
@@ -1111,14 +1111,14 @@
                   <ListItem>
                     <Label>Allow Custom Memes</Label>
                     <ScriptBlock>$_.funSettings.allowCustomMemes</ScriptBlock>
-                  </ListItem>         
-                </ListItems>    
+                  </ListItem>
+                </ListItems>
               </ListEntry>
             </ListEntries>
           </ListControl>
-        </View>   
+        </View>
         <View>
-            <Name>Graph Threads</Name><ViewSelectedBy><TypeName>GraphThread</TypeName></ViewSelectedBy>
+            <Name>Graph Threads</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphConversationThread</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1159,13 +1159,13 @@
                                 <ScriptBlock>$_.uniqueSenders -join ', '</ScriptBlock>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
-                            
+
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>   
-        
+        </View>
+
         <View>
           <Name>Graph Sign-in log entryk</Name><ViewSelectedBy><TypeName>GraphSigninLog</TypeName></ViewSelectedBy>
             <TableControl>
@@ -1228,10 +1228,10 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>   
-        
+        </View>
+
         <View>
-          <Name>Graph OneNote NoteBook</Name><ViewSelectedBy><TypeName>GraphOneNoteBook</TypeName></ViewSelectedBy>
+          <Name>Graph OneNote NoteBook</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphNotebook</TypeName></ViewSelectedBy>
           <ListControl>
             <ListEntries>
               <ListEntry>
@@ -1240,7 +1240,7 @@
                     <label>Display Name</label>
                     <PropertyName>displayName</PropertyName>
                   </ListItem>
-                  <ListItem> 
+                  <ListItem>
                     <Label>Sections</Label>
                     <ScriptBlock>$_.sections.displayName -join ", "</ScriptBlock>
                   </ListItem>
@@ -1263,22 +1263,22 @@
                   <ListItem>
                     <Label>Created By</Label>
                     <ScriptBlock>$_.createdBy.user.displayName</ScriptBlock>
-                  </ListItem> 
-                  <ListItem> 
+                  </ListItem>
+                  <ListItem>
                     <Label>Last Modified By</Label>
                     <ScriptBlock>$_.lastModifiedBy.user.displayName</ScriptBlock>
                   </ListItem>
-                  <ListItem> 
+                  <ListItem>
                     <Label>Last Modified Date</Label>
                     <ScriptBlock>([datetime]$_.lastModifiedDateTime).ToString('g')</ScriptBlock>
-                  </ListItem>  
+                  </ListItem>
                 </ListItems>
               </ListEntry>
             </ListEntries>
           </ListControl>
-        </View>         
+        </View>
         <View>
-          <Name>Graph OneNote Section</Name><ViewSelectedBy><TypeName>GraphOneNoteSection</TypeName></ViewSelectedBy>
+          <Name>Graph OneNote Section</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteSection</TypeName></ViewSelectedBy>
           <ListControl>
             <ListEntries>
               <ListEntry>
@@ -1294,7 +1294,7 @@
                   <ListItem>
                     <Label>Parent Notebook</Label>
                     <ScriptBlock>$_.parentNotebook.displayName</ScriptBlock>
-                  </ListItem>                  
+                  </ListItem>
                   <ListItem>
                     <Label>OneNote Client Url</Label>
                     <ScriptBlock>$_.links.oneNoteClientUrl.href</ScriptBlock>
@@ -1306,20 +1306,20 @@
                   <ListItem>
                     <Label>Created By</Label>
                     <ScriptBlock>$_.createdBy.user.displayName</ScriptBlock>
-                  </ListItem> 
-                  <ListItem> 
+                  </ListItem>
+                  <ListItem>
                     <Label>Last Modified By</Label>
                     <ScriptBlock>$_.lastModifiedBy.user.displayName</ScriptBlock>
                   </ListItem>
-                  <ListItem> 
+                  <ListItem>
                     <Label>Last Modified Date</Label>
                     <ScriptBlock>([datetime]$_.lastModifiedDateTime).ToString('g')</ScriptBlock>
-                  </ListItem>  
+                  </ListItem>
                 </ListItems>
               </ListEntry>
             </ListEntries>
           </ListControl>
-        </View>         
+        </View>
         <View>
           <Name>Graph OneNote Page</Name><ViewSelectedBy><TypeName>GraphOneNotePage</TypeName></ViewSelectedBy>
           <ListControl>
@@ -1342,17 +1342,17 @@
                     <Label>OneNote Web Url</Label>
                     <ScriptBlock>$_.links.oneNoteWebUrl.href</ScriptBlock>
                   </ListItem>
-                  <ListItem> 
+                  <ListItem>
                     <Label>Last Modified Date</Label>
                     <ScriptBlock>([datetime]$_.lastModifiedDateTime).ToString('g')</ScriptBlock>
-                  </ListItem>  
+                  </ListItem>
                 </ListItems>
               </ListEntry>
             </ListEntries>
           </ListControl>
-        </View>  
+        </View>
         <View>
-            <Name>Graph Site</Name><ViewSelectedBy><TypeName>Graphsite</TypeName></ViewSelectedBy>
+            <Name>Graph Site</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphSite</TypeName></ViewSelectedBy>
             <TableControl>
                 <TableHeaders>
                     <TableColumnHeader>
@@ -1416,9 +1416,9 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>        
+        </View>
         <View>
-            <Name>Graph Column</Name><ViewSelectedBy><TypeName>GraphColumn</TypeName></ViewSelectedBy>
+            <Name>Graph Column</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphColumnDefinition</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1487,16 +1487,16 @@
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>        
-    
+        </View>
+
         <View>
-            <Name>Graph List</Name><ViewSelectedBy><TypeName>GraphList</TypeName></ViewSelectedBy>
+            <Name>Graph List</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphList</TypeName></ViewSelectedBy>
                 <GroupBy>
                     <ScriptBlock>$_.parentURL</ScriptBlock>
-                    <CustomControlName>sharePointLists-GroupingFormat</CustomControlName>  
+                    <CustomControlName>sharePointLists-GroupingFormat</CustomControlName>
                  </GroupBy>
                  <TableControl>
-                 <AutoSize /> 
+                 <AutoSize />
                 <TableHeaders>
                     <TableColumnHeader>
                       <Label>Name</Label>
@@ -1543,12 +1543,12 @@
                                 <PropertyName>description</PropertyName>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
-                            
+
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View> 
+        </View>
         <View>
             <Name>Graph Conversation</Name><ViewSelectedBy><TypeName>GraphConversation</TypeName></ViewSelectedBy>
             <TableControl>
@@ -1591,7 +1591,7 @@
                                 <ScriptBlock>$_.uniqueSenders -join ', '</ScriptBlock>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
-                            
+
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
@@ -1755,7 +1755,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Contact</Name><ViewSelectedBy><TypeName>GraphContact</TypeName></ViewSelectedBy>
+            <Name>Graph Contact</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPerson</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1823,7 +1823,7 @@
                                    <ScriptBlock>$_.homephones -join ","</ScriptBlock>
                                 <Alignment>Left</Alignment>
                            </TableColumnItem>
-                           
+
                            <TableColumnItem>
                                 <ScriptBlock>($_.emailaddresses | select-object -ExpandProperty address) -join ", "</ScriptBlock>
                                 <Alignment>Left</Alignment>
@@ -1886,7 +1886,7 @@
                   <ListItem>
                     <Label>Organizer</Label>
                     <ScriptBlock>$_.organizer.emailaddress.name</ScriptBlock>
-                  </ListItem> 
+                  </ListItem>
                   <ListItem>
                     <Label>Body Preview</Label>
                     <PropertyName>bodypreview</PropertyName>
@@ -1895,9 +1895,9 @@
               </ListEntry>
             </ListEntries>
           </ListControl>
-        </View>         
+        </View>
         <View>
-            <Name>Graph App</Name><ViewSelectedBy><TypeName>GraphApp</TypeName></ViewSelectedBy>
+            <Name>Graph App</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphTeamsAppDefinition</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1919,21 +1919,21 @@
                         <Wrap/>
                         <TableColumnItems>
                             <TableColumnItem>
-                                <ScriptBlock>$_.teamsAppDefinition.displayName</ScriptBlock>
+                                <ScriptBlock>$_.displayName</ScriptBlock>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <ScriptBlock>$_.teamsAppDefinition.version</ScriptBlock>
+                                <ScriptBlock>$_.version</ScriptBlock>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
                              <TableColumnItem>
-                                <ScriptBlock>$_.teamsAppDefinition.teamsAppId</ScriptBlock>
+                                <ScriptBlock>$_.teamsAppId</ScriptBlock>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
                         </TableColumnItems>
                     </TableRowEntry>
                 </TableRowEntries>
             </TableControl>
-        </View>      
+        </View>
     </ViewDefinitions>
 </Configuration>

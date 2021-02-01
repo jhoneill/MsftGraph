@@ -1,4 +1,6 @@
-﻿function Get-GraphPlan           {
+﻿
+$GraphUri = "https://graph.microsoft.com/v1.0"
+function Get-GraphPlan           {
     <#
       .Synopsis
         Gets information about plans used in the Planner app.
@@ -26,66 +28,62 @@
         [switch]$FullTasks
     )
     process {
-        Connect-MSGraph
         if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-        $webParams = @{Method = "Get"
-                       Headers = $Script:DefaultHeader
+
+        if (-not $Plan)         {$Plan = (Invoke-MgGraphRequest -Uri "$GraphUri/me/planner/plans").value | Select-Object -First 1 }
+        if ($Plan.title)        {$planTitle = $Plan.title}
+        if ($Plan.id)           {$Plan      = $Plan.id}
+        if ($Plan -is [string]) {$Uri       = "$GraphUri/planner/plans/$Plan" }
+        else                    {
+            Write-Warning "Could not get a plan ID from the information provided"
         }
-        if ($Plan.title)    {$planTitle = $Plan.title}
-        if ($Plan.id)       {$Plan = $Plan.id}
-        if ($Plan)          {$Uri  = "https://graph.microsoft.com/v1.0/planner/plans/$Plan" }
-        else                {$Uri  = "https://graph.microsoft.com/v1.0/me/planner/"}
         Write-Verbose -Message "Geting information from $uri"
-        if     ($Tasks)     {
-            $results = Invoke-RestMethod @webParams -Uri "$uri/Tasks"
-            $t       = $results.value | Sort-Object -Property orderHint
-            foreach ($task in $t) {$task.pstypenames.add("GraphTask")}
-              if ($planTitle) {
-                $t = $t  | Add-Member -PassThru   -MemberType NoteProperty -Name PlanTitle -value $planTitle
+
+        if     ($Tasks -or
+                $FullTasks)     {
+            $result = (Invoke-MgGraphRequest -Uri "$uri/Tasks").value | Sort-Object -Property orderHint
+            foreach ($r in $result) {
+                $etag = $r.'@odata.etag'  #we need this for chaning items, but it isn't in the object definition ... grrr.
+                $r.remove( '@odata.etag') ;
+                $taskobj = New-Object -Property $r -TypeName Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerTask
+                Add-Member -InputObject $taskobj -NotePropertyName  etag -NotePropertyValue $etag
+                if ($planTitle) { Add-Member -InputObject $taskobj -NotePropertyName  PlanTitle -NotePropertyValue $planTitle}
+                if ($FullTasks) {Expand-GraphTask -Task $taskobj}
+                else            {$taskobj}
             }
-            return $t
         }
-        elseif ($FullTasks) {
-            $results = (Invoke-RestMethod @webParams -Uri "$uri/tasks"   ).value | Sort-Object -Property orderHint
-            if ($planTitle) {
-                $results  = $results  | Add-Member -PassThru  -MemberType NoteProperty -Name PlanTitle -value $planTitle
-            }
-            $results |  Expand-GraphTask
+        elseif ($Details )      {
+            New-object -TypeName psobject -Property (Invoke-MgGraphRequest  -Uri "$uri/Details")
         }
-        elseif ($Details -and
-                $Plan)      {  Invoke-RestMethod @webParams -Uri "$uri/Details" }
-        elseif ($Buckets -and
-                $Plan)      {
-            $results =  Invoke-RestMethod @webParams -Uri "$uri/Buckets"
-            $b       = $results.value | Sort-Object -Property orderHint
-            foreach ($bucket in $b) {
-                $bucket.pstypenames.add("GraphBucket")
-                if ($planTitle) {Add-Member -InputObject $bucket -MemberType NoteProperty -Name PlanTitle -value $planTitle     }
+        elseif ($Buckets)       {
+            (Invoke-MgGraphRequest  -Uri "$uri/Buckets").value | Sort-Object -Property orderHint | ForEach-Object {
+                $etag = $_.'@odata.etag'  #we need this for chaning items, but it isn't in the object definition ... grrr.
+                $_.remove('@odata.etag')
+                $bucketobj = New-object -Property $_ -TypeName Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerBucket
+                Add-Member -InputObject $bucketobj -NotePropertyName  etag -NotePropertyValue $etag
+                if ($planTitle) {Add-Member -PassThru -InputObject $bucketobj -NotePropertyName PlanTitle -NotePropertyValue $planTitle     }
+                else            {$bucketobj}
             }
-            return $b
         }
-        elseif ($Buckets  -or
-                $Details)   {  Write-Warning -Message "You need to specify a Plan when using -Buckets or -Details"}
-        elseif ($plan)      {
-            $result =  Invoke-RestMethod @webParams -Uri "$uri`?`$expand=details"
-            $result.pstypenames.add("GraphPlan")
-            if ($result.owner) {
-                $owner = (Invoke-RestMethod  @webparams -Uri "https://graph.microsoft.com/v1.0/directoryobjects/$($result.owner)").displayname
-                Add-Member -InputObject $result -MemberType NoteProperty -Name OwnerName -Value $owner
+        else                    {
+            $result    =  Invoke-MgGraphRequest  -Uri "$uri`?`$expand=details"
+            $etag      =  $result.'@odata.etag'  #we need this for chaning items, but it isn't in the object definition ... grrr.
+            $odatakeys =  $result.Keys.Where({$_ -match "@odata\."})
+            foreach ($k in $odatakeys) {$result.Remove($k)}
+            $planObj = New-Object  -Property $result -TypeName Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerPlan
+            Add-Member -InputObject $planObj -NotePropertyName  etag -NotePropertyValue $etag
+            if ($planObj.owner) {
+                $owner = (Invoke-MgGraphRequest  -Uri "$GraphUri/directoryobjects/$($planObj.owner)").displayname
+                Add-Member -InputObject $planObj -NotePropertyName OwnerName -NotePropertyValue $owner
             }
-            if ($result.createdBy.user.id -and $result.createdBy.user.id  -eq $result.owner) {
-                Add-Member -InputObject $result -MemberType NoteProperty -Name CreatorName -Value $owner
+            if ($planObj.createdBy.user.id -and $planObj.createdBy.user.id  -eq $planObj.owner) {
+                Add-Member -InputObject $planObj -MemberType NoteProperty -Name CreatorName -Value $owner
             }
-            elseif ($result.createdBy.user.id) {
-                $creator = (Invoke-RestMethod  @webparams -Uri "https://graph.microsoft.com/v1.0/directoryobjects/$($result.createdBy.user.id)").displayname
-                Add-Member -InputObject $result -MemberType NoteProperty -Name CreatorName -Value $creator
+            elseif ($planObj.createdBy.user.id) {
+                $creator = (Invoke-MgGraphRequest  -Uri "$GraphUri/directoryobjects/$($planObj.createdBy.user.id)").displayname
+                Add-Member -InputObject $planObj -MemberType NoteProperty -Name CreatorName -Value $creator
             }
-            return $result
-        }
-        else                {
-            $result =  Invoke-RestMethod @webParams -Uri  $uri
-            $result.pstypenames.add("GraphPlan")
-            return $result
+            return $planObj
         }
     }
 }
@@ -107,7 +105,6 @@ function New-GraphTeamPlan       {
         [Switch]$Force
     )
     begin   {
-        Connect-MSGraph
     }
     process {
         if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
@@ -116,14 +113,13 @@ function New-GraphTeamPlan       {
         foreach ($p in $PlanName) {
             $settings["title"] = $p
             $webParams = @{Method      = "Post"
-                           Headers     = $Script:DefaultHeader
                            URI         = "https://graph.microsoft.com/beta/planner/plans"
                            Contenttype = "application/json"
                            Body        = (ConvertTo-Json $settings)
             }
             Write-Debug $webParams.Body
             if ($Force -or  $PSCmdlet.ShouldProcess($P,"Add Team Planner")) {
-                $result = Invoke-RestMethod @webParams -ErrorAction Stop
+                $result = Invoke-MgGraphRequest @webParams -ErrorAction Stop
                 $result.pstypenames.add("GraphPlan")
                 Add-Member -InputObject $result -MemberType NoteProperty -Name Team -Value $Team
                 return $result
@@ -170,12 +166,11 @@ function Set-GraphPlanDetails    {
         #If specified the plan will updated without confirmation
         [switch]$Force
     )
-    Connect-MSGraph
     if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-    if ($Plan.id) {$detailsURI = "https://graph.microsoft.com/v1.0/planner/plans/$($plan.id)/details" ; $planTitle = $Plan.Title}
-    else          {$detailsURI = "https://graph.microsoft.com/v1.0/planner/plans/$plan/details"       ; $planTitle = "."   }
+    if ($Plan.id) {$detailsURI = "$GraphUri/planner/plans/$($plan.id)/details" ; $planTitle = $Plan.Title}
+    else          {$detailsURI = "$GraphUri/planner/plans/$plan/details"       ; $planTitle = "."   }
     try {
-        $tag = (Invoke-RestMethod -Method Get -Headers $Script:DefaultHeader -Uri $detailsURI -ErrorAction Stop ).'@odata.etag'
+        $tag = (Invoke-MgGraphRequest   -Uri $detailsURI -ErrorAction Stop ).'@odata.etag'
     }
     catch          {throw "Failed to get tag from $detailsURI" ; return }
     if (-not $tag) {throw "Failed to get tag from $detailsURI" ; return }
@@ -191,13 +186,13 @@ function Set-GraphPlanDetails    {
     else {$Settings = @{"categoryDescriptions" = $CategorySettings} }
     $webParams = @{ Method      = "Patch"
                     URI         = $detailsURI
-                    Headers     = @{Authorization = $Script:AuthHeader; "If-Match" = $tag}
+                    Headers     = @{"If-Match" = $tag}
                     Contenttype = "application/json"
                     body        =  ((ConvertTo-Json $settings) -replace '""','null')
 
     }
     write-Debug   $webParams.body
-    if ($Force -or $PSCmdlet.ShouldProcess($PlanTitle,"Update Plan Details")) {Invoke-RestMethod @webParams }
+    if ($Force -or $PSCmdlet.ShouldProcess($PlanTitle,"Update Plan Details")) {Invoke-MgGraphRequest @webParams }
 }
 
 function New-GraphPlanBucket     {
@@ -220,10 +215,8 @@ function New-GraphPlanBucket     {
         [switch]$Force
     )
     begin {
-        Connect-MSGraph
         $webParams = @{ 'Method'      = "Post"
-                        'URI'         = "https://graph.microsoft.com/v1.0/planner/buckets"
-                        'Headers'     = $Script:DefaultHeader
+                        'URI'         = "$GraphUri/planner/buckets"
                         'Contenttype' = "application/json"
 
         }
@@ -238,7 +231,7 @@ function New-GraphPlanBucket     {
             $json      = (ConvertTo-Json ([ordered]@{"planId"=$Planid; "name"=$bucketName; "orderHint"= $orderHint}))
             Write-Debug $json
             if ($force -or $PSCmdlet.ShouldProcess($Name,"Add Bucket to plan $($Plan.title)")){
-            $bucket    = Invoke-RestMethod @webParams -Body $json
+            $bucket    = Invoke-MgGraphRequest @webParams -Body $json
             $bucket.pstypenames.add("GraphBucket")
             $orderHint = " " + $orderHint + "!"
 
@@ -268,15 +261,14 @@ function Rename-GraphPlanBucket  {
         [Switch]$Force
     )
 
-    if ($Bucket.id) { $uri = "https://graph.microsoft.com/v1.0/planner/buckets/$($Bucket.id)"}
-    else             {$uri = "https://graph.microsoft.com/v1.0/planner/buckets/$Bucket"       }
+    if ($Bucket.id) { $uri = "$GraphUri/planner/buckets/$($Bucket.id)"}
+    else             {$uri = "$GraphUri/planner/buckets/$Bucket"       }
     if ($Bucket.'@odata.etag') {$tag = $Bucket.'@odata.etag'}
-    else                       {$tag = (Invoke-RestMethod -Method Get -URI $uri -Headers $Script:DefaultHeader).'@odata.etag' }
+    else                       {$tag = (Invoke-MgGraphRequest  -URI $uri ).'@odata.etag' }
 
-    $headers = @{'If-Match'=$tag} + $Script:DefaultHeader
     $body    = "{  ""name"": ""$NewName"" }"
     if ($Force -or $PSCmdlet.ShouldProcess($NewName,'Apply new name to bucket')) {
-        Invoke-RestMethod -Method Patch -URI $uri  -Headers $headers -Body $body -ContentType 'application/json'
+        Invoke-MgGraphRequest -Method Patch -URI $uri  -Headers @{'If-Match'=$tag} -Body $body -ContentType 'application/json'
     }
 }
 
@@ -294,22 +286,20 @@ function Remove-GraphPlanBucket  {
         [switch]$Force
     )
     begin {
-        Connect-MSGraph
     }
     process {
         if ($Bucket.name )         {$target = $Bucket.name}
         if ($Bucket.'@odata.etag') {$tag    = $Bucket.'@odata.etag'}
         if ($Bucket.id )           {$Bucket = $Bucket.ID}
-        $uri =  "https://graph.microsoft.com/v1.0/planner/buckets/$Bucket"
+        $uri =  "$GraphUri/planner/buckets/$Bucket"
         if (-not $tag)  {
-            $bucketdetails = Invoke-RestMethod -Method Get -Headers $Script:DefaultHeader -Uri $uri
+            $bucketdetails = Invoke-MgGraphRequest  -Uri $uri
             $tag           = $bucketdetails.'@odata.etag'
             $target        = $bucketdetails.name
         }
         if (-not $target)  {$target=$Bucket}
-        $headers = @{'If-Match' = $tag} + $Script:DefaultHeader
         if($Force -or $PSCmdlet.ShouldProcess($target,'Delete Plan Bucket')) {
-            Invoke-RestMethod -Method Delete -Uri $uri -Headers $headers
+            Invoke-MgGraphRequest -Method Delete -Uri $uri -Invoke-MgGraphRequests @{'If-Match' = $tag}
         }
 
     }
@@ -319,22 +309,27 @@ function Get-GraphBucketTaskList {
     [CmdletBinding()]
     Param(
         #Bucket to query either as an ID or a Bucket object with an ID
-        [Parameter(ValueFromPipelineByPropertyName=$true,Mandatory=$true, Position=0)]
+        [Parameter(ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true,Mandatory=$true, Position=0)]
+        [Alias('ID')]
         $Bucket,
-         #If specified IDs will be updated to their names, and extended properties (e.g. Checklist) will be added
+        #If specified IDs will be updated to their names, and extended properties (e.g. Checklist) will be added
+        [Alias('FullTasks')]
         [Switch]$Expand
     )
-    if ($Bucket.id) {$Bucket = $BucketID}
-    $response = Invoke-RestMethod -Method Get -URI "https://graph.microsoft.com/v1.0/planner/buckets/$Bucket/tasks" -Headers $Script:DefaultHeader
-    $value    = $response.value
+    if ($Bucket.id) {$Bucket = $Bucket.ID}
+    $response      = Invoke-MgGraphRequest  -URI "$GraphUri/planner/buckets/$Bucket/tasks"
+    $result        = $response.value
     while ($response.'@odata.nextLink') {
-        $response = Invoke-RestMethod -Method Get -URI $response.'@odata.nextLink' -Headers $Script:DefaultHeader
-        $value += $response.value
+        $response  = Invoke-MgGraphRequest  -URI $response.'@odata.nextLink'
+        $result   += $response.value
     }
-    if ($Expand) {$value | Expand-GraphTask}
-    else {
-        foreach ($v in $value) { $v.pstypenames.add("GraphTask")}
-        return $value
+    foreach ($r in $result) {
+        $etag      =  $r.'@odata.etag'  #we need this for chaning items, but it isn't in the object definition ... grrr.
+        $r.remove( "@odata.etag") ;
+        $taskobj   = New-Object -Property $r -TypeName "Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerTask"
+        Add-Member -InputObject $taskobj -NotePropertyName  etag -NotePropertyValue $etag
+        if ($Expand) {Expand-GraphTask -Task $taskobj}
+        else            {$taskobj}
     }
 }
 
@@ -393,7 +388,6 @@ function Add-GraphPlanTask       {
         if ($Plan.owner)  {$owner = $plan.owner}
         if ($Plan.id)     {$Plan = $Plan.id}
 
-        Connect-MSGraph
         try {
             Write-Progress -Activity 'Adding Task' -Status 'Getting buckets and team memmbers for this plan'
             if (-not $owner) {$owner = (Get-GraphPlan -Plan $plan).owner }
@@ -406,8 +400,7 @@ function Add-GraphPlanTask       {
         catch { throw "An error occured while get information about the plan" ; return }
 
         $webParams = @{ Method      = "Post"
-                        URI         = "https://graph.microsoft.com/v1.0/planner/tasks"
-                        Headers     =  $Script:DefaultHeader
+                        URI         = "$GraphUri/planner/tasks"
                         Contenttype = "application/json"
         }
     }
@@ -442,7 +435,7 @@ function Add-GraphPlanTask       {
                 try {
                     if ($a -match "\w+@\w+") {
                     Write-Progress -Activity 'Adding Task' -Status 'Getting system ID for user' -CurrentOperation $a
-                    $a = (Invoke-RestMethod -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/users/$a" -ErrorAction stop).id}
+                    $a = (Invoke-MgGraphRequest   -Uri "$GraphUri/users/$a" -ErrorAction stop).id}
                 }
                 catch {throw "Couldn't resolve user $a"; return}
                 $settings.assignments[$a] = @{'@odata.type'= "#microsoft.graph.plannerAssignment"; 'orderHint'= " !" }}
@@ -458,7 +451,7 @@ function Add-GraphPlanTask       {
         Write-Debug $json
         if ($Force -or $PSCmdlet.ShouldProcess($Title,"Add Task") ) {
             Write-Progress -Activity 'Adding Task' -Status 'Saving new task'
-            $task  = Invoke-RestMethod @webParams -body $Json
+            $task  = Invoke-MgGraphRequest @webParams -body $Json
             if     ($Description -and $Checklist) {Set-GraphTaskDetails -PSC $PSCmdlet -Task $task -Description $Description -CheckList $Checklist }
             elseif ($Description )                {Set-GraphTaskDetails -PSC $PSCmdlet -Task $task -Description $Description  }
             elseif ($Checklist   )                {Set-GraphTaskDetails -PSC $PSCmdlet -Task $task -CheckList $Checklist }
@@ -484,17 +477,20 @@ function Get-GraphPlanTask       {
         [Parameter(ValueFromPipeline=$true,Position=0,Mandatory=$true)]
         $Task,
         #If specified IDs will be updated to their names, and extended properties (e.g. Checklist) will be added
+        [Alias('FullTasks')]
         [Switch]$Expand
-
     )
 
     if ($Task.ID)   {$Task = $Task.ID}
-    $response = Invoke-RestMethod -Method Get -URI "https://graph.microsoft.com/v1.0/planner/tasks/$Task" -Headers $Script:DefaultHeader
-    if ($Expand) {$response | Expand-GraphTask }
-    else         {
-        $response.pstypenames.add("GraphTask")
-        return $response
-    }
+    $result    = Invoke-MgGraphRequest  -URI "$GraphUri/planner/tasks/$Task"
+    $etag      =  $result.'@odata.etag'  #we need this for chaning items, but it isn't in the object definition ... grrr.
+    $odatakeys =  $result.Keys.Where({$_ -match "@odata\."})
+    foreach ($k in $odatakeys) {$result.Remove($k)}
+    $taskobj  = New-Object -Property $result -TypeName "Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerTask"
+    Add-Member -InputObject $taskobj -NotePropertyName  etag -NotePropertyValue $etag
+    if ($Expand) {Expand-GraphTask -Task $taskobj}
+    else         {$taskobj}
+
 }
 
 function Set-GraphPlanTask       {
@@ -551,7 +547,6 @@ function Set-GraphPlanTask       {
         [switch]$Passthru
     )
     begin   {
-        Connect-MSGraph
         $planHash = @{}
     }
     process {
@@ -622,15 +617,15 @@ function Set-GraphPlanTask       {
 
         $json =  (ConvertTo-Json $settings)
         Write-Debug $json
-        $webParams = @{ URI     = "https://graph.microsoft.com/v1.0/planner/tasks/$Task"
-                    Headers     = @{'If-Match' = $tag ; 'Prefer' = 'return=representation'  } + $Script:DefaultHeader
+        $webParams = @{ URI     = "$GraphUri/planner/tasks/$Task"
+                    Headers     = @{'If-Match' = $tag ; 'Prefer' = 'return=representation'  }
                     Contenttype = 'application/json'
                     body        = $json
         }
         if (($settings.count -gt 0) -and ($Force -or $PSCmdlet.ShouldProcess($promptTitle,"Update Task")) ) {
             Write-Progress -Activity "Updating task" -Status 'Updating Task'
             #by specifying a 'return' preference in the headers we get the task back, and we can use that when calling set-graphtaskDetails, and return it if asked to.
-            $UpdatedTask = Invoke-RestMethod -Method Patch @webParams
+            $UpdatedTask = Invoke-MgGraphRequest -Method Patch @webParams
         }
         #The only warnings we get from Set-GraphTaskDetails are 'This check list item/ This link' is already there' - supress those because if we have a changed task, that's expected.
         if     ($Description -and $Checklist) {Set-GraphTaskDetails -Task $UpdatedTask -PSC $PSCmdlet -CheckList   $Checklist   -WarningAction SilentlyContinue -ClearList:$ClearList  -Description $Description }
@@ -660,22 +655,20 @@ function Remove-GraphPlanTask    {
         [switch]$Force
     )
     begin   {
-        Connect-MSGraph
     }
     process {
         if ($Task.title )        {$target = $Task.title}
         if ($Task.'@odata.etag') {$tag    = $Task.'@odata.etag'}
         if ($Task.id )           {$Task   = $Task.ID}
-        $uri =  "https://graph.microsoft.com/v1.0/planner/Tasks/$Task"
+        $uri =  "$GraphUri/planner/Tasks/$Task"
         if (-not $tag)  {
-            $Taskdetails = Invoke-RestMethod -Method Get -Headers $Script:DefaultHeader -Uri $uri
+            $Taskdetails = Invoke-MgGraphRequest   -Uri $uri
             $tag           = $Taskdetails.'@odata.etag'
             $target        = $Taskdetails.title
         }
         if (-not $target)  {$target=$Task}
-        $headers = @{'If-Match' = $tag} + $Script:DefaultHeader
         if($Force -or $PSCmdlet.ShouldProcess($target,'Delete Plan Task')) {
-            Invoke-RestMethod -Method Delete -Uri $uri -Headers $headers
+            Invoke-MgGraphRequest -Method Delete -Uri $uri -Headers  @{'If-Match' = $tag}
         }
 
     }
@@ -694,10 +687,6 @@ function Expand-GraphTask        {
         $Task
     )
     begin   {
-        Connect-MSGraph
-        $webParams  = @{Method = "Get"
-                        Headers = $Script:DefaultHeader
-        }
         $allTasks   = @()
         $planhash   = @{}
         $bucketHash = @{}
@@ -710,29 +699,29 @@ function Expand-GraphTask        {
         Write-Progress -Activity "Getting task details" -Status "Getting plan and bucket names"
         $planids      = $allTasks.planid | Sort-Object -Unique
         foreach ($p  in $planids) {
-            $planhash[$p] = (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/planner/plans/$P" ).title
-            (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/planner/plans/$p/buckets" ).value |
+            $planhash[$p] = (Invoke-MgGraphRequest  -Uri "$GraphUri/planner/plans/$P" ).title
+            (Invoke-MgGraphRequest  -Uri "$GraphUri/planner/plans/$p/buckets" ).value |
                 ForEach-Object  {$bucketHash[$_.id] = $_.name}
         }
         Write-Progress -Activity "Getting task details" -Status "Getting name(s) for assignee ID(s)"
-        $userIDs = $allTasks | ForEach-Object {$_.assignments.psobject.Properties} | Select-Object -ExpandProperty Name | Sort-object -unique
+        $userIDs = $allTasks.Assignments.Keys | Sort-object -unique
         foreach ($u in $userIDs)  {
-            $uData = Invoke-RestMethod @webParams -Uri  "https://graph.microsoft.com/v1.0/users/$u"
+            $uData = Invoke-MgGraphRequest  -Uri  "$GraphUri/users/$u"
             if ($uData) {$userHash[$uData.id]=$uData.displayname}
         }
         $i = 0 #Counter for progress bar.
         Write-Progress -Activity "Getting task details" -Status "Extending Tasks" -PercentComplete 0
         foreach ($t in $allTasks) {
-            $details   = Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/planner/tasks/$($t.id)/details"
-            $assignees = $t.assignments.psobject.Properties | Select-Object -ExpandProperty Name | foreach-object {$userhash[$_]}
-            Add-Member -Force -InputObject $t -MemberType NoteProperty -Name Assignees    -Value ($assignees -join ", ")
-            Add-Member -Force -InputObject $t -MemberType NoteProperty -Name Bucketname   -Value $buckethash[$t.bucketId]
-            Add-Member -Force -InputObject $t -MemberType NoteProperty -Name PlanTitle    -Value $planhash[$t.planID]
-            Add-Member -Force -InputObject $t -MemberType NoteProperty -Name DetailTag    -Value $details.'@odata.etag'
-            Add-Member -Force -InputObject $t -MemberType NoteProperty -Name references   -Value $details.references
-            Add-Member -Force -InputObject $t -MemberType NoteProperty -Name checklist    -Value $details.checklist
-            Add-Member -Force -InputObject $t -MemberType NoteProperty -Name description  -Value $details.description
-            Add-Member -Force -InputObject $t -MemberType NoteProperty -Name previewType  -Value $details.previewType
+            $details   = Invoke-MgGraphRequest  -Uri "$GraphUri/planner/tasks/$($t.id)/details"
+            $assignees = $t.assignments.keys |  foreach-object {$userhash[$_]}
+            Add-Member -Force -InputObject $t -NotePropertyName Assignees   -NotePropertyValue ($assignees -join ", ")
+            Add-Member -Force -InputObject $t -NotePropertyName Bucketname  -NotePropertyValue  $buckethash[$t.bucketId]
+            Add-Member -Force -InputObject $t -NotePropertyName PlanTitle   -NotePropertyValue  $planhash[$t.planID]
+            Add-Member -Force -InputObject $t -NotePropertyName DetailTag   -NotePropertyValue  $details.'@odata.etag'
+            Add-Member -Force -InputObject $t -NotePropertyName References  -NotePropertyValue  $details.references
+            Add-Member -Force -InputObject $t -NotePropertyName Checklist   -NotePropertyValue  $details.checklist
+            Add-Member -Force -InputObject $t -NotePropertyName Description -NotePropertyValue  $details.description
+            Add-Member -Force -InputObject $t -NotePropertyName PreviewType -NotePropertyValue  $details.previewType
             $t.pstypeNames.Add("GraphExtendedTask")
             $i += 100 #To give percentage
             Write-Progress -Activity "Getting task details" -Status "Extending Tasks" -PercentComplete ($i/$allTasks.count)
@@ -780,8 +769,8 @@ function Set-GraphTaskDetails    {
 
     $referencesHash = $checklistHash = $null
     if (-not $psc) {$psc = $PSCmdlet}
-    if ($task.id ) {$detailsURI = "https://graph.microsoft.com/v1.0/planner/tasks/$($task.id)/details" ; $taskTitle =$Task.title}
-    else           {$detailsURI = "https://graph.microsoft.com/v1.0/planner/tasks/$task/details"       ; $taskTitle = "."       }
+    if ($task.id ) {$detailsURI = "$GraphUri/planner/tasks/$($task.id)/details" ; $taskTitle =$Task.title}
+    else           {$detailsURI = "$GraphUri/planner/tasks/$task/details"       ; $taskTitle = "."       }
     try   {
         if ($task.DetailTag -and -not $ClearChecks -and -not $ClearReferences) {
             $tag            = $task.DetailTag
@@ -790,7 +779,7 @@ function Set-GraphTaskDetails    {
         }
         else {
             Write-Progress -Activity "Updating task" -Status 'Updating Task' -CurrentOperation 'Fetching suplementary details'
-            $taskdetails    = Invoke-RestMethod -Method Get -Headers $Script:DefaultHeader -Uri $detailsURI
+            $taskdetails    = Invoke-MgGraphRequest   -Uri $detailsURI
             $tag            = $taskdetails.'@odata.etag'
             if ($ClearChecks) {
                                $taskdetails.checklist.psobject.Properties.name |
@@ -810,7 +799,7 @@ function Set-GraphTaskDetails    {
         if ($_.exception.response.statuscode.value__ -eq 404) {
             Write-Warning "Retrying connection to get taskdetails"
             Start-Sleep -Seconds 5
-            $taskdetails    = Invoke-RestMethod -Method Get -Headers $Script:DefaultHeader -Uri $detailsURI
+            $taskdetails    = Invoke-MgGraphRequest   -Uri $detailsURI
             $tag            = $taskdetails.'@odata.etag'
             $existingChecks = $taskdetails.checklist.psobject.Properties.value.title
         }
@@ -880,13 +869,13 @@ function Set-GraphTaskDetails    {
     #Now send a PATCH to the details URI with the if-match header and the settings in JSON Form
     $webParams = @{ Method      = "Patch"
                     URI         = $detailsURI
-                    Headers     = @{Authorization = $Script:AuthHeader; "If-Match" = $tag}
+                    Headers     = @{"If-Match" = $tag}
                     Contenttype = "application/json"
                     body        = (ConvertTo-Json $settings)}
     Write-Debug $webParams.body
     if (($Settings.Count -gt 0 ) -and  ($Force -or $PSC.ShouldProcess($taskTitle,"Set details on task"))) {
         Write-Progress -Activity "Updating task" -Status 'Updating Task' -CurrentOperation 'Updating suplementary details'
-        Invoke-RestMethod @webParams | Out-Null
+        Invoke-MgGraphRequest @webParams | Out-Null
     }
     Write-Progress -Activity "Updating task" -Completed
 }
@@ -936,11 +925,10 @@ function Add-GraphPlannerTab     {
     #If Plan and/or channel were objects with IDs use the ID
     if       ($Channel.id) {$Channel = $Channel.id}
     if       ($Plan.id)    {$Plan    = $Plan.id}
-    $tabURI = "https://tasks.office.com/{0}/Home/PlannerFrame?page=7&planId={1}" -f $Script:TenantId , $Plan
+    $tabURI = "https://tasks.office.com/{0}/Home/PlannerFrame?page=7&planId={1}" -f [Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext.TenantId  , $Plan
 
     $webparams = @{'Method'      = 'Post';
                    'Uri'         = "https://graph.microsoft.com/beta/teams/$team/channels/$channel/tabs" ;
-                   'Headers'     =  $Script:DefaultHeader;
                    'ContentType' = 'application/json'
     }
 
@@ -956,7 +944,7 @@ function Add-GraphPlannerTab     {
             })
     Write-Debug $json
     if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {
-        $result = Invoke-RestMethod @webParams -body $json
+        $result = Invoke-MgGraphRequest @webParams -body $json
         if ($PassThru) {
             $result.pstypeNames.add('GraphTab')
             #Giving a type name formats things nicely, but need to set the name to be used when the tab is displayed
@@ -965,4 +953,3 @@ function Add-GraphPlannerTab     {
         }
     }
 }
-
