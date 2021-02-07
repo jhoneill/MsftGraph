@@ -1,6 +1,8 @@
 using namespace System.Management.Automation
-using namespace System.Globalization
 using namespace Microsoft.Graph.PowerShell.Models
+using namespace System.Globalization
+
+
 $Script:GraphUri  = "https://graph.microsoft.com/v1.0"
 $Script:GUIDRegex = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
 
@@ -978,7 +980,7 @@ Function Import-GraphGroup       {
         #One or more files to read for input.
         [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
-        #Usually the command will prompt for confirmation -Force disables this primpt
+        #Disables any prompt for confirmation
         [switch]$Force,
         #Supresses output of Added, Removed, or No action messages for each row in the file.
         [switch]$Quiet

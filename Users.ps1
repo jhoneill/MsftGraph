@@ -1,6 +1,7 @@
 ﻿using namespace System.Management.Automation
-using namespace System.Globalization
 using namespace Microsoft.Graph.PowerShell.Models
+using namespace System.Globalization
+
 
 $GuidRegex = '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$'
 
@@ -670,10 +671,7 @@ function New-GraphUser     {
 
 }
 
-
-
-
-function Find-GraphPeople {
+function Find-GraphPeople  {
     <#
        .Synopsis
           Searches people in your inbox / contacts / directory
@@ -715,4 +713,60 @@ function Find-GraphPeople {
             Add-Member -PassThru -MemberType ScriptProperty -Name Score          -Value {$This.scoredEmailAddresses[0].relevanceScore }                |
             Add-Member -PassThru -MemberType AliasProperty  -Name emailaddresses -Value scoredEmailAddresses
     }
+}
+
+Function Import-GraphUser  {
+<#
+    .synopsis
+       Imports a list of users from a CSV file
+    .description
+        Takes a list of CSV files and looks for xxxx columns
+        * Action is either Add, Remove or Set - other values will cause the row to be ignored
+        * DisplayName
+
+#>
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    param (
+        #One or more files to read for input.
+        [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        $Path,
+        #Disables any prompt for confirmation
+        [switch]$Force,
+        #Supresses output of Added, Removed, or No action messages for each row in the file.
+        [switch]$Quiet
+    )
+    begin {
+        $list = @()
+    }
+    process {
+        foreach ($p in $path) {
+            if (Test-Path $p) {$list += Import-Csv -Path $p}
+            else { Write-Warning -Message "Cannot find $p" }
+        }
+    }
+    end {
+        if (-not $Quiet) { $InformationPreference = 'continue'  }
+
+        foreach ($user in $list) {
+            $upn = $user.DisplayName
+            $exists = (Microsoft.Graph.Users.private\Get-MgUser_List -Filter "userprincipalName eq '$upn'") -as [bool]
+            if (($user.Action -eq 'Remove' -and $exists) -and
+                ($force -or $PSCmdlet.ShouldProcess($upn,"Remove user "))){
+                        Remove-Graphuser -Force -user $upn
+                        Write-Information "Removed user'$upn'"
+            }
+            elseif (($user.Action -eq 'Add' -and -not $exists) -and
+                ($force -or $PSCmdlet.ShouldProcess($upn,"Add new user"))){
+                    $params = @{Force=$true; DisplayName=$user.DisplayName; UserPrincipalName= $user.UserPrincipalName;   }
+                    if ($user.Visibility)             {$params['Visibility'] = $user.Visibility}
+                    if ($user.Description)            {$params['Description'] = $user.Description}
+                    New-GraphUser -
+                    #@params
+
+                    Write-Information "Added user'$upn'"
+            }
+            else {  Write-Information "No action taken for user '$displayName'"}
+        }
+    }
+
 }

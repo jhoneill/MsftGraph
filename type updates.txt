@@ -1,13 +1,10 @@
 #type updates to do
 
-# don't have Microsoft.Graph.PowerShell.Models.MicrosoftGraphServicePlanInfo GraphServicePlan
-             Microsoft.Graph.PowerShell.Models.MicrosoftGraphProfilePhoto  ??GraphPhoto  ??
-             Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization # GraphOrganization     -->
-             Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTaskList
-                     Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTaskList
-            Microsoft.Graph.PowerShell.Models.MicrosoftGraphPresence
-
-
+#       Microsoft.Graph.PowerShell.Models.MicrosoftGraphServicePlanInfo     GraphServicePlan
+        Microsoft.Graph.PowerShell.Models.MicrosoftGraphProfilePhoto        ??GraphPhoto  ??
+        Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization        # GraphOrganization
+        Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTaskList
+        Microsoft.Graph.PowerShell.Models.MicrosoftGraphPresence
 
 
 Done
