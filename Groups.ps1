@@ -4,6 +4,27 @@ using namespace Microsoft.Graph.PowerShell.Models
 $Script:GraphUri  = "https://graph.microsoft.com/v1.0"
 $Script:GUIDRegex = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
 
+class GroupCompleter : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result = [System.Collections.Generic.List[CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        $wordToComplete = $wordToComplete -replace '"|''', ''
+
+        if ($wordToComplete) {$uri =  $script:GraphUri +  ("/Groups/?&`$filter=startswith(displayName,'{0}') or startswith(mail,'{0}')" -f $wordToComplete)}
+        else                 {$uri = "$script:GraphUri/Groups/?&`$Top=20"}
+
+        Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
+                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
+        }
+
+        return $result
+    }
+}
+
 function Get-GraphGroupList      {
     <#
       .Synopsis
@@ -130,6 +151,7 @@ function Get-GraphGroup          {
         #One more Team IDs or team objects containing and ID. If omitted the current user's teams will be used.
         [Parameter(ValueFromPipeline=$true, Position=1)]
         [Alias("Team","Group")]
+        [ArgumentCompleter([GroupCompleter])]
         $ID ,
         #If specified returns the teams Apps
         [Parameter(parameterSetName='Apps')]
@@ -486,6 +508,7 @@ function Set-GraphGroup          {
     [Cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
     param (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true,Position=0)]
+        [ArgumentCompleter([GroupCompleter])]
         $Group ,
         #If specified, the group can receive external email; the option can be disabled with -AllowExternalSenders:$false.
         [switch]$AllowExternalSenders,
@@ -553,6 +576,7 @@ function Set-GraphTeam           {
     [Cmdletbinding(SupportsShouldProcess=$true)]
     param (
         #The team to update either as an ID or a team object with and ID.
+        [ArgumentCompleter([GroupCompleter])]
         [Parameter(ValueFromPipeline=$true,Position=0)]
         $Team ,
         #Allow members to add or remove apps
@@ -664,6 +688,7 @@ function Remove-GraphGroup       {
     param(
         #The ID of the Group / team
         [Parameter(Mandatory=$true, Position=0,ValueFromPipeline=$true )]
+        [ArgumentCompleter([GroupCompleter])]
         [Alias("Team")]
         $Group,
         #If specified the group will be removed without prompting
@@ -844,6 +869,7 @@ function Export-GraphGroupMember {
     param (
         [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
         #One or more group(s) to export
+        [ArgumentCompleter([GroupCompleter])]
         $Group,
         #Destination for CSV output
         $Path,

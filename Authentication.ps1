@@ -260,7 +260,7 @@ Function Connect-Graph     {
         [switch]$ForceRefresh ,
 
         #Determines the scope of authentication context. This accepts `Process` for the current process, or `CurrentUser` for all sessions started by user.
-        [ContextScope]$ContextScope,
+      #  [ContextScope]$ContextScope,
 
         #The name of the national cloud environment to connect to. By default global cloud is used.
         [Alias('EnvironmentName', 'NationalCloud')]

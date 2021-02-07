@@ -86,7 +86,7 @@ function Get-GraphSite                {
                                     Add-Member -InputObject $subsite -MemberType NoteProperty -Name ParentUrl -Value $ParentURL
                                 }
                               }
-                              retrun $SubSitelist
+                              return $SubSitelist
             }
             elseif ($Notebooks)  {
                 if ($siteID -eq "root") {

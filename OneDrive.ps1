@@ -1,4 +1,61 @@
-﻿function Get-GraphDrive {
+﻿using namespace Microsoft.Graph.PowerShell.Models
+using namespace System.Management.Automation
+
+class OneDrivePathCompleter : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result = [System.Collections.Generic.List[CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        $wordToComplete = $wordToComplete -replace '"|''', ''
+
+        If     ($wordToComplete -notmatch "/.+/" -or
+                $wordToComplete -eq "/root:?/" )   {$params =@{folderPath = '/'} }
+        elseif ($wordToComplete -Match '^/?root:') {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:'} } #catch after any leading / and before final /; and sandwich between / and :
+        else                                       {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:'} } #catch after any leading / and before final /; and sandwich between /root/ and :
+
+        if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
+        # #it would be better to order-by at the server, but consumer one drive doesn't support it.
+        Get-GraphDrive -quiet @params | Sort-Object -Property name | ForEach-Object {
+            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
+            if ($P -like "*$wordToComplete*") {
+                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
+            }
+        }
+        return $result
+    }
+}
+
+class OneDriveFolderCompleter : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result = [System.Collections.Generic.List[CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        $wordToComplete = $wordToComplete -replace '"|''', ''
+
+        If     ($wordToComplete -notmatch "/.+/" -or
+                $wordToComplete -eq "/root:?/" )   {$params =@{folderPath = '/'} }
+        elseif ($wordToComplete -Match '^/?root:') {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:'} } #catch after any leading / and before final /; and sandwich between / and :
+        else                                       {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:'} } #catch after any leading / and before final /; and sandwich between /root/ and :
+
+        if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
+        # #it would be better to order-by at the server, but consumer one drive doesn't support it.
+        Get-GraphDrive @params -subFolders -quiet | Sort-Object -Property name | ForEach-Object {
+            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
+            if ($P -like "*$wordToComplete*") {
+                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
+            }
+        }
+        return $result
+    }
+}
+
+function Get-GraphDrive {
     <#
       .Synopsis
         Gets information about a OneDrive volume
@@ -36,12 +93,12 @@
       .Example
         >$folder = (get-graphuser -Drive).root.children | where name -eq scripts
         >get-graphdrive -Drive $folder.parentReference.driveId -FolderID $folder.id
-        The first command gets the users drive, and looks for a known folder as a child item in the drive-roo.
+        The first command gets the users drive, and looks for a known folder as a child item in the drive-root.
         This folder can't be piped into get-graphdrive, so the drive id and folder id are passed.
         In this case the drive ID could be ommitted because the default is to use the user's home drive
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Write-warning could be used, but the is informational non-output.')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Write-warning could be used, ut the is informational non-output.')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Drive cache is intended to be accessible outside the module.')]
     param   (
         #The drive to examine - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
@@ -49,6 +106,7 @@
         $Drive = 'me/Drive',
         #if specified gets the items in a folder by the path from {drive}/root:
         [Parameter(Mandatory=$true, ParameterSetName='FolderName',Position=0)]
+        [ArgumentCompleter([OneDriveFolderCompleter])]
         [Alias("Path")]
         [String]$FolderPath,
         #If Specified gets the items in a folder by folder ID
@@ -77,18 +135,16 @@
         [Parameter(ParameterSetName='None')]
         [Switch]$Subfolders,
         #if specified gets the items in a folder by the path from {drive}/root:
+        [ArgumentCompleter([OneDrivePathCompleter])]
         [Parameter(Mandatory=$true, ParameterSetName='ItemName')]
         [String]$ItemPath,
         #If Specified gets the items in a folder by folder ID
         [Parameter(Mandatory=$true, ParameterSetName='ItemID')]
-        [String]$ItemID
+        [String]$ItemID,
+        #If specified does not display a message when a folder is empty
+        [switch]$Quiet
     )
-    begin   {
-        Connect-MSGraph
-        $webParams = @{Method  = "Get"
-                       Headers = $Script:DefaultHeader
-        }
-    }
+
     process {
         #region Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
@@ -97,15 +153,14 @@
         #Strip leading and trailing / from $drive so it fits in the URI template.
         $Drive = $Drive -replace '/$','' -replace '^/',''
         try   {
-            if ($script:WorkOrSchool) {$uri = "https://graph.microsoft.com/v1.0/$Drive`?`$expand=root(`$expand=children)"}
-            else                      {$uri = "https://graph.microsoft.com/v1.0/$Drive"} #The expand fails on consumer one drive
-            $driveObj  =  (Invoke-RestMethod @webParams -uri $uri )
-            $driveObj.pstypenames.Add('GraphDrive')
+            if  (ContextHas -WorkOrSchool) {$uri = "$GraphUri/$Drive`?`$expand=root(`$expand=children)"}
+            else                           {$uri = "$GrpahUri/$Drive"} #The expand fails on consumer one drive
+            $driveObj  =  Invoke-GraphRequest -uri $uri #Don't convert to a type yet
             $global:drivecache[$driveObj.id] = $driveObj.name
         }
         catch {
-            $drive = $null
-            throw ('Error trying to get drive $drive - the code was ' + $_.exception.response.statuscode.value__  ) ; return
+            $driveObj = $null
+            throw ("Error trying to get drive $drive - the code was " + $_.exception.response.statuscode.value__  ) ; return
         }
         #endregion
 
@@ -113,12 +168,15 @@
         # Make something we can insert in a REST URI
         if     ($ItemID   -and $ItemID -Match '^/?items')   {$ItemID =  $ItemID  -replace '^/?(.*)/?$',            '$1' } #Allow "items/{id}" Strip off any leading or trailing /
         elseif ($ItemID   )                                 {$ItemID =  $ItemID  -replace '^/?(.*)/?$',      'items/$1' } #Allow "{id}". Strip off any leading or trailing / and prepend "items/"
-        elseIf ($Itempath -in @("root:", "/", "root:/") )   {$ItemID = 'root' }                                           #Convert "root:", "/" or root:/" to "root"
+        elseif ($Itempath -in @("root:", "/", "root:/") )   {$ItemID = 'root' }                                           #Convert "root:", "/" or root:/" to "root"
         elseif ($ItemPath -and $ItemPath -Match '^/?root:') {$ItemID =  $ItemPath -replace '^/?(.*?)[:/]*$',       '$1:'} #Allow "[/]root:{path}" strip any leading / or trailing / or : and append ":"
         elseif ($ItemPath )                                 {$ItemID =  $ItemPath -replace '^/?(.*?)[:/]*$', 'root:/$1:'} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
         #if we had an item ID or built an itemID string from the path, get the item, add a type and return it
         if     ($ItemID ) {
-            try   {$item = Invoke-RestMethod @WebParams -Uri "https://graph.microsoft.com/v1.0/$Drive/$ItemID" }
+            try   {
+                Invoke-GraphRequest -Uri "$GraphUri/$Drive/$ItemID" -ExcludeProperty '@odata.context', '@microsoft.graph.downloadUrl' -AsType ([MicrosoftGraphDriveItem])
+                return
+            }
             catch {
                 if ($_.exception.response.statuscode.value__ -eq 404) {
                      Write-Warning -Message "Item Not found" ; return
@@ -126,13 +184,11 @@
                 #we got something other than a 404 error
                 else {Write-Warning -Message $_.exception.tostring() ; return }
             }
-            $item.pstypenames.add('GraphDriveItem')
-            return $item
         }
         #endregion
         #region Getting collections of items either in special folders by name, normal folders by path/id, recent items, or items "shared with me".
         #if we got a folder path or ID, search for its items; first make make sure we can insert it into the URL
-        if    (($search) -and -not
+        if    (($Search) -and -not
                ($FolderID   -or $FolderPath) )                  {$FolderID = 'root'}                                               #If We were asked to search but not told where, choose "root"
         elseif ($FolderID  -and $FolderID -Match '^/?items')    {$FolderID =  $FolderID   -replace '^/?(.*)/?$',             '$1'} #Other processing mirrors items above.
         elseif ($FolderID )                                     {$FolderID =  $FolderID   -replace '^/?(.*)/?$',       'items/$1'}
@@ -142,40 +198,45 @@
         elseif ($SpecialFolder)                                 {$FolderID = "special/$SpecialFolder"                            }
 
         if ($FolderID -or $SharedWithMe -or $Recent) {
-            if     ($FolderID -and $Search)     {$webParams['URI']=  "https://graph.microsoft.com/v1.0/$Drive/$FolderID/search(q='$search')?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file"}
-            elseif ($FolderID             )     {$webParams['URI'] = "https://graph.microsoft.com/v1.0/$Drive/$FolderID/children?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file" }
+            if     ($FolderID -and $Search)     {$uri = "$GraphUri/$Drive/$FolderID/search(q='$Search')?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file"}
+            elseif ($FolderID             )     {$uri = "$GraphUri/$Drive/$FolderID/children?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file" }
             elseif ($SharedWithMe -and $search) {}  #can these be combined ?
-            elseif ($SharedWithMe             ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/me/Drive/SharedWithMe"        }
-            elseif ($Search                   ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/me/drive/search(q='$Search')" }  #me or $drive
-            elseif ($Recent                   ) {$webParams['URI'] = "https://graph.microsoft.com/v1.0/$Drive/recent"                }  #Me or $drive
-            try    {$children = (Invoke-RestMethod @WebParams).value }
+            elseif ($SharedWithMe             ) {$uri = "$GraphUri/me/Drive/SharedWithMe"        }
+            elseif ($Search                   ) {$uri = "$GraphUri/me/drive/search(q='$Search')" }  #me or $drive
+            elseif ($Recent                   ) {$uri = "$GraphUri/$Drive/recent"                }  #Me or $drive
+            try    {$children = Invoke-GraphRequest $uri -ValueOnly }
             catch  {
                     if ($_.exception.response.statuscode.value__ -eq 404) {
                           Write-Warning -Message "Not found" ;return
                     }
                     else {Write-Warning -Message $_.exception.tostring() ; return}
             }
-            if ($Subfolders) {$children.where({$_.folder}) | Sort-Object -Property name}
+            $children.where({$_.folder -or -not $Subfolders}) |
+                ForEach-Object {
+                    $_.remove('@odata.etag')
+                    $_.remove('@odata.type')
+                    New-Object -TypeName MicrosoftGraphDriveItem -Property $_
+                } | Sort-Object -Property name
+            #This may have returned nothing no subfolders.
         }
         #endregion
         #region Getting the drive - either the drive object itself , or the folders in its root.
         elseif ($Subfolders) {
-            $children = $driveObj.root.children.where({$_.folder}) | Sort-Object -Property Name
+            $children = $driveObj.root.children.where({$_.folder})
+            $children | ForEach-Object {New-Object -TypeName MicrosoftGraphDriveItem -Property $_} |
+                    Sort-Object -Property Name
         }
         else             {
-            foreach ($c in $driveObj.children) {$c.pstypenames.Add("GraphDriveItem")}
-            return $driveObj
+            $driveObj.remove('root@odata.context')
+            $driveObj.remove('@odata.context')
+            return (New-object -TypeName MicrosoftGraphDrive -Property $driveObj)
         }
         #endregion
 
         #The above will either have left a collection of items in $children, or explictly returned a result.
         #region return any collection of items - filtered to subfolders if required. Tell the user if the folder is empty but send nothing to the pipeline
-        if (-not $children) { Write-Host  "Folder exists, but is empty."}
-        else  {
-                foreach ($c in $children ) {$c.pstypenames.Add("GraphDriveItem")  }
+        if (-not $children -and -not $Quiet) { Write-Host  "Folder exists, but is empty."}
 
-                $children  | Sort-Object -Property @{e={$null -eq $_.folder}},name
-        }
         #endregion
 
         <#
@@ -217,15 +278,13 @@ function New-GraphFolder {
         #The name for the new folder
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
         [Alias('FolderPath')]
+        [ArgumentCompleter([OneDriveFolderCompleter])]
         [string]$Path,
-        #The drive hold the new folder - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
+        #The drive holding the new folder - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
         [Parameter()]
         $Drive = 'me/Drive'
     )
     begin {
-        Connect-MSGraph
-        $webParams = @{Headers= $Script:DefaultHeader }
-
         #  Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
         if     ($Drive.id)               {$drive = "drives/$($drive.id)"}
@@ -233,7 +292,7 @@ function New-GraphFolder {
         #Strip leading and trailing / from $drive so it fits in the URI template.
         $Drive = $Drive -replace '/$','' -replace '^/',''
         try   {
-            $driveObj  =  (Invoke-RestMethod @webParams -Method GET -Uri "https://graph.microsoft.com/v1.0/$Drive")
+            $driveObj  =  (Invoke-GraphRequest -Method GET -Uri "$GraphUri/$Drive")
             $global:drivecache[$driveObj.id] = $driveObj.name
         }
         catch {
@@ -252,17 +311,21 @@ function New-GraphFolder {
         elseif ($parentpath -Match '^/?root:')                    {$parentpath =  $parentpath -replace '^/?(.*?)[:/]*$',       '$1:'} #Allow "[/]root:{path}" strip any leading / or trailing / or : and append ":"
         else                                                      {$parentpath =  $parentpath -replace '^/?(.*?)[:/]*$', 'root:/$1:'} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
 
-        $body = ConvertTo-Json $settings
-        Write-Debug $body
+        $webparams = @{
+            uri             = "$GraphUri/$Drive/$parentPath/children"
+            Method          = 'Post'
+            body            = (ConvertTo-Json $settings)
+            ContentType     = "application/json"
+            AsType          =([MicrosoftGraphDriveItem])
+            ExcludeProperty = @('@odata.context', '@microsoft.graph.downloadUrl')
+
+        }
+        Write-Debug $webparams.body
         if ($PSCmdlet.ShouldProcess($parentPath, "Create new OneDrive folder '$($settings.Name)'")) {
-            try {
-                $newFolder = Invoke-RestMethod @webParams -Method Post -uri "https://graph.microsoft.com/v1.0/$Drive/$parentPath/children" -ContentType "application/json" -Body $body
-                $newFolder.Pstypenames.add("GraphDriveItem")
-                return $newFolder
-            }
+            try { Invoke-GraphRequest @webparams}
             Catch {
                 if ($_.exception.response.statuscode.value__ -eq 409) {
-                    Write-Warning -Message "A Confilict error was returned. The folder probably exists already"
+                    Write-Warning -Message "A Confilict error was returned. The folder probably exists already."
                 }
                 else {throw $_ }
             }
@@ -289,8 +352,9 @@ function Show-GraphFolder {
     [CmdletBinding(DefaultParameterSetName='FolderName')]
     param(
         #If Specified gets the  folder by folder ID
-        [Parameter(Mandatory=$true, ParameterSetName='FolderName')]
+        [Parameter(Mandatory=$true, ParameterSetName='FolderName',Position=1)]
         [Alias("FolderPath")]
+        [ArgumentCompleter([OneDriveFolderCompleter])]
         [String]$Path,
         #If Specified gets the  folder by folder ID
         [Parameter(Mandatory=$true, ParameterSetName='FolderID')]
@@ -331,6 +395,7 @@ function Copy-ToGraphFolder {
         $Path,
         #Location file should be copied to can be in the form "/files/" to copy to users "files" folder, or "/drives/{id}/root:/folder/Subfolder" to select another drive
         [Parameter(Mandatory=$true)]
+        [ArgumentCompleter([OneDriveFolderCompleter])]
         [string]$Destination,
         #The drive, by default the current user's OneDrive.
         $Drive = 'me/Drive',
@@ -342,10 +407,6 @@ function Copy-ToGraphFolder {
         #if specified disables quick updates and uses resumable ones. Forced to true of conflict behavior is set to "fail"
         [switch]$ForceResumable
     )
-
-    begin  {
-        Connect-MSGraph
-    }
     process {
         #Ensure Path gives us something we can upload
         $uploadItem = Get-Item -Path $Path
@@ -377,12 +438,12 @@ function Copy-ToGraphFolder {
         #region Figure out what the URI should be
         #was destination writen out in full as drives/{id}/root:/{path} ? (with or without a leading /)
         if     ($Destination.parentReference -and
-                $Destination.fileSystemInfo)                   { $uri = "https://graph.microsoft.com/v1.0/drives/"+ $Destination.parentReference.driveId + "/items/" + $Destination.id}
-        elseif ($Destination -match '/?drives.*:/\w')           {$uri = 'https://graph.microsoft.com/v1.0/' + ($Destination -replace '^/','') }
+                $Destination.fileSystemInfo)                   { $uri = "$GraphUri/drives/" + $Destination.parentReference.driveId + "/items/" + $Destination.id}
+        elseif ($Destination -match '/?drives.*:/\w')           {$uri = "$GraphUri/" + ($Destination -replace '^/','') }
         else { #We didn't get the drive in the destination, so is it an object, a partial path "drives/id"  or "me/drive", or just an ID
-            if     ($Drive.id)                                  {$uri  = "https://graph.microsoft.com/v1.0/drives/$($drive.id)/"}
-            elseif ($Drive -match './.')                        {$uri  = "https://graph.microsoft.com/v1.0/$drive/"             }
-            elseif ($Drive)                                     {$uri  = "https://graph.microsoft.com/v1.0/drives/$drive/"      }
+            if     ($Drive.id)                                  {$uri  = "$GraphUri/drives/$($drive.id)/"}
+            elseif ($Drive -match './.')                        {$uri  = "$GraphUri/$drive/"             }
+            elseif ($Drive)                                     {$uri  = "$GraphUri/drives/$drive/"      }
             # the root might be "/" root: or root:/ (/root will be assumed to be a folder) anywhere else we can bolt on to the URI. We may need to put root: in front and strip leading /
             If     ($Destination -in @("root:", "/", "root:/")) {$uri += "root/"                                       }
             elseif ($Destination -Match '^/?root:')             {$uri += ($Destination -replace '^/', '')              }
@@ -393,7 +454,7 @@ function Copy-ToGraphFolder {
         if    ($uri -match '/$') {$uri = $uri + $uploadItem.Name }
         else  {     # Otherwise see if we have a directory, or a file path with a valid parent
             try   { # Does the Path exist ? Try to get it and catch the 404 error that will result if destination points to a new file
-                $x = Invoke-RestMethod -Method get -Headers $Script:DefaultHeader -Uri $uri
+                $x = Invoke-GraphRequest -Uri $uri
                 #The path exists ... is it a folder or a file  ?
                 if ($x.folder) {
                       $uri = $uri +'/' + $uploadItem.Name
@@ -431,12 +492,12 @@ function Copy-ToGraphFolder {
         if ($ConflictBehavior -eq 'fail') {$ForceResumable = $true}
         if ($PSCmdlet.ShouldProcess($uploadItem.FullName,"Upload file")){
             if ($uploadItem.Length -lt 3.5mb -and -not $ForceResumable) {
-                $result             = Invoke-RestMethod -Method Put  -headers @{Authorization = "Bearer $AccessToken"} -Uri ($uri + ":/Content") -InFile $uploadItem.FullName -ContentType $ContentType
+                Invoke-GraphRequest -Method Put  ($uri + ":/Content") -InputFilePath $uploadItem.FullName -ContentType $ContentType -AsType ([MicrosoftGraphDriveItem])  -ExcludeProperty '@odata.context', '@microsoft.graph.downloadUrl'
             }
             else {
                 $body               = ConvertTo-Json $settings
                 try   {
-                    $UploadSession  = Invoke-RestMethod -Method Post -headers @{Authorization = "Bearer $AccessToken"} -Uri ($uri + ":/createUploadSession") -Body $body  -ContentType "application/json"
+                    $UploadSession  = Invoke-GraphRequest -Method Post -Uri ($uri + ":/createUploadSession") -Body $body -ContentType "application/json"
                 }
                 catch {
                     if ($_.exception.response.statuscode.value__ -eq 409) {
@@ -446,14 +507,16 @@ function Copy-ToGraphFolder {
                     else          { Write-Warning -Message $_.exception.tostring() ; return}
                 }
                 if (-not $UploadSession.uploadUrl) {Write-Warning -Message 'Server did not provide an upload destination' ; return}
-                else                               {Write-Verbose -Message "Have an upload session until $($SessionConnection.expirationDateTime)" }
+                else                               {Write-Verbose -Message "Have an upload session until $($UploadSession.expirationDateTime)" }
                 $oldprogressPref    = $ProgressPreference
                 $ProgressPreference = 'SilentlyContinue'
-                $result             = Invoke-RestMethod -Method Put -Uri $UploadSession.uploadUrl -InFile $uploadItem.FullName -ContentType "application/octet-stream" -Headers @{"Content-Range"=$RangeText}
-                $ProgressPreference =$oldprogressPref
+                $result             = Invoke-WebRequest  -Method Put -Uri $UploadSession.uploadUrl -InFile $uploadItem.FullName -ContentType "application/octet-stream" -Headers @{"Content-Range"=$RangeText}
+                $resultHash         = ConvertFrom-Json $result.content -AsHashtable
+                $keysToRemove        = $resultHash.Keys.where({$_ -match '@'})
+                foreach ($k in $keysToRemove) {$resultHash.Remove($k)}
+                New-Object -TypeName MicrosoftGraphDriveItem -Property $resultHash
+                $ProgressPreference = $oldprogressPref
             }
-            $result.pstypenames.Add("GraphDriveItem")
-            return $result
         }
     }
 }
@@ -474,11 +537,14 @@ function Copy-FromGraphFolder {
     [cmdletbinding(SupportsShouldProcess=$true)]
     param(
         #The path to the file on one drive
-        [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
+        [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=1)]
+        [ArgumentCompleter([OneDrivePathCompleter])]
         $Path,
         #The drive, by default the current user's OneDrive.
+        [Parameter()]
         $Drive = 'me/Drive',
         #The destination on the local computer
+        [Parameter(Position=2)]
         $Destination = $pwd,
         #If specified prevents an existing file from being overwritten.
         [Switch]$NoClobber,
@@ -486,17 +552,11 @@ function Copy-FromGraphFolder {
         [Alias('PT')]
         [Switch]$Passthru
     )
-    begin    {
-                 Connect-MSGraph
-                 $webParams = @{Method  = "Get"
-                               Headers = $Script:DefaultHeader
-        }
-    }
     process  {
         <#
         We can download from
         /drives/{drive-id}/items/{parent-id}:/{filename}
-        /drives/{drive-id}/root:/{folder-path}/{filename}
+        /drives/{drive-id}/root:/{folder-path}/{filename}q
         /groups/{group-id}/drive/items/{parent-id}:/{filename}
         /me/drive/items/{parent-id}:/{filename}
         /me/drive/root:/{folder-path}/{filename}
@@ -506,19 +566,19 @@ function Copy-FromGraphFolder {
         if ($Path.name -and $Path.'@microsoft.graph.downloadUrl') {$sourceDetails = $Path}
         else {
             if     ($Path.parentReference -and
-                    $Path.fileSystemInfo         ) {$webparams['uri']  = "https://graph.microsoft.com/v1.0/drives/"+ $Path.parentReference.driveId + "/items/" + $path.id}
+                    $Path.fileSystemInfo         ) {$uri  = "$GraphUri/drives/"+ $Path.parentReference.driveId + "/items/" + $path.id}
             elseif ($Path -isnot [string]        ) {throw 'An invalid Object was passed as a Path Parameter' ; return }
-            elseif ($Path -match '/?drives.*:/\w') {$webparams['uri']  = 'https://graph.microsoft.com/v1.0/' + ($path -replace '^/','') }
+            elseif ($Path -match '/?drives.*:/\w') {$uri  = '$GraphUri/' + ($path -replace '^/','') }
             else { #We didn't get the drive in the destination, so is it an object, a partial path "drives/id"  or "me/drive", or just an ID
-                if     ($Drive.id)                 {$webparams['uri']  = "https://graph.microsoft.com/v1.0/drives/$($drive.id)/"}
-                elseif ($Drive -match './.')       {$webparams['uri']  = "https://graph.microsoft.com/v1.0/$drive/"             }
-                elseif ($Drive)                    {$webparams['uri']  = "https://graph.microsoft.com/v1.0/drives/$drive/"      }
-                if     ($path -Match '^/?root:')   {$webparams['uri'] += ($path -replace '^/', '')              }
-                else                               {$webparams['uri'] += ($path -replace '^/?(.*$)', 'root:/$1')}
+                if     ($Drive.id)                 {$uri  = "$GraphUri/drives/$($drive.id)/"}
+                elseif ($Drive -match './.')       {$uri  = "$GraphUri/$drive/"             }
+                elseif ($Drive)                    {$uri  = "$GraphUri/drives/$drive/"      }
+                if     ($path -Match '^/?root:')   {$uri += ($path -replace '^/', '')              }
+                else                               {$uri += ($path -replace '^/?(.*$)', 'root:/$1')}
             }
 
             #Get the item. The result should have a downloadURL as property.
-            try   {$sourceDetails  = Invoke-RestMethod @webParams }
+            try   {$sourceDetails  = Invoke-GraphRequest $uri}
             catch {Write-warning -Message "Error trying to get $uri"; return }
         }
         if (-not $sourceDetails) {Write-warning -Message 'Could not get soruce file'; return}
@@ -531,7 +591,7 @@ function Copy-FromGraphFolder {
         }
         if  ((Test-path -Path $Destination -IsValid      ) -and $sourceDetails.'@microsoft.graph.downloadUrl') {
               if ($pscmdlet.ShouldProcess($Destination,"Copy file to")){
-                Invoke-WebRequest -Method get -Uri $sourceDetails.'@microsoft.graph.downloadUrl' -OutFile $Destination
+                Invoke-GraphRequest -Method get -Uri $sourceDetails.'@microsoft.graph.downloadUrl' -OutputFilePath $Destination
               if ($Passthru) {Get-Item -Path  $Destination}}
         }
         elseif (-not $sourceDetails.'@microsoft.graph.downloadUrl') {
@@ -539,72 +599,4 @@ function Copy-FromGraphFolder {
         }
         else {Write-Warning -Message "$Destination is not a valid path."}
     }
-}
-
-function FileCompletion {
-    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameter)
-    $Drive       = $fakeBoundParameter['Drive']
-     if     (-not $Drive -or $drive -eq "/")             {$uri =   'https://graph.microsoft.com/v1.0/me/Drive'}
-    elseif ($Drive.id)               {$uri =   "https://graph.microsoft.com/v1.0/drives/$($Drive.id)"}
-    elseif ($Drive -notmatch './.')  {$uri =   'https://graph.microsoft.com/v1.0/drives/' + $Drive -replace '/$','' -replace '^/' }
-    else                             {$uri =   'https://graph.microsoft.com/v1.0/drives/' + $Drive -replace '/$','' -replace '^/' }
-    #strip quotes from word to complete - replace " or ' with nothing
-    $wordToComplete = $wordToComplete -replace '"|''', ''
-
-
-    #if it is not */something/* (and that includes nothing, / or root:/) or if it is /root:/ or /root/   use "/root"                (no :path:)
-    #if it is root:/something/more   or /root:/something/more  or /something/more  ......................use "/root:/something:"    (with:path ignore a part-completed final item)
-    #if it is root:/something/more/  or /root:/something/more/ or /something/more/ --------------------- use /root:/something/more: (with:path just drop the final /)
-    If     ($wordToComplete -notmatch "/.+/" -or $wordToComplete -eq "/root:?/" ) {$uri +=  '/root' }
-    elseif ($wordToComplete -Match '^/?root:')                                    {$Uri +=  $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:' } #catch after any leading / and before final /; and sandwich between / and :
-    else                                                                          {$uri +=  $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:' } #catch after any leading / and before final /; and sandwich between /root/ and :
-
-    #So the uri is now either /root   or /root:/{path}: where path is a complete folder name. we its children, but only the folders, only a couple of columns, in name order
-    $uri +=    '/children?$select=Name,ParentReference'
-
-    (Invoke-RestMethod -Method get -headers @{Authorization = "Bearer $AccessToken"} -Uri $uri ).value | Sort-Object -Property Name | #it would be better to order-by at the server, but consumer one drive doesn't support it.
-        ForEach-Object {
-            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
-            if ($P -like "*$wordToComplete*") {
-                New-Object -TypeName System.Management.Automation.CompletionResult -ArgumentList "'$p'", $p, ([System.Management.Automation.CompletionResultType]::ParameterValue) , $p
-            }
-        }
-}
-
-function FolderCompletion {
-    param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameter)
-    $Drive       = $fakeBoundParameter['Drive']
-    if     (-not $Drive)             {$uri =   'https://graph.microsoft.com/v1.0/me/Drive'}
-    elseif ($Drive.id)               {$uri =   "https://graph.microsoft.com/v1.0/drives/$($Drive.id)"}
-    elseif ($Drive -notmatch './.')  {$uri =   'https://graph.microsoft.com/v1.0/drives/' + $Drive -replace '/$','' -replace '^/' }
-    else                             {$uri =   'https://graph.microsoft.com/v1.0/drives/' + $Drive -replace '/$','' -replace '^/' }
-    #strip quotes from word to complete - replace " or ' with nothing
-    $wordToComplete = $wordToComplete -replace '"|''', ''
-
-    #if it is not */something/* (and that includes nothing, / or root:/) or if it is /root:/ or /root/   use "/root"                (no :path:)
-    #if it is root:/something/more   or /root:/something/more  or /something/more  ......................use "/root:/something:"    (with:path ignore a part-completed final item)
-    #if it is root:/something/more/  or /root:/something/more/ or /something/more/ --------------------- use /root:/something/more: (with:path just drop the final /)
-    If     ($wordToComplete -notmatch "/.+/" -or $wordToComplete -eq "/root:?/" ) {$uri +=  '/root' }
-    elseif ($wordToComplete -Match '^/?root:')                                    {$Uri +=  $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:' } #catch after any leading / and before final /; and sandwich between / and :
-    else                                                                          {$uri +=  $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:' } #catch after any leading / and before final /; and sandwich between /root/ and :
-
-    #So the uri is now either /root   or /root:/{path}: where path is a complete folder name. we its children, but only the folders, only a couple of columns, in name order
-    $uri +=    '/children?$filter=folder ne null&$select=Name,ParentReference'
-
-    (Invoke-RestMethod -Method get -headers @{Authorization = "Bearer $AccessToken"} -Uri $uri ).value | Sort-Object -Property Name |  #it would be better to order-by at the server, but consumer one drive doesn't support it.
-        ForEach-Object {
-            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
-            if ($P -like "*$wordToComplete*") {
-                New-Object -TypeName System.Management.Automation.CompletionResult -ArgumentList "'$p'", $p, ([System.Management.Automation.CompletionResultType]::ParameterValue) , $p
-            }
-        }
-}
-#In PowerShell 3 and 4 Register-ArgumentCompleter is part of TabExpansion ++. From V5 it is part of Powershell.core
-if (Get-Command -ErrorAction SilentlyContinue -name Register-ArgumentCompleter) {
- Register-ArgumentCompleter -CommandName 'Copy-FromGraphFolder' -ParameterName 'Path'        -ScriptBlock $Function:FileCompletion
- Register-ArgumentCompleter -CommandName 'Get-GraphDrive'       -ParameterName 'ItemPath'    -ScriptBlock $Function:FileCompletion
- Register-ArgumentCompleter -CommandName 'Get-GraphDrive'       -ParameterName 'FolderPath'  -ScriptBlock $Function:FolderCompletion
- Register-ArgumentCompleter -CommandName 'New-GraphFolder'      -ParameterName 'Path'        -ScriptBlock $Function:FolderCompletion
- Register-ArgumentCompleter -CommandName 'Show-GraphFolder'     -ParameterName 'Path'        -ScriptBlock $Function:FolderCompletion
- Register-ArgumentCompleter -CommandName 'Copy-ToGraphFolder'   -ParameterName 'Destination' -ScriptBlock $Function:FolderCompletion
 }

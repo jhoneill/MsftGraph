@@ -21,24 +21,6 @@ class ValidateCountryAttribute : ValidateArgumentsAttribute {
     }
 }
 
-class DomainCompleter : IArgumentCompleter {
-    [MicrosoftGraphDomain[]]$Domains = @()
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    )
-    {
-        $result = [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
-        if (-not $this.Domains)  {$this.Domains = Get-GraphDomain }
-        $wildcard          = ("*" + ($wordToComplete  -replace "['""]",'' )+ "*")
-
-        $this.domains.id.where({$_ -like $wildcard}) |
-            Sort-Object | ForEach-Object {$result.Add([System.Management.Automation.CompletionResult]::new($_))}
-        return $result
-    }
-}
-
-
 function Get-GraphUserList {
     <#
       .Synopsis
