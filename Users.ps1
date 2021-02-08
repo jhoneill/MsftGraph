@@ -297,14 +297,17 @@ function Get-GraphUser     {
                         Add-Member -PassThru -NotePropertyName CalendarPath -NotePropertyValue  "$userID/Calendars/$($r.id)"
                 }
                 elseif ($Notebooks         ) {
-                    $bookobj = Invoke-GraphRequest -Uri ($uri +
+                    $result = Invoke-GraphRequest -Uri ($uri +
                                           '/onenote/notebooks?$expand=sections' ) -All  -Exclude 'sections@odata.context'               -As ([MicrosoftGraphNotebook])
                     #Section fetched this way won't have parentNotebook, so make sure it is available when needed
-                    foreach ($b in $bookobj) {
-                        $parentobj = New-Object -TypeName psobject -Property @{'id'=$b.id; 'displayname'=$b.displayName; 'Self'=$b.self}
-                        $b.Sections | Add-Member -NotePropertyName Parent -NotePropertyValue $parentobj
+                    foreach ($bookobj in $result) {
+                        foreach ($s in $b.Sections) {
+                                $s.parentNotebook.id          = $b.id
+                                $s.parentNotebook.displayname = $b.displayname
+                                $s.parentNotebook.self        = $b.self
+                        }
+                        $bookobj
                     }
-                    $bookobj
                 }
                 # for site, get the user's MySite. Convert it into a graph URL and get that, expand drives subSites and lists, and add formatting types
                 elseif ($Site              ) {

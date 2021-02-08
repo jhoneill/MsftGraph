@@ -27,8 +27,7 @@ Done
 # GraphColumn           --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphColumnDefinition
 # GraphCalendar         --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphCalendar
 
-Remove-GraphUser
-Import-GraphUSer
+
 Invites
 
 

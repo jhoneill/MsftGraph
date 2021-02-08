@@ -1,4 +1,7 @@
-﻿function Get-GraphOneNoteBook    {
+﻿using namespace System.Management.Automation
+using namespace Microsoft.Graph.PowerShell.Models
+
+function Get-GraphOneNoteBook    {
     <#
       .Synopsis
         Gets notebook objects or sections of notebooks
@@ -27,65 +30,35 @@
         #if specified filters the returned objects by to those with names begining with ...
         [string]$Name
     )
-    begin   {
-        Connect-MSGraph
-        $webParams = @{Method  = "Get"
-                       Headers = $Script:DefaultHeader
-        }
-    }
     process  {
         if ($Notebook.self) {$Notebook=$Notebook.self}
         if ($Name) {$Name = '?$filter=startswith(tolower(displayname),''{0}'')' -f ($Name.ToLower() -replace '\*$','') }
 
         #Combinations of params. Just notebook, Just Sections or both (with or without name), neither
-        if     ($notebook -and -not $sections){
-            Write-Progress "Getting Notebook Information"
-            $n =  (Invoke-RestMethod @webParams -Uri  ("$Notebook`?`$expand=Sections" + ($Name -replace "^\?","&")))
-            $n.pstypeNames.Add("GraphOneNoteBook")
+        Write-Progress "Getting Notebook Information"
+        if     ($sections)    {
+            if ($notebook) {$uri =            "$Notebook/sections" + $Name }
+            else           {$uri = "$GraphUri/me/onenote/sections" + $Name }
+            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty "parentSectionGroup@odata.context",  "parentNotebook@odata.context"
+        }
+        else { #if not $sections
+            if ($Notebook) { $params = @{uri =                      "$Notebook`?`$expand=Sections" + ($Name -replace "^\?","&") }}
+            else           { $params = @{uri = ("$GraphUri/me/onenote/notebooks?`$expand=Sections" + ($Name -replace '^\?','&'))
+                                         valueonly = $true}
+            }
+
+            $bookobj =  Invoke-GraphRequest @params -AsType ([MicrosoftGraphNotebook]) -ExcludeProperty "@odata.context", "sections@odata.context"
             #Section fetched this way won't have parentNotebook, so make sure it is available when needed
-            $bookobj =new-object -TypeName psobject -Property @{'id'=$n.id; 'displayname'=$n.displayName; 'Self'=$n.self}
-            foreach ($s in $n.sections) {
-                $s.pstypeNames.add("GraphOneNoteSection")
-                Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebook   -Value $bookobj
-            }
-            Write-Progress "Getting Notebook Information" -Completed
-            return $n
-        }
-        elseif ($sections) {
-            if   ($notebook) {$results =  Invoke-RestMethod @webParams -Uri ("$Notebook/sections" + $Name) }
-            else {$results =  Invoke-RestMethod @webParams -Uri ('https://graph.microsoft.com/v1.0/me/onenote/Sections' +  $Name) }
-            #Section fetched this way have parentNotebook
-            $sectionList = $results.value
-            foreach ($s in $sectionList) {
-                $s.pstypeNames.add("GraphOneNoteSection")
-            }
-            return $sectionList
-        }
-        else                              {
-            $n =  (Invoke-RestMethod @webParams -Uri ('https://graph.microsoft.com/v1.0/me/onenote/notebooks?`$expand=Sections' + ($Name -replace '^\?','&') ))
-            if($n.value) {
-                foreach ($item in $n.value) {
-                    $item.pstypeNames.Add('GraphOneNoteBook')
-                    #Section fetched this way won't have parentNotebook, so make sure it is available when needed
-                    $bookobj =new-object -TypeName psobject -Property @{'id'=$item.id; 'displayname'=$item.displayName; 'Self'=$item.self}
-                    foreach ($s in $item.sections) {
-                        $s.pstypeNames.add('GraphOneNoteSection')
-                        Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebook   -Value $bookobj
-                    }
-                }
-                return $n.value
-            }
-            elseif ($n.self) {
-                $n.pstypeNames.Add('GraphOneNoteBook')
-                #Section fetched this way won't have parentNotebook, so make sure it is available when needed
-                $bookobj =new-object -TypeName psobject -Property @{'id'=$n.id; 'displayname'=$n.displayName; 'Self'=$n.self}
-                foreach ($s in $n.sections) {
-                    $s.pstypeNames.add('GraphOneNoteSection')
-                    Add-Member -InputObject $s -MemberType NoteProperty -Name ParentNotebook   -Value $bookobj
-                }
-                return $n
+            foreach ($b in $bookobj) {
+                foreach ($s in $b.sections) {
+                    $s.parentNotebook = $b <#.id          = $b.id
+                    $s.parentNotebook.displayname = $b.displayname
+                    $s.parentNotebook.self        = $b.self #>
+                 }
+                $b
             }
         }
+        Write-Progress "Getting Notebook Information" -Completed
     }
 }
 
@@ -128,42 +101,31 @@ function Get-GraphOneNoteSection {
         #If specified filters pages or Sections to those with names beginning ...
         [string]$Name
     )
-    begin   {
-        Connect-MSGraph
-        $webParams = @{Method  = "Get"
-                       Headers = $Script:DefaultHeader
-        }
-    }
     process  {
         if     ($Notebook) {
             #A notebook has sections URL we'll use it. If not if it's an object with a self parameter try with that, otherwise if it is a string, assume it's the URI for the notebook
             if     ($Notebook.sectionsUrl)  {$uri  = $Notebook.sectionsUrl}
-            elseif ($Notebook.self)         {$uri  = $Notebook.self +"/sections"}
-            elseif ($Notebook -is [string]) {$uri  = $Notebook      +"/sections"}
+            elseif ($Notebook.self)         {$uri  = $Notebook.self +"/sections?`$expand=parentNotebook"}
+            elseif ($Notebook -is [string]) {$uri  = $Notebook      +"/sections?`$expand=parentNotebook"}
             else   {Write-warning -Message 'Could not process the notebook parameter provided'}
             if     ($Name)                  {$uri += ('?$filter=startswith(tolower(displayname),''{0}'')' -f ($Name.ToLower() -replace '\*$','')) }
+            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty "parentSectionGroup@odata.context",  "parentNotebook@odata.context"
 
-            $results =  Invoke-RestMethod @webParams -Uri $uri
-            $sectionList = $results.value
-            foreach ($s in $sectionList) {
-                $s.pstypeNames.add("GraphOneNoteSection")
-            }
-            return $sectionList
+            return
         }
         if     ($Section.self)         {$uri = $Section.self}
         elseif ($Section -is [string]) {$uri = $Section}
         else   {Write-Warning 'Can not process the Section Parameter' ; Return }
         if     ($Name -or $Pages) {
-            if ($Name)     {$uri =  "$uri/Pages?`$filter=startswith(tolower(title),'$Name')" }
-            else           {$uri =  "$uri/Pages"}
-            $p = (Invoke-RestMethod @webParams -Uri  $uri).value
-            foreach ($page in $p) {$page.pstypeNames.add("GraphOneNotePage")}
-            return   $p
+            if ($Name)     {$uri =  "$uri/Pages?`$expand=parentSection,ParentNotebook&`$filter=startswith(tolower(title),'$Name')" }
+            else           {$uri =  "$uri/Pages?`$expand=parentSection,ParentNotebook"}
+
+            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenotepage]) -ExcludeProperty "parentSection@odata.context","parentNotebook@odata.context"
+
+            return
         }
         else   {
-            $result  = Invoke-RestMethod @webParams -Uri  $uri
-            $result.pstypeNames.add("GraphOneNoteSection")
-            return $result
+           Invoke-GraphRequest -Uri  ("$uri`?`$expand=parentNotebook")  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty "parentSectionGroup@odata.context",  "parentNotebook@odata.context", "@odata.context"
         }
     }
 }
@@ -201,24 +163,24 @@ function New-GraphOneNoteSection {
         [switch]$Force
     )
     begin   {
-        Connect-MSGraph
-        $webParams = @{'Method'      = 'Post'
-                       'Headers'     = $Script:DefaultHeader
-                       'ContentType' = 'application/json'
+        $webParams = @{'Method'           = 'Post'
+                       'ContentType'      = 'application/json'
+                       'AsType'           =  [MicrosoftGraphOnenoteSection]
+                       'ExcludeProperty' = @("parentSectionGroup@odata.context",  "parentNotebook@odata.context", "@odata.context")
         }
-        if     ($Notebook.sectionsUrl)            {$uri = $Notebook.sectionsUrl}
-        elseif ($Notebook.self)                   {$uri = $Notebook.self + "/sections"}
+        if     ($Notebook.sectionsUrl)            {$webparams['uri'] = $Notebook.sectionsUrl}
+        elseif ($Notebook.self)                   {$webparams['uri'] = $Notebook.self + "/sections"}
         elseif ($Notebook -isnot [String])        {Write-Warning -Message 'Could not process the Notebook parameter'; Return }
-        elseif ($notebook -notmatch "/sections$") {$uri = $Notebook + "/sections"}
-        else                                      {$uri = $Notebook }
+        elseif ($notebook -notmatch "/sections$") {$webparams['uri'] = $Notebook + "/sections"}
+        else                                      {$webparams['uri'] = $Notebook }
     }
     process  {
-        $json = ConvertTo-Json @{"displayName" = $sectionName}
-        Write-Debug $json
+        $webparams['body']  = ConvertTo-Json @{"displayName" = $sectionName}
+        Write-Debug $webparams['body']
         if ($Force -or $PSCmdlet.ShouldProcess($SectionName,"Add section to Notebook $($Notebook.displayname)")) {
-            $result = Invoke-RestMethod @webParams -Uri $uri -Body $json
-            $result.pstypenames.add('GraphOneNoteSection')
-            return $result
+            $sectionobj = Invoke-GraphRequest @webParams
+            if ($Notebook -is [MicrosoftGraphNotebook]) {$sectionobj.parentNotebook = $Notebook}
+            return $sectionobj
         }
     }
 }
@@ -246,24 +208,17 @@ function Get-GraphOneNotePage    {
         #If specified returs the contents with guids for each section where content can be inserted.
         [switch]$ContentWithIDs
     )
-    begin   {
-        Connect-MSGraph
-        $webParams = @{'Method'  = 'Get';
-                       'Headers' = $Script:DefaultHeader
-        }
-    }
+
     process  {
         if     ($Page.self)        {$uri=$Page.self}
         elseif ($page-is [string]) {$uri=$Page}
         else   {Write-Warning -Message 'Could not process the page parameter' ; return}
         #Normally we want Invoke-RestMethod, but here we want the unprocessed content.
-        if      ($ContentWithIDs) {(Invoke-WebRequest @webParams -Uri  "$uri/Content?includeIDs=true").Content}
-        elseif  ($Content)        {(Invoke-WebRequest @webParams -Uri  "$uri/Content").Content}
+        if      ($ContentWithIDs) {Invoke-GraphRequest -Uri  "$uri/Content?includeIDs=true"}
+        elseif  ($Content)        {Invoke-GraphRequest -Uri  "$uri/Content"}
         #should return the outer xml property as this is HTML in an XML document. Check what else it comes back as
         else           {
-            $result = Invoke-RestMethod @webParams -Uri  $uri
-            $result.pstypeNames.add("GraphOneNotePage")
-            return $result
+          Invoke-GraphRequest -Uri "$uri" -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage]) -ExcludeProperty "parentSection@odata.context" ,"@odata.context"
         }
     }
 }
@@ -308,26 +263,26 @@ function Add-GraphOneNotePage    {
         [Alias('PT')]
         [switch]$PassThru
     )
-    Connect-MSGraph
+
     if     ($Section.pagesURL)            {$uri = $Section.PagesUrl}
     elseif ($Section.self)                {$uri = $Section.Self + '/pages'}
     elseif ($Section -isnot [String])     {Write-Warning -Message 'Could not process the Section parameter'; Return }
     elseif ($Section -notmatch "/pages$") {$uri = $Section + '/pages'}
     else                                  {$uri = $Section}
-    $webParams = @{'Method'      = 'Post'
-                   'Headers'     = $Script:DefaultHeader
-                   'ContentType' = $ContentType
-                   'Body'        = $HTMLPage
+    $webParams = @{'Method'          = 'Post'
+                   'ContentType'     = $ContentType
+                   'Body'            = $HTMLPage
+                   'uri'             = $URI
+                   'ExcludeProperty' = "@odata.context"
+                   'AsType'          = ([MicrosoftGraphOnenotePage])
     }
 
     if ($Force -or $PSCmdlet.ShouldProcess($Section.DisplayName,'Add page to OneNote Section')) {
-        $result =  Invoke-WebRequest @webParams -uri $uri
-        Write-Verbose  -Message "Return status was $($result.StatusCode)/$($result.StatusDescription)"
+        $result =  Invoke-GraphRequest @webParams
         If ($PassThru) {
-            $p = ConvertFrom-Json $result.Content
-            $p.pstypeNames.add('GraphOneNotePage')
-            Add-Member -InputObject $p -MemberType NoteProperty -Name 'ParentSection' -Value $Section
-            return $p
+            if ($Section -is [MicrosoftGraphOnenoteSection]) {$result.ParentSection = $section}
+            if ($section.parentnotebook.DisplayName)  {$result.parentNoteBook = $section.parentNotebook}
+            return $result
         }
     }
 }
