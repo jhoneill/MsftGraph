@@ -1,5 +1,5 @@
-﻿using namespace Microsoft.Graph.PowerShell.Models
-using namespace System.Management.Automation
+﻿using namespace System.Management.Automation
+using namespace Microsoft.Graph.PowerShell.Models
 
 class OneDrivePathCompleter : IArgumentCompleter {
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(

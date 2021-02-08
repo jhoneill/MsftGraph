@@ -1,6 +1,7 @@
 ﻿using namespace System.Management.Automation
-using namespace System.Globalization
 using namespace Microsoft.Graph.PowerShell.Models
+using namespace System.Globalization
+
 
 $GuidRegex = '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$'
 
@@ -29,7 +30,7 @@ function Get-GraphUserList {
         Get-GraphUserList -filter "Department eq 'Accounts'"
 
     #>
-    [OutputType([MicrosoftGraphUser])]
+    [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser])]
     [cmdletbinding(DefaultparameterSetName="None")]
     param(
         #If specified searches for users whose first name, surname, displayname, mail address or UPN start with that name.
@@ -56,9 +57,12 @@ function Get-GraphUserList {
         [Alias('OrderBy')]
         [string]$Sort,
 
-        #Filter clause for the query
+        #Filter clause for the query for example "startswith(displayname,'Bob') or startswith(displayname,'Robert')"
         [parameter(Mandatory=$true, parameterSetName='FilterByString')]
         [string]$Filter,
+
+        [validateSet('directReports', 'manager', 'memberOf', 'ownedDevices', 'ownedObjects', 'registeredDevices', 'transitiveMemberOf',  'extensions')]
+        [string]$ExpandProperty,
 
         # The URI for the proxy server to use
         [Parameter(DontShow)]
@@ -482,7 +486,7 @@ function Set-GraphUser     {
             elseif ($U.id)  {
                     $webparams['uri']   = "$Graphuri/users/$($U.id)/"
             }
-            elseif ($user.UserPrincipalName) {
+            elseif ($U.UserPrincipalName) {
                     $webparams['uri']   = "$Graphuri/users/$($U.UserPrincipalName)/"
             }
             else {  $webparams['uri']   = "$Graphuri/users/$U/" }
@@ -592,6 +596,12 @@ function New-GraphUser     {
         [Parameter(ParameterSetName='DomainFromUPNLast')]
         [scriptblock]$NickNameRule    = {"$GivenName.$Surname"},
 
+        #A two letter country code (ISO standard 3166). Required for users that will be assigned licenses due to legal requirement to check for availability of services in countries.  Examples include: 'US', 'JP', and 'GB'
+        [ValidateNotNullOrEmpty()]
+        [UpperCaseTransformAttribute()]
+        [ValidateCountryAttribute()]
+        [string]$UsageLocation = 'GB',
+
         [string]$Initialpassword,
         [switch]$NoPasswordChange,
         [switch]$ForceMFAPasswordChange,
@@ -638,6 +648,7 @@ function New-GraphUser     {
         'displayName'       = $DisplayName
         'mailNickname'      = $MailNickName
         'userPrincipalName' = $UserPrincipalName
+        'usageLocation'     = $UsageLocation
         'passwordProfile'   =  @{
             'forceChangePasswordNextSignIn' = -not $NoPasswordChange
             'password' = $Initialpassword
@@ -670,10 +681,45 @@ function New-GraphUser     {
 
 }
 
+function Remove-GraphUser  {
+      <#
+      .Synopsis
+        Deletes a user
+    #>
+    [cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
+    param (
+        #ID for the user if not the current user
+        [parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        $UserID,
+        [Switch]$Force
+    )
+    process{
+       if (ContextHas -Not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        #xxxx todo check scopes
 
+        #allow an array of users to be passed.
+        foreach ($u in $UserID ) {
+            if     ($u.displayName)       {$displayname = $u.displayname}
+            elseif ($u.UserPrincipalName) {$displayName = $u.UserPrincipalName}
+            else                          {$displayName = $u}
+            if     ($u.id)                {$u =$U.id}
+            elseif ($u.UserPrincipalName) {$u = $U.UserPrincipalName}
+            if ($Force -or $pscmdlet.ShouldProcess($displayname,"Delete User")) {
+                try {
+                    Remove-MgUser_Delete -UserId $u -ErrorAction Stop
+                }
+                catch {
+                    if ($_.exception.statuscode.value__ -eq 404) {
+                          Write-Warning -Message "'Not found' error while trying to delete '$displayname'."
+                    }
+                    else {throw $_}
+                }
+            }
+        }
+    }
+}
 
-
-function Find-GraphPeople {
+function Find-GraphPeople  {
     <#
        .Synopsis
           Searches people in your inbox / contacts / directory
@@ -715,4 +761,141 @@ function Find-GraphPeople {
             Add-Member -PassThru -MemberType ScriptProperty -Name Score          -Value {$This.scoredEmailAddresses[0].relevanceScore }                |
             Add-Member -PassThru -MemberType AliasProperty  -Name emailaddresses -Value scoredEmailAddresses
     }
+}
+
+Function Import-GraphUser  {
+<#
+    .synopsis
+       Imports a list of users from a CSV file
+    .description
+        Takes a list of CSV files and looks for xxxx columns
+        * Action is either Add, Remove or Set - other values will cause the row to be ignored
+        * DisplayName
+
+#>
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    param (
+        #One or more files to read for input.
+        [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        $Path,
+        #Disables any prompt for confirmation
+        [switch]$Force,
+        #Supresses output of Added, Removed, or No action messages for each row in the file.
+        [switch]$Quiet,
+        #Fields which are lists will be split at , or ; by default but a replacement split expression may be given
+        [String]$ListSeparator = '\s*,\s*|\s*;\s*'
+    )
+    begin {
+        $list = @()
+    }
+    process {
+        foreach ($p in $path) {
+            if (Test-Path $p) {$list += Import-Csv -Path $p}
+            else { Write-Warning -Message "Cannot find $p" }
+        }
+    }
+    end {
+        if (-not $Quiet) { $InformationPreference = 'continue'  }
+
+        foreach ($user in $list) {
+            $upn = $user.UserPrincipalName
+            if (-not $upn) {
+                Write-Warning "User was missing a UPN"
+                continue
+            }
+            else {
+                 $exists = (Microsoft.Graph.Users.private\Get-MgUser_List -Filter "userprincipalName eq '$upn'") -as [bool]
+            }
+
+            if     ($user.Action -eq 'Remove' -and (-not $exists)) {
+                Write-Warning "User '$upn' was marked for removal, but no matching user was found."
+                continue
+            }
+            elseif ($user.Action -eq 'Remove' -and
+                   ($force -or $PSCmdlet.ShouldProcess($upn,"Remove user "))){
+                Remove-Graphuser -Force -user $user
+                Write-Information "Removed user'$upn'"
+                continue
+            }
+
+            if     ($user.Action -eq 'Add'    -and $exists) {
+                    Write-Warning  "User '$upn' was marked for addition, but that name already exists."
+                    continue
+            }
+            elseif ($user.Action -eq 'Add'    -and (-not $user.DisplayName) ) {
+                Write-Warning "User was missing a UPN"
+                continue
+            }
+            elseif ($user.Action -eq 'Add'    -and
+                ($force -or $PSCmdlet.ShouldProcess($upn,"Add new user"))){
+                $params = @{Force=$true; DisplayName=$user.DisplayName; UserPrincipalName= $user.UserPrincipalName;   }
+                if ($user.MailNickName)      {$params['MailNickName']    = $user.MailNickName   }
+                if ($user.GivenName)         {$params['GivenName']       = $user.GivenName      }
+                if ($user.Surname)           {$params['Surname']         = $user.Surname        }
+                if ($user.Initialpassword)   {$params['Initialpassword'] = $user.Initialpassword}
+                if ($user.PasswordPolicies)  {$params['Initialpassword'] = $user.PasswordPolicies -split $ListSeparator}
+                if ($user.NoPasswordChange -in @("Yes","True","1") ) {
+                            {$params['NoPasswordChange'] = $true}
+                }
+                if ($user.ForceMFAPasswordChange -in @("Yes","True","1") ) {
+                            {$params['ForceMFAPasswordChange'] = $true}
+                }
+                New-GraphUser @params
+                Write-Information "Added user '$($user.DisplayName)' as '$upn'"
+                $exists = $true
+                $user.Action = "Set"
+            }
+
+            if     ($user.Action -eq 'Set'    -and (-not $exists)) {
+                Write-Warning "User '$upn' was marked for update, but no matching user was found."
+                continue
+            }
+            if     ($user.Action -eq 'Set') {
+                $params = @{'UserId' = $upn}
+                $Setparameters = (Get-Command Set-GraphUser ).Parameters.Values |
+                    Where-Object name -notin (Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters  )
+
+                foreach ($p in $setparameters) {
+                    $pName = $p.name
+                    if     ($user.$pname -and ($p.parameterType -eq [string[]] )) {$params[$pName] = $user.$pName -split $ListSeparator  }
+                    elseif ($user.$pname -and ($p.switchParameter))               {$params[$pName] = $user.$pName -in @("Yes","True","1")  }
+                    elseif ($user.$pname)                                         {$params[$pName] = $user.$pName}
+                }
+                Set-GraphUser @params
+                Write-Information "Updated properties of user '$upn'"
+            }
+        }
+    }
+}
+
+Function Export-GraphUser  {
+<#
+    .synopsis
+       Imports a list of users from a CSV file
+    .description
+        Takes a list of CSV files and looks for xxxx columns
+        * Action is either Add, Remove or Set - other values will cause the row to be ignored
+        * DisplayName
+
+#>
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    param (
+        #Destination for CSV output
+        [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        $Path,
+        #Filter clause for the query for example "department eq 'accounts'"
+        $Filter,
+        #String to insert between parts of multi-part items.
+        $ListSeparator = "; "
+    )
+Microsoft.Graph.Users.private\Get-MgUser_List -Select 'UserPrincipalName',  'MailNickName','GivenName', 'Surname', 'DisplayName', 'UsageLocation',
+                        'accountEnabled', 'PasswordPolicies', 'Mail',  'MobilePhone', 'BusinessPhones',
+                        'JobTitle',  'Department',  'OfficeLocation', 'CompanyName',
+                        'StreetAddress', 'City', 'State', 'Country', 'PostalCode' -ExpandProperty manager -filter $Filter |
+    Select-Object      'UserPrincipalName', 'MailNickName',   'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
+                        @{n='AccountDisabled';e={-not 'accountEnabled'}} , 'PasswordPolicies', 'Mail',  'MobilePhone',
+                        @{n='BusinessPhones';e={$_.'BusinessPhones' -join $ListSeparator }},
+                        @{n='Manager';e={$_.manager.AdditionalProperties.userPrincipalName}},
+                        'JobTitle',  'Department', 'OfficeLocation', 'CompanyName',
+                        'StreetAddress', 'City', 'State', 'Country', 'PostalCode' | Export-Csv -NoTypeInformation -Path $Path
 }

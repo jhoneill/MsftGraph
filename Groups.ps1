@@ -1,6 +1,8 @@
 using namespace System.Management.Automation
-using namespace System.Globalization
 using namespace Microsoft.Graph.PowerShell.Models
+using namespace System.Globalization
+
+
 $Script:GraphUri  = "https://graph.microsoft.com/v1.0"
 $Script:GUIDRegex = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
 
@@ -866,7 +868,7 @@ function Export-GraphGroupMember {
         If a file is specified it will be treated as CSV file for export,
         otherwise the objects are output
 #>
-    param (
+    param  (
         [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
         #One or more group(s) to export
         [ArgumentCompleter([GroupCompleter])]
@@ -876,7 +878,7 @@ function Export-GraphGroupMember {
         #If specified , output will be in Group name order (default is User name.)
         [switch]$OrderByGroup
     )
-    begin {
+    begin  {
     $list = @()
     }
     process{
@@ -890,7 +892,7 @@ function Export-GraphGroupMember {
                                             Displayname
         }
     }
-    end {
+    end    {
         if ($OrderByGroup) {$list = $list | Sort-Object -Property Memberof, UserPrincipalName }
         else               {$list = $list | Sort-Object -Property UserPrincipalName, Memberof }
         if (-not $path) {return $list}
@@ -912,7 +914,7 @@ Function Import-GraphGroupMember {
         marked "add" in the file who are not in the group will be added.
 #>
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='high')]
-    param (
+    param   (
         #One or more files to read for input.
         [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
@@ -921,7 +923,7 @@ Function Import-GraphGroupMember {
         #Supresses output of Added, Removed, or No action messages for each row in the file.
         [switch]$Quiet
     )
-    begin {
+    begin   {
         $list = @()
     }
     process {
@@ -930,7 +932,7 @@ Function Import-GraphGroupMember {
             else { Write-Warning -Message "Cannot find $p" }
         }
     }
-    end {
+    end     {
         if (-not $Quiet) { $InformationPreference = 'continue'  }
         $groups = ($List | Group-Object -NoElement -Property memberof).Name
         foreach ($g in $groups) {
@@ -974,16 +976,16 @@ Function Import-GraphGroup       {
         IF the group exists no check is done to see that it matches the file settings.
 #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    param (
+    param   (
         #One or more files to read for input.
         [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
-        #Usually the command will prompt for confirmation -Force disables this primpt
+        #Disables any prompt for confirmation
         [switch]$Force,
         #Supresses output of Added, Removed, or No action messages for each row in the file.
         [switch]$Quiet
     )
-    begin {
+    begin   {
         $list = @()
     }
     process {
@@ -992,7 +994,7 @@ Function Import-GraphGroup       {
             else { Write-Warning -Message "Cannot find $p" }
         }
     }
-    end {
+    end     {
         if (-not $Quiet) { $InformationPreference = 'continue'  }
         $existingGroups = Get-GraphGroupList
         $existingNames  = $existingGroups.DisplayName

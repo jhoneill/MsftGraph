@@ -360,7 +360,7 @@ Function Connect-Graph     {
     #endregion
     #region if succesful cache information about the user and session, and if necessary setup a trigger to auto-refresh tokens we fetched above
     if ($result-match "Welcome To Microsoft Graph") {
-        $authcontext      = [GraphSession]::Instance.AuthContext
+        $authcontext      = [Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext
         $result           = "Welcome To Microsoft Graph, $($authcontext.Account)."
         #we could call Get-Mgorganization but this way we don't depend on anything outside authentication module
         $Organization     = ( Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/organization/").value
