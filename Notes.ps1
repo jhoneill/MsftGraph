@@ -39,7 +39,7 @@ function Get-GraphOneNoteBook    {
         if     ($sections)    {
             if ($notebook) {$uri =            "$Notebook/sections" + $Name }
             else           {$uri = "$GraphUri/me/onenote/sections" + $Name }
-            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty "parentSectionGroup@odata.context",  "parentNotebook@odata.context"
+            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty 'parentSectionGroup@odata.context',  'parentNotebook@odata.context'
         }
         else { #if not $sections
             if ($Notebook) { $params = @{uri =                      "$Notebook`?`$expand=Sections" + ($Name -replace "^\?","&") }}
@@ -47,7 +47,7 @@ function Get-GraphOneNoteBook    {
                                          valueonly = $true}
             }
 
-            $bookobj =  Invoke-GraphRequest @params -AsType ([MicrosoftGraphNotebook]) -ExcludeProperty "@odata.context", "sections@odata.context"
+            $bookobj =  Invoke-GraphRequest @params -AsType ([MicrosoftGraphNotebook]) -ExcludeProperty '@odata.context', 'sections@odata.context'
             #Section fetched this way won't have parentNotebook, so make sure it is available when needed
             foreach ($b in $bookobj) {
                 foreach ($s in $b.sections) {
@@ -109,7 +109,7 @@ function Get-GraphOneNoteSection {
             elseif ($Notebook -is [string]) {$uri  = $Notebook      +"/sections?`$expand=parentNotebook"}
             else   {Write-warning -Message 'Could not process the notebook parameter provided'}
             if     ($Name)                  {$uri += ('?$filter=startswith(tolower(displayname),''{0}'')' -f ($Name.ToLower() -replace '\*$','')) }
-            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty "parentSectionGroup@odata.context",  "parentNotebook@odata.context"
+            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty 'parentSectionGroup@odata.context',  'parentNotebook@odata.context'
 
             return
         }
@@ -120,12 +120,12 @@ function Get-GraphOneNoteSection {
             if ($Name)     {$uri =  "$uri/Pages?`$expand=parentSection,ParentNotebook&`$filter=startswith(tolower(title),'$Name')" }
             else           {$uri =  "$uri/Pages?`$expand=parentSection,ParentNotebook"}
 
-            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenotepage]) -ExcludeProperty "parentSection@odata.context","parentNotebook@odata.context"
+            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenotepage]) -ExcludeProperty 'parentSection@odata.context','parentNotebook@odata.context'
 
             return
         }
         else   {
-           Invoke-GraphRequest -Uri  ("$uri`?`$expand=parentNotebook")  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty "parentSectionGroup@odata.context",  "parentNotebook@odata.context", "@odata.context"
+           Invoke-GraphRequest -Uri  ("$uri`?`$expand=parentNotebook")  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty 'parentSectionGroup@odata.context',  'parentNotebook@odata.context', '@odata.context'
         }
     }
 }
@@ -166,7 +166,7 @@ function New-GraphOneNoteSection {
         $webParams = @{'Method'           = 'Post'
                        'ContentType'      = 'application/json'
                        'AsType'           =  [MicrosoftGraphOnenoteSection]
-                       'ExcludeProperty' = @("parentSectionGroup@odata.context",  "parentNotebook@odata.context", "@odata.context")
+                       'ExcludeProperty' = @('parentSectionGroup@odata.context',  'parentNotebook@odata.context', '@odata.context')
         }
         if     ($Notebook.sectionsUrl)            {$webparams['uri'] = $Notebook.sectionsUrl}
         elseif ($Notebook.self)                   {$webparams['uri'] = $Notebook.self + "/sections"}
@@ -218,7 +218,7 @@ function Get-GraphOneNotePage    {
         elseif  ($Content)        {Invoke-GraphRequest -Uri  "$uri/Content"}
         #should return the outer xml property as this is HTML in an XML document. Check what else it comes back as
         else           {
-          Invoke-GraphRequest -Uri "$uri" -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage]) -ExcludeProperty "parentSection@odata.context" ,"@odata.context"
+          Invoke-GraphRequest -Uri "$uri" -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage]) -ExcludeProperty 'parentSection@odata.context' ,'@odata.context'
         }
     }
 }
@@ -273,7 +273,7 @@ function Add-GraphOneNotePage    {
                    'ContentType'     = $ContentType
                    'Body'            = $HTMLPage
                    'uri'             = $URI
-                   'ExcludeProperty' = "@odata.context"
+                   'ExcludeProperty' = '@odata.context'
                    'AsType'          = ([MicrosoftGraphOnenotePage])
     }
 
@@ -316,57 +316,58 @@ function Add-FileToGraphOneNote  {
         $Path ,
         #Title for the page. If not specified the file name will be used.
         [String]$Title,
-        #Section to post to.
-        $Section,
+        #Section to post to - the URL for a default section can be stored in the environment variable DefaultOneNoteSection
+        $Section = $env:DefaultOneNoteSection,
         #Specifies text to add before the embedded object. By default, there is no text in that position.
         [ValidateNotNullOrEmpty()][string[]]$PreContent,
         #Specifies text to add after the embedded object. By default, there is no text in that position.
         [ValidateNotNullOrEmpty()][string[]]$PostContent,
+        #A recognized mime type for the embedded file. on Windows the command will try to determine this from the file extension.
+        [string]$MimeType,
         #Normally the page containing the file is added 'silently'. If passthru is specified, an object describing the new page will be returned.
         [Alias('PT')]
         [switch]$PassThru,
         #If specified the command will not pause for conformation, this is the default unless $ConfirmPreference is modified,
         [switch]$Force
     )
-    begin   {
-        $webParams = @{ 'Method'      = 'Post'
-                        'Headers'     = $Script:DefaultHeader
-                        'ContentType' = 'multipart/form-data; boundary=MyAppPartBoundary'
-        }
-    }
     process  {
-        #If section wasn't passed but we have it in an enviroment variable use that
-        if     (-not $Section -and
-                     $env:DefaultOneNoteSection) {$Section = $env:DefaultOneNoteSection}
-        elseif (-not $section )                  {throw "Section parameter is required"}
+        #region set the URI - based on $Section - and other parameters used to send the page
+        $webParams = @{ 'Method'          = 'Post'
+                        'ContentType'     = 'multipart/form-data; boundary=MyAppPartBoundary'
+                        'ExcludeProperty' = '@odata.context'
+                        'AsType'          = ([MicrosoftGraphOnenotePage])
+        }
         #if we got a section object use its pages URL, otherwise if we got a string without pages on the end, add pages, otherwise use section as is
-        if     ($Section.pagesURL)               {$webParams['uri'] = $Section.pagesURL}
+        if     (-not $section )                  {throw [ParameterBindingException]::new("Section parameter is required")}
+        elseif ($Section.pagesURL)               {$webParams['uri'] =  $Section.pagesURL}
         elseif ($Section -is [string] -and
                 $Section -notmatch "/pages$")    {$webParams['uri'] = ($Section -replace '/$','')  + "/pages"}
-        elseif ($Section -is [string])           {$webParams['uri'] = $Section}
+        elseif ($Section -is [string])           {$webParams['uri'] =  $Section}
         else   {Write-Warning -Message 'Could not process the -Section paramater' ; return}
-        #check we have a valid URI for posting to
         if     ($webParams['uri']-notmatch "/onenote/sections/") {Write-Warning -Message "That does not appear to be a valid section" ; return}
-
-        #region read file
-        $i = Get-Item -Path $Path
-        if ($i.count -ne 1) {Write-Warning "The path must be exactly one file. $path matches $($i.count)." ; return  }
-        #Not sure where this came from and why I don't just use [byte[]]$array = [System.IO.File]::ReadAllBytes($i.fullName)
-        [String]$filename      =      $i.Name
-        [byte[]]$array         = ,0 * $i.length
-        $stream                =      $i.OpenRead()
-        [void]$stream.Read($array, 0, $i.Length)
-        $stream.Close()
         #endregion
-        #region   Prepare Data to send
-        $mimetype           =  (Get-ItemProperty -Path (Join-Path "HKLM:\SOFTWARE\Classes\" $I.Extension)  -Name "content type")."Content type"
-        if ($mimetype -match "image") {
-                   $imgTag  = '<img src="name:MyAppFileBlockName" width="500"/>'}
-        else      {$imgTag  = '<img data-render-src="name:MyAppFileBlockName" width="1024"/>'
-                $objectTag  = '<p align="center"><object data-attachment="{1}" data="name:MyAppFileBlockName" type="{0}" /></p>' -f $mimetype,$filename}
-        if ($Title) {$tTag  = [System.Web.HttpUtility]::HtmlEncode($Title)}
-        else        {$tTag  =  $i.Name}
-        [byte[]]$myhtml     = ([byte[]][char[]]( @"
+        #region read file into a data block in HTML
+        $i = Get-Item -Path $Path
+        if ($i.count -ne 1) {Write-Warning "The path must match exactly one file. $path matches $($i.count)." ; return  }
+
+        if ([System.Environment]::OSVersion -match "win" -and -not $MimeType) {
+            $MimeType          =  (Get-ItemProperty -Path (Join-Path "HKLM:\SOFTWARE\Classes\" $I.Extension)  -Name "content type")."Content type"
+        }
+        if (-not $MimeType) {Write-Warning "The Mime type could not be determined automatically. Please specify the mimetype for '$path' with -MimeType." ; return  }
+
+        [String]$filename      =      $i.Name
+        [byte[]]$array         = [System.IO.File]::ReadAllBytes($i.fullName)
+
+        if ($MimeType -match "image") {
+                $imgTag         = '<img src="name:FileBlock" width="500"/>'
+        }
+        else      {
+                $imgTag        = '<img data-render-src="name:FileBlock" width="1024"/>'
+                $objectTag     = '<p align="center"><object data-attachment="{1}" data="name:FileBlock" type="{0}" /></p>' -f $mimetype, $filename
+        }
+        if ($Title) {$tTag     = [System.Web.HttpUtility]::HtmlEncode($Title)}
+        else        {$tTag     =  $i.Name}
+        [byte[]]$myhtml        = ([byte[]][char[]]( @"
 --MyAppPartBoundary
 Content-Disposition:form-data; name="Presentation"
 Content-type:text/html
@@ -378,23 +379,21 @@ Content-type:text/html
 </html>
 
 --MyAppPartBoundary
-Content-Disposition:form-data; name="MyAppFileBlockName"
+Content-Disposition:form-data; name="FileBlock"
 Content-type:$mimetype
 `r`n
 "@ ))  + $array + ([byte[]][char[]]"`r`n--MyAppPartBoundary--`r`n")
-#endregion
-
-#Send it
+        #endregion
+        #region Send it - return the new page if -passthru was given
         if ($Force -or $PSCmdlet.ShouldProcess($tTag,'Add page to OneNote Section')) {
-            $result =  Invoke-WebRequest @webParams -Body $myhtml
-            Write-Verbose  -Message "Return status was $($result.StatusCode)/$($result.StatusDescription)"
+            $result =  Invoke-GraphRequest @webParams -Body $myhtml
             If ($PassThru) {
-                $p = ConvertFrom-Json $result.Content
-                $p.pstypeNames.add('GraphOneNotePage')
-                Add-Member -InputObject $p -MemberType NoteProperty -Name 'ParentSection' -Value $Section
-                return $p
+                if ($Section -is [MicrosoftGraphOnenoteSection]) {$result.ParentSection = $section}
+                if ($section.parentnotebook.DisplayName)  {$result.parentNoteBook = $section.parentNotebook}
+                return $result
             }
         }
+        #endregion
     }
 }
 
@@ -433,16 +432,13 @@ function Update-GraphOneNotePage {
         #If specified, the page is updated without prompting.
         [switch]$Force
     )
-    begin   {
-        Connect-MSGraph
-    }
     process  {
          #If the content contains binary data, the request must be sent using the multipart/form-data content type with a "Commands" part.
         if     ($Page.self)          {$uri = $Page.self}
         elseif ($Page -is [String])  {$uri = $Page}
+        Write-Progress -Activity 'Updating Page' -Status 'Checking exsiting page'
         try {
-            Write-Progress -Activity 'Updating Page' -Status 'Checking exsiting page'
-            $result = Invoke-RestMethod  -Headers $Script:DefaultHeader -Uri  $URI -Method  Get
+            $result = Invoke-GraphRequest -Uri  $URI
         }
         catch {
             Write-Progress -Activity 'Updating Page' -Completed
@@ -463,9 +459,8 @@ function Update-GraphOneNotePage {
         Write-Debug $json
         if ($Force -or $PSCmdlet.ShouldProcess($result.title, 'Update Onenote Page')) {
             Write-Progress -Activity 'Updating Page'  -Status 'Applying changes'
-            $result = Invoke-WebRequest -Method Patch -Uri  "$URI/content" -Headers  $Script:DefaultHeader -ContentType "application/json" -Body $json
+            $result = Invoke-GraphRequest -Method Patch -Uri  "$URI/content"  -ContentType "application/json" -Body $json
             Write-Progress -Activity 'Updating Page' -Completed
-            Write-Verbose  -Message "Update response was $($result.statuscode)/$($result.statusDescription)"
         }
     }
 }
@@ -494,16 +489,13 @@ function Remove-GraphOneNotePage {
         #If specified, the page is deleted without prompting.
         [switch]$Force
     )
-    begin   {
-        Connect-MSGraph
-    }
     process  {
         if     ($Page.self)         {$uri = $Page.self}
         elseif ($Page -is [string]) {$uri = $Page}
         else   {Write-Warning -Message 'Could not process the Page parameter' ; return}
+        Write-Progress -Activity 'Deleting OneNote page(s)' -Status 'Checking page'
         try {
-            Write-Progress -Activity 'Deleting OneNote page(s)' -Status 'Checking page'
-            $result = Invoke-RestMethod  -Headers $Script:DefaultHeader -Uri  $uri -Method  Get
+            $result = Invoke-GraphRequest -Uri  $uri
         }
         catch {
             Write-Progress -Activity 'Deleting OneNote page(s)' -Completed
@@ -514,8 +506,7 @@ function Remove-GraphOneNotePage {
         }
         if ($Force -or $PSCmdlet.ShouldProcess($result.title, 'Delete Onenote Page')) {
             Write-Progress -Activity 'Deleting OneNote page(s)' -Status 'Deleting' -CurrentOperation $result.title
-            $result = Invoke-WebRequest  -Headers  $Script:DefaultHeader -Uri  $uri -Method  Delete
-            Write-Verbose -Message "Delete response was $($result.statuscode) $($result.statusDescription)"
+            $result = Invoke-GraphRequest  -Uri  $uri -Method  Delete
         }
         Write-Progress -Activity 'Deleting OneNote page(s)' -Completed
     }
@@ -526,12 +517,12 @@ function Out-GraphOneNote        {
       .Synopsis
         Output to a new OneNote page
       .INPUTS
-        You can pipe any .NET object to Out-OneNoteLive
+        You can pipe any .NET object to Out-GraphOneNote
      .EXAMPLE
         Generates a page
       .EXAMPLE
-        start ( Get-process  | Out-OneNoteLive -Title "Processes @ $(get-date)" -property Name,Handles,NPM,PM,VM,WS )
-        Generates a page and opens it
+        start ( Get-process  | Out-GraphOneNote -Title "Processes @ $(get-date)" -property Name,Handles,NPM,PM,VM,WS -passthru ).links.oneNoteWebUrl.href
+        Generates a page in the default section (using the environment variable DefaultOneNoteSection) and opens it in a web browser.
     #>
     [CmdletBinding(DefaultParameterSetName='Page')]
     param   (
@@ -539,165 +530,75 @@ function Out-GraphOneNote        {
         [parameter(ValueFromPipeline=$true)]
         [psobject]$InputObject,
         #Includes the specified properties of the objects in the output
-        [Parameter(Position=0)]
-        [System.Object[]]
-        $Property,
+        [Parameter(Position=1)]
+        [String[]]$Property = @('*'),
         #The section to the content to this can be set in an environment variable DefaultOneNoteSection.
-        $Section,
-        [Parameter(ParameterSetName='Page', Position=3)]
+        $Section = $env:DefaultOneNoteSection,
+        [Parameter(ParameterSetName='Page', Position=4)]
         #Specifies the text to add after the opening <BODY> tag. By default, there is no text in that position.
         [string[]]$Body,
         #Specifies the content of the <HEAD> tag. The default is "<title>HTML TABLE</title>".  If you use the Head parameter, the Title parameter is ignored.
-        [Parameter(ParameterSetName='Page', Position=1)]
-        [string[]]
-        $Head,
-        #Specifies a title for the Page.
         [Parameter(ParameterSetName='Page', Position=2)]
+        [string[]]$Head,
+        #Specifies a title for the Page.
+        [Parameter(ParameterSetName='Page', Position=3)]
         [ValidateNotNullOrEmpty()][string]$Title,
         #Determines whether the object is formatted as a table or a list. Valid values are TABLE and LIST. The default value is TABLE.
         [ValidateSet('Table','List')][string]$As = 'Table',
         #Generates only an HTML table. The HTML, HEAD, TITLE, and BODY tags are omitted.
         [Parameter(ParameterSetName='Fragment')]
-        [ValidateNotNullOrEmpty()][switch]$Fragment,
+        [switch]$Fragment,
+        [String[]]$ExcludeProperty,
         # Specifies text to add before the opening <TABLE> tag. By default, there is no text in that position.
         [ValidateNotNullOrEmpty()][string[]]$PreContent,
         #Specifies text to add after the closing </TABLE> tag. By default, there is no text in that position.
-        [ValidateNotNullOrEmpty()][string[]]$PostContent
+        [ValidateNotNullOrEmpty()][string[]]$PostContent,
+        #Normally the page is added 'silently'. If passthru is specified, an object describing the new page will be returned.
+        [Alias('PT')]
+        [switch] $PassThru
     )
+    #collect whatever comes in as Input object and process in the end block
     begin   { $stuff = @() }
     process { $Stuff = $Stuff + $InputObject}
     end     {
-        Connect-MSGraph
-        $webParams = @{ Method      = "Post"
-                        Headers     = $Script:DefaultHeader
-                        ContentType ="text/html"
+
+        #region gather the parameters for the API call - built URI from $section
+         #if we got a section object use its pages URL, otherwise if we got a string without pages on the end, add pages, otherwise use section as is
+        if     (-not $section )                  {throw [ParameterBindingException]::new('Section parameter is required')}
+        $webParams = @{ 'Method'          = 'Post'
+                        'ContentType'     = 'text/html'
+                        'ExcludeProperty' = '@odata.context'
+                        'AsType'          = ([MicrosoftGraphOnenotePage])
         }
-        #If section wasn't passed but we have it in an enviroment variable use that
-        if(-not $Section -and $env:DefaultOneNoteSection) {$Section = $env:DefaultOneNoteSection}
-        elseif(-not $section ) {throw "Section parameter is required"}
-        #if we got a section object use its pages URL, otherwise if we got a string without pages on the end, add pages, otherwise use section as is
-        if ($Section.pagesURL) {$webParams['uri'] = $Section.pagesURL}
-        elseif ($Section -is [string] -and $Section -notmatch "/pages$") {$webParams['uri'] = ($Section -replace '/$','')  + "/pages"}
+        if ($Section.pagesURL) {
+                $webParams['uri'] = $Section.pagesURL
+        }
+        elseif ($Section -is [string] -and $Section -notmatch '/pages$') {
+                $webParams['uri'] = ($Section -replace '/$','')  + '/pages'
+        }
         else   {$webParams['uri'] = $Section}
+        if     ($webParams['uri']-notmatch '/onenote/sections/') {Write-Warning -Message 'That does not appear to be a valid section' ; return}
+        #end region
+        #region generate the HTML  - filtering the input properties as needed
+        if ($PSBoundParameters['Property','ExcludeProperty']) {
+            $Stuff = $stuff | Select-Object -Property $Property -ExcludeProperty $ExcludeProperty
+            [void]$PSBoundParameters.Remove('Property')
+            [void]$PSBoundParameters.Remove('ExcludeProperty')
+        }
 
-        #check we have a valid URI for posting to
-        if ($webParams['uri']-notmatch "/onenote/sections/") {Write-Warning -Message "That does not appear to be a valid section" ; return}
-
-        #Generate HTML
-        [void]$PSBoundParameters.Remove("Section")
-        [void]$PSBoundParameters.Remove("InputObject")
-        if (-not $Title)    {$PSBoundParameters.Add("Title", ( $MyInvocation.Line + "  -  " +  (Get-Date))) }
+        [void]$PSBoundParameters.Remove('Section')
+        [void]$PSBoundParameters.Remove('InputObject')
+        [void]$PSBoundParameters.Remove('PassThru')
+        if (-not $Title)    {$PSBoundParameters.Add('Title', ( $MyInvocation.Line + '  -  ' +  (Get-Date))) }
         $webParams['body'] = $Stuff | ConvertTo-Html  @PSBoundParameters
-        #And post it, returning the URL of the page.
-        (Invoke-RestMethod @webParams ).links.onenoteWebUrl.href
-    }
-}
+        #end region
 
-function Add-GraphOneNoteTab     {
-    <#
-      .Synopsis
-        Adds a tab in a Teams channel for a OneNote section or Notebook
-      .Description
-        This posts to https://graph.microsoft.com/v1.0/teams/{id}/channels/{id}/tabs
-        which requires consent to use the Group.ReadWrite.All scope.
-        The Notebook Parameter has an alias of 'Section' and will accept either
-        a OneNote Notebook object (or its 'Self' URI - which requires the tab name to be
-        set explicitly) or a Section object. If the notebook is specified it opens at the
-        first section.
-      .Example
-        >
-        > $section = Get-GraphTeam -ByName accounts -Notebooks | Select-Object -ExpandProperty sections  | where displayname -like "FY-19*"
-        > $channel = Get-GraphTeam -ByName accounts -Channels -ChannelName 'year-end'
-        > Add-GraphOneNoteTab  $section $channel -TabLabel "FY-19 Notes"
-
-        The first command gets the Notebook for the Accounts team and finds the "FY-19 Year End" section
-        The second command gets the channels for the same team and finds the "Year end" channel
-        The Third command creates a tab in the channel named 'FY-19 Notes' which opens the team notebook
-        at its 'FY-19 Year End' section.
-    #>
-    [CmdletBinding(SupportsShouldProcess)]
-    param(
-        #The Notebook or Section to associate with the tab
-        [Parameter(Mandatory=$true,Position=0)]
-        [Alias('Section')]
-        $Notebook,
-        #An ID or Channel object which may contain the team ID; the tab will be created in this channel
-        [Parameter(Mandatory=$true, Position=1)]
-        $Channel,
-        #A team ID, or a team object if the team can't be found from the the channel
-        $Team,
-        #The label for the tab, if left blank the name of the Notebook or Section will be sued
-        $TabLabel,
-        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
-        [Alias('PT')]
-        [switch]$PassThru,
-        #If Specified the tab will be added without pausing for confirmation, this is the default unless $ConfirmPreference has been set.
-        $Force
-    )
-    Connect-MSGraph
-    if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-    if       ($Channel.Team)           {$Team     = $Channel.Team }
-    elseif   ($Team.id)                {$Team     = $Team.id}
-    elseif   ($team -isnot [string])   {Write-Warning 'Unable to determine the team, please specify it explicitly'; return}
-    if       ($Channel.id) {           $Channel   = $Channel.id }
-    elseif   ($Channel-isnot [string]) {Write-Warning 'Unable to determine the channel'; return}
-    if       (-not $TabLabel -and
-                $notebook.displayName) {$TabLabel = $Notebook.displayName}
-    elseif   (-not $TabLabel)          {Write-warning 'Unable to determin a name for the tab, please specify one explicitly'; return}
-
-    $webparams = @{'Method'       = 'Post';
-                   'Uri'          = "https://graph.microsoft.com/beta/teams/$team/channels/$channel/tabs" ;
-                   'Headers'      =  $Script:DefaultHeader;
-                   'ContentType'  = 'application/json'
-    }
-    #This bit had to be reverse engineered, from a beta version of the API, so if it works past next week, be happy.
-    #If the "Notebook" object is actually a section, and it was fetched by one of the module commands (get-GraphTeam -notebook, or get-graphNotebook -section)
-    #then $Notebook it will have a a parentNotebook ID. This IF..Else is to make sure we have the real notebook ID, and catch a sectionID if there is one.
-    if   ($Notebook.parentNotebook.id) {
-                    $ParamsPt2    = '&notebookSource=PickSection&sectionId='+ $Notebook.id
-                    $NotebookID   = $Notebook.parentNotebook.id
-          }
-    else  {         $ParamsPt2    = '&notebookSource=New'
-                    $NotebookID   = $Notebook.id }
-
-    #if $Notebook is a section its url will end ?wd=(something). We need to split this off the URL and re-use it. The () need to be unescapted too,
-    if ($notebook.links.oneNoteWebUrl.href -match '\?(wd=.*$)') {
-                $ParamsPt2       += '&' + ( $Matches[1] -replace '%28','(' -replace '%29',')' )
-                $OnenoteWebUrl    = $notebook.links.oneNoteWebUrl.href  -replace  '\?wd=.*$', ''
-    }
-    else      { $OnenoteWebUrl    = $notebook.links.oneNoteWebUrl.href}
-
-    #We need the teamsite URL for the team who owns this channel, and the URL to the the Notebook. Both need to be escaped.
-    $OnenoteWebUrl  = $OnenoteWebUrl                           -replace "%", "%25" -replace '/','%2F' -replace ':','%3A'
-    $siteUrl        = (Get-GraphTeam -Team $Team -Site).webUrl -replace "%", "%25" -replace '/','%2F' -replace ':','%3A'
-
-    #Now we need to build up the mother and father of all URIs It contains the ID and URL for the notebook (not section). The Name, the teamsite. And Section specifics if applicable.
-    $URIParams      = "?entityid=%7BentityId%7D&subentityid=%7BsubEntityId%7D&auth_upn=%7Bupn%7D&ui={locale}&tenantId={tid}"+
-                      "&notebookSelfUrl=https%3A%2F%2Fwww.onenote.com%2Fapi%2Fv1.0%2FmyOrganization%2Fgroups%2F$Team%2Fnotes%2Fnotebooks%2F"+ $NotebookID   +
-                      "&oneNoteWebUrl=" + $oneNoteWebUrl +
-                      "&notebookName="  + [uri]::EscapeDataString( $notebook.displayName ) +
-                      "&siteUrl="       + $SiteUrl +
-                      $ParamsPt2
-
-    #Now we can create the JSON. Such information as there is can be found at https://docs.microsoft.com/en-us/graph/teams-configuring-builtin-tabs
-    $json = ConvertTo-Json ([ordered]@{
-                'TeamsAppId'      = '0d820ecd-def2-4297-adad-78056cde7c78'
-                'name'            = $TabLabel
-                'configuration'   = [ordered]@{
-                    'entityId'    = ((New-Guid).tostring() + "_" +  $Notebook.ID)
-                    'contentUrl'  = "https://www.onenote.com/teams/TabContent" + $URIParams
-                    'removeUrl'   = "https://www.onenote.com/teams/TabRemove"  + $URIParams
-                    'websiteUrl'  = "https://www.onenote.com/teams/TabRedirect?redirectUrl=$oneNoteWebUrl"
-                }})
-    $json= $json  -replace "\\u0026","&"
-    Write-Debug $json
-    if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {
-        $result = Invoke-RestMethod @webParams -body $json
-        if ($PassThru) {
-            $result.pstypeNames.add('GraphTab')
-            #Giving a type name formats things nicely, but need to set the name to be used when the tab is displayed
-            Add-Member -InputObject $result -MemberType NoteProperty -Name teamsAppName -Value 'OneNote'
-            return $result
+        #Make the call, returning the URL of the new page.
+        $result = Invoke-GraphRequest @webParams
+        If ($PassThru) {
+                if ($Section -is [MicrosoftGraphOnenoteSection]) {$result.ParentSection = $section}
+                if ($section.parentnotebook.DisplayName)  {$result.parentNoteBook = $section.parentNotebook}
+                return $result
         }
     }
 }

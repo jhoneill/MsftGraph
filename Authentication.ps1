@@ -181,7 +181,7 @@ Function Invoke-GraphRequest {
             }
         }
         else  {$result = $response}
-        if ($StatusCodeVariable) {Set-variable $StatusCodeVariable -Scope 1 -Value (Get-Variable $vname -ValueOnly) }
+        if ($StatusCodeVariable) {Set-variable $StatusCodeVariable -Scope 1 -Value (Get-Variable $StatusCodeVariable -ValueOnly) }
         foreach ($r in $result) {
             foreach ($p in $ExcludeProperty) {$r.remove($p)}
             if ($AsType) {New-Object -TypeName $AsType -Property $r}

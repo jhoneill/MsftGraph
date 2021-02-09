@@ -15,9 +15,10 @@ Done
 # GraphSite             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphSite
 # GraphSKU              --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphSubscribedSku
 # GraphPlan             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerPlan
-# GraphOneNoteSection   -->Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteSection
+# GraphOneNoteSection   --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteSection
 # GraphOneNoteBook      --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphNotebook
-# GraphMailboxSettings  --> Microsoft.Graph.PowerShell.Models.IMicrosoftGraphMailboxSettings# GraphLicense          --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphLicenseDetails
+# GraphMailboxSettings  --> Microsoft.Graph.PowerShell.Models.IMicrosoftGraphMailboxSettings
+# GraphLicense          --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphLicenseDetails
 # GraphList             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphList
 # GraphGroup            --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphGroup
 # GraphDriveItem        --> Microsoft.Graph.PowerShell.Models.Microsoft
@@ -32,22 +33,21 @@ Invites
 
 
     4 Excel.ps1
-    4 Reports.ps1
     7 Outlook-Contacts.ps1
     9 ActionCard.ps1
     9 Outlook-Calendar.ps1
     9 Outlook-Mail.ps1
-   10 OneNote.ps1
-   14 Planner.ps1
    15 GsAndTsToDO.ps1
    21 Sharepoint.ps1
 
-
+    4 Reports.ps1
     5 Authentication.ps1
     5 OneDrive.ps1
     6 Identity.DirectoryManage…
     6 Users.ps1
+    9 Notes.ps1
    12 Groups.ps1
+   14 Planner.ps1
 
    Other sign ins
    graphtToDo
