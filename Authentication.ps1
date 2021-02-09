@@ -60,6 +60,7 @@ else                  {$global:DefaultGraphScopes = @(
                 'Files.ReadWrite.All',
                  #'Group.ReadWrite.All', or read fails when logging on as non-admin
                 'Mail.ReadWrite',
+                'Mail.Send',
                 'MailboxSettings.ReadWrite',
                 'Notes.ReadWrite.All',
                 'Notes.Create',
@@ -117,7 +118,7 @@ Function Invoke-GraphRequest {
         [string]$ContentType,
 
         #Graph Authentication Type
-        [Models.GraphRequestAuthenticationType]
+        [Microsoft.Graph.PowerShell.Authentication.Models.GraphRequestAuthenticationType]
         $Authentication,
 
         #Specifies a web request session. Enter the variable name, including the dollar sign ($).You can''t use the SessionVariable and GraphRequestSession parameters in the same command.

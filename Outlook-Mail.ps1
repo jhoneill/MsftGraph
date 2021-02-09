@@ -1,24 +1,29 @@
-﻿[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Scope='Function', Target='New*')]
+﻿using namespace Microsoft.Graph.PowerShell.Models
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Scope='Function', Target='New*')]
 param()
 function Get-GraphMailTips       {
     <#
       .synopsis
         Gets mail tips for one or more users (is their mailbox full, are auto-replies on etc)
     #>
-    [cmdletbinding()]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification="MailTip would be incorrect")]
     param(
         #mail addresses
         [Parameter(Mandatory=$true)]
         [string[]]$Address
     )
-
-    $json = Convertto-Json @{EmailAddresses=$Address;
-                  MailTipsOptions= "automaticReplies, mailboxFullStatus, customMailTip, deliveryRestriction, externalMemberCount, maxMessageSize, moderationStatus, recipientScope, recipientSuggestions, totalMemberCount"
+    $webparams = @{
+                    'Method'      = 'post'
+                    'Uri'         = "$GraphUri/me/getMailTips"
+                    'ContentType' = 'application/json'
+                    'body'        = Convertto-Json @{EmailAddresses= @() + $Address;
+                                                    MailTipsOptions= "automaticReplies, mailboxFullStatus, customMailTip, "+
+                                                                      "deliveryRestriction, externalMemberCount, maxMessageSize, " +
+                                                                      "moderationStatus, recipientScope, recipientSuggestions, totalMemberCount"
+                    }
      }
 
-    Connect-MSGraph
-    (Invoke-RestMethod -Method post -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/me/getMailTips" -Body $json -ContentType "application/json").value
+    Invoke-GraphRequest @webparams -ValueOnly -AsType ([MicrosoftGraphMailTips])
 }
 
 function Get-GraphMailFolderList {
@@ -48,13 +53,9 @@ function Get-GraphMailFolderList {
         [string]$Filter
     )
 
-    Connect-MSGraph
-    $webParams = @{Method = "Get"
-                    Headers = $Script:DefaultHeader
-    }
     #region set-up URI . If we got a user ID, use it other otherwise use the current user, add select, orderby, filter & top parameters as needed
-    if ($UserID)  {$uri = "https://graph.microsoft.com/v1.0/users/$userID/mailFolders" }
-    else          {$uri = "https://graph.microsoft.com/v1.0/me/mailFolders" }
+    if ($UserID)  {$uri = "$GraphUri/users/$userID/mailFolders" }
+    else          {$uri = "$GraphUri/me/mailFolders" }
     $JoinChar = "?"  #Will the next parameter be joined onto the URI with a "?"" or with "&"  ?
     if ($Select)  {$uri = $uri + '?$select=' + ($Select -join ',') ;                                 $JoinChar = "&"}
     if ($Name)    {$uri = $uri + $JoinChar + ("`$filter=startswith(displayName,'{0}') " -f $Name ) ; $JoinChar = "&"}
@@ -65,15 +66,19 @@ function Get-GraphMailFolderList {
 
     #region get the data, cope with it being paged add a type to help formatting and return the result
     $folderList    = @()
-    $result       = Invoke-RestMethod @webParams -Uri $uri
+    $result       = Invoke-GraphRequest -Uri $uri
     $folderList   += $result.value
     while ($result.'@odata.nextLink') {
-        $result          =Invoke-RestMethod @webParams -Uri  $result.'@odata.nextLink' ;
+        $result          = Invoke-GraphRequest -Uri  $result.'@odata.nextLink' ;
         $folderList += $result.value
     }
 
-    foreach ($f in $folderList) {$f.pstypenames.add("GraphMailFolder")}
-    return $folderList
+    foreach ($f in $folderList) {
+        $size = $f.sizeInBytes
+        $f.remove('sizeInBytes')
+        New-object -TypeName MicrosoftGraphMailFolder -Property $f |
+            Add-Member -PassThru -NotePropertyName SizeInBytes -NotePropertyValue $size
+        }
     #endregion
 }
 
@@ -132,32 +137,22 @@ function Get-GraphMailItem       {
         [Parameter(Mandatory=$true, ParameterSetName='FilterByString')]
         [string]$Filter
     )
-    begin   {
-        Connect-MSGraph
-    }
     process {
         if     ($Mailfolder.id) {$MailPath = 'mailfolders/' +  $Mailfolder.id}
         elseif ($Mailfolder)    {$MailPath = 'mailfolders/' + ($Mailfolder -replace '^/','')}
         else                    {$MailPath = ''}
 
         if ($User.id) {$User  = $User.id}
-        if ($User)    {$uri   = "https://graph.microsoft.com/v1.0/users/$user/$MailPath" }
-        else          {$uri   = "https://graph.microsoft.com/v1.0/me/$MailPath" }
-        $webParams = @{Method = "Get"
-                      Headers = $Script:DefaultHeader
-        }
+        if ($User)    {$uri   = "$GraphUri/users/$user/$MailPath" }
+        else          {$uri   = "$GraphUri/me/$MailPath" }
 
         if ($ChildFolders -and '' -ne $MailPath)    {
-            $result = (Invoke-RestMethod @webParams -Uri "$uri/childfolders")
-            $folderList = $result.value
-            foreach ($f in $folderList) {$f.pstypenames.add("GraphMailFolder")}
-            return $folderList
+            Invoke-GraphRequest -Uri "$uri/childfolders" -ValueOnly -AsType ([MicrosoftGraphMailFolder])
         }
         elseif ($ChildFolders) {
             Write-Warning -Message 'You need to specify a folder when requesting child folders.'
         }
         else {
-            $webParams.Headers["Prefer"] ='outlook.body-content-type="text"'
             $uri =  $uri + '/messages?$select='  + ($Select -join ',')
             if     ($Top)    {$uri = $uri + '&$top='     + $Top              }
             if     ($Search) {$Uri = $uri + '&$search="' + $Search + '"'     }
@@ -165,8 +160,7 @@ function Get-GraphMailItem       {
             else             {$uri = $uri + '&$orderby=' + $OrderBy          }
 
 
-            (Invoke-RestMethod @webParams -Uri $uri ).value |
-                ForEach-Object {$_.pstypeNames.add("GraphMailMessage") ; $_ } |
+            Invoke-GraphRequest -Uri $uri -Headers @{'Prefer' ='outlook.body-content-type="text"'} -ValueOnly -AsType ([MicrosoftGraphMessage]) -ExcludeProperty '@odata.etag' |
                 Add-Member -PassThru -MemberType ScriptProperty -Name "fromName"    -Value {$this.from.emailAddress.name} |
                 Add-Member -PassThru -MemberType ScriptProperty -Name "fromAddress" -Value {$this.from.emailAddress.address} |
                 Add-Member -PassThru -MemberType ScriptProperty -Name "bodyText"    -Value {$this.body.content}
@@ -275,7 +269,7 @@ function Send-GraphMailMessage   {
                     throw ("The total size of attachments would result in an HTTP Post which greater than 4MB. Individual uploads are not possible when SaveToSentItems is disabled.")
                     return
                 }
-                Else {
+                else {
                     Write-Verbose -Message "After BASE64 encoding attacments, message may exceed 4MB. Using Draft and sequential attachment method"
                     $asDraft= $true
                 }
@@ -288,11 +282,8 @@ function Send-GraphMailMessage   {
     }
     elseif (-not $Subject) {$Subject = "No subject"}
 
-    Connect-MSGraph
-    $webParams = @{Headers = $Script:DefaultHeader}
-
-    if ($asDraft) {$Uri = "https://graph.microsoft.com/v1.0/me/Messages"}
-    else          {$Uri = "https://graph.microsoft.com/v1.0/me/sendmail"}
+    if ($asDraft) {$Uri = "$GraphUri/me/Messages"}
+    else          {$Uri = "$GraphUri/me/sendmail"}
 
     #Build a hash table with the parts of the message, this will be coverted into JSON
     #BEWARE names are case sensitive. if you create $msgSettings.Body instead of $msgSettings.body
@@ -310,14 +301,14 @@ function Send-GraphMailMessage   {
             if     ($recip  -is [string] ) { $msgSettings[ 'toRecipients'] += New-Recipient $recip}
             else                           { $msgSettings[ 'toRecipients'] += $recip}
     }
-    if     ($CC) {
+    if ($CC) {
         $msgSettings['ccRecipients']      = @()
         foreach ($recip in $cc ) {
             if     ($recip  -is [string] ) { $msgSettings[ 'ccRecipients'] += New-Recipient $recip}
             else                           { $msgSettings[ 'ccRecipients'] += $recip}}
     }
-    if     ($BCC) {
-                $msgSettings['bccRecipients']      = @()
+    if ($BCC) {
+        $msgSettings['bccRecipients']      = @()
         foreach ($recip in $bcc ) {
             if     ($recip  -is [string] ) { $msgSettings['bccRecipients'] += New-Recipient $recip}
             else                           { $msgSettings['bccRecipients'] += $recip}}
@@ -325,10 +316,10 @@ function Send-GraphMailMessage   {
     if ($Receipt)                          { $msgSettings['isDeliveryReceiptRequested'] = $true }
 
     #If we are creating a draft, save it now; if sending-in-one be ready for attachments
-    if ($asDraft) {
+    if     ($asDraft) {
         Write-Progress -Activity "Sending Message" -CurrentOperation "Uploading draft"
         $json = ConvertTo-Json $msgSettings -Depth 5 #default depth isn't enough !
-        try            {$msg  = Invoke-RestMethod @webParams -Method post  -uri $uri  -Body $json -ContentType "application/json" }
+        try            {$msg  = Invoke-GraphRequest -Method post  -uri $uri  -Body $json -ContentType "application/json" }
         catch          {throw "There was an error creating the draft message."; return }
         if (-not $msg) {throw "The draft message was not created as expected" ; return }
         else           {
@@ -351,11 +342,11 @@ function Send-GraphMailMessage   {
         if ($asDraft) {
             Write-Progress -Activity "Sending Message" -CurrentOperation "Uploading $($f.Name)"
             try {
-                $null = Invoke-RestMethod @webParams -Method post  -uri "$uri/attachments"  -Body (ConvertTo-Json $Filesettings) -ContentType "application/json" -ErrorAction Stop
+                $null = Invoke-GraphRequest -Method post  -uri "$uri/attachments"  -Body (ConvertTo-Json $Filesettings) -ContentType "application/json" -ErrorAction Stop
             }
             catch {
                 Write-warning -Message "Error occured uploading file $($f.name) - will attempt to delete the draft message"
-                Invoke-RestMethod @webParams -Method Delete  -Uri "$uri"
+                Invoke-GraphRequest -Method Delete  -Uri "$uri"
                 throw "Failure during attachment upload"
                 return
             }
@@ -372,8 +363,7 @@ function Send-GraphMailMessage   {
     elseif ($asDraft) {
             Write-Progress -Activity "Sending Message" -CurrentOperation "Sending Draft"
             try {
-                $msg =  Invoke-WebRequest @webParams -Method post  -uri "$uri/send"
-                write-verbose -Message ($msg.StatusCode + "  " + $msg.StatusDescription)
+                Invoke-GraphRequest  -Method post  -uri "$uri/send" -Body " " # underlying stuff requires -body, but server ignores it.
                 Write-Progress -Activity "Sending Message" -Completed
             }
             catch {throw "There was an error sending the draft message; it remains in the drafts folder"}
@@ -386,10 +376,9 @@ function Send-GraphMailMessage   {
         Write-Progress -Activity "Sending Message" -CurrentOperation "Uploading and sending"
 
         $json = ConvertTo-Json $mail -Depth 10
-        Write-Verbose $json
-        try            {$msg  = Invoke-RestMethod @webParams -Method post  -uri $uri  -Body $json -ContentType "application/json" }
+        Write-Debug $Json
+        try            {Invoke-GraphRequest -Method post  -uri $uri  -Body $json -ContentType "application/json" }
         catch          {throw "There was an error sending message."; return }
-        write-verbose  -Message ($msg.StatusCode + "  " + $msg.StatusDescription)
         Write-Progress -Activity "Sending Message" -Completed
     }
 }
@@ -421,12 +410,12 @@ function Send-GraphMailForward   {
         else                           { $msgSettings[ 'toRecipients'] += $recip}
     }
     if ($Comment)                      { $msgSettings[ 'comment'] = $Comment}
-    if ($Message.id) {$uri = "https://graph.microsoft.com/v1.0/me/Messages/$($Message.id)/forward"}
-    else             {$uri = "https://graph.microsoft.com/v1.0/me/Messages/$Message/forward"}
+    if ($Message.id) {$uri = "$GraphUri/me/Messages/$($Message.id)/forward"}
+    else             {$uri = "$GraphUri/me/Messages/$Message/forward"}
 
     $json = ConvertTo-Json $msgSettings -depth 10
-    Write-Verbose $Json
-    Invoke-RestMethod -Method post -Uri $uri -ContentType 'application/json' -Body $json -Headers $script:DefaultHeader
+    Write-Debug $Json
+    Invoke-GraphRequest -Method post -Uri $uri -ContentType 'application/json' -Body $json
 }
 
 function Send-GraphMailReply     {
@@ -447,14 +436,14 @@ function Send-GraphMailReply     {
         [switch]$ReplyAll
     )
     $msgSettings =  @{'comment' = $Comment }
-    if ($Message.id) {$uri =  "https://graph.microsoft.com/v1.0/me/Messages/$($Message.id)/"}
-    else             {$uri =  "https://graph.microsoft.com/v1.0/me/Messages/$Message"}
+    if ($Message.id) {$uri =  "$GraphUri/me/Messages/$($Message.id)/"}
+    else             {$uri =  "$GraphUri/me/Messages/$Message"}
     if ($ReplyAll)   {$uri += '/replyAll' }
     else             {$uri += '/reply' }
 
     $json = ConvertTo-Json $msgSettings -depth 10
-    Write-Verbose $Json
-    Invoke-RestMethod -Method post -Uri $uri -ContentType 'application/json' -Body $json -Headers $script:DefaultHeader
+    Write-Debug $Json
+    Invoke-GraphMethod -Method post -Uri $uri -ContentType 'application/json' -Body $json
 }
 
 <#

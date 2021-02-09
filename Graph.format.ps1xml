@@ -1661,7 +1661,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Mailfolder</Name><ViewSelectedBy><TypeName>GraphMailFolder</TypeName></ViewSelectedBy>
+            <Name>Graph Mailfolder</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphMailFolder</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1708,7 +1708,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph MailMessage</Name><ViewSelectedBy><TypeName>GraphMailMessage</TypeName></ViewSelectedBy>
+            <Name>Graph MailMessage</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphMessage</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
