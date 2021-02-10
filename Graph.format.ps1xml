@@ -1935,5 +1935,123 @@
                 </TableRowEntries>
             </TableControl>
         </View>
+        <View>
+            <Name>Todo TaskLists</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTaskList</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>DisplayName</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>IsOwner</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>IsShared</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Well-known List Name</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>DisplayName</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>IsOwner</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>IsShared</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>WellknownListName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Todo Tasks</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTask</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Title</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Recurs</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Status</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Importance</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Due Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Reminder Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Reminder</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>Title</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <Scriptblock>$_.Recurrence.pattern.type</Scriptblock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Status</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Importance</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <Scriptblock>$_.DueDatetime.DateTime + " " + $_.DueDatetime.TimeZone </Scriptblock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <PropertyName>IsReminderOn</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <Scriptblock>$_.ReminderDateTime.DateTime + " " + $_.ReminderDateTime.TimeZone</Scriptblock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
     </ViewDefinitions>
 </Configuration>

@@ -219,10 +219,10 @@ function Get-GraphGroup          {
 #>(irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/groupsettings/$($team.id)") ##may be empty
 
     process {
-        if     (ContextHas -Not -WorkOrSchoolAccount)  {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         #check scopes - Scopes Group.Read.All, Files.Read, Sites.Read.All, Notes.Create, Notes.Read, depending on params passed.
-        elseif ($id -is [string] -and
-                $id -notmatch $guidregex)   {$id = Get-GraphGroupList -Name $id}
+        if ($ID -is [string] -and
+                $ID -notmatch $guidregex)   {$ID = Get-GraphGroupList -Name $id}
         # if we didn't get passed a group get the current user's groups
         elseif (-not $ID)                   {$ID = Get-GraphUser      -Teams}
         if     (-not $ID)                   {Write-Warning 'Could not Get a team from the parameters provided' ; return}
@@ -416,7 +416,7 @@ function New-GraphGroup          {
         #if specified group will be added without prompting
         [Switch]$Force
     )
-    if (ContextHas -Not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+    ContextHas -WorkOrSchoolAccount -BreakIfNot
 
     if (Invoke-GraphRequest -Uri "$GraphURI/groups?`$filter=displayname eq '$Name'" -ValueOnly) {
         throw "There is already a group with the display name '$Name'." ; return
@@ -522,7 +522,7 @@ function Set-GraphGroup          {
         [switch]$Force
     )
     process {
-        if     (ContextHas -Not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         #ensure we have an ID for the group(s) we were passed. If we got a GUID in a string, we'll confirm it's a group and get the display name.
         $Group = foreach ($g in $Group) {
                   if     ($g.ID) {$g}
@@ -759,7 +759,7 @@ function Add-GraphGroupMember    {
         }
     }
     process {
-        if   (ContextHas -Not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
 
         foreach ($g in $Group) {
             #group(s) resolved in begin block so should have an ID and display name.
@@ -824,7 +824,7 @@ function Remove-GraphGroupMember {
         }
     }
     process {
-        if     (ContextHas -Not -WorkOrSchoolAccount) { Write-Warning -Message "This command only works when you are logged in with a work or school account."; return}
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         foreach ($g in $Group) {
             #I'm not really expecting an array of users so I have left this is one call fo.r each user.
             #To optimize it piped users could be collected in the process block and the work done in the end block
@@ -1041,7 +1041,7 @@ function New-GraphTeamPlan       {
     begin   {
     }
     process {
-        if (ContextHas -Not -WorkOrSchoolAccount ) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         if     ($Team.id)                   {$settings =  @{owner = $team.id} }
         elseif ($Team -is [string] -and
                 $Team -match $GUIDRegex )   {$settings =  @{owner = $team} }

@@ -29,7 +29,7 @@ function Get-GraphPlan           {
         [switch]$FullTasks
     )
     process {
-        if (ContextHas -Not -WorkOrSchoolAccount ) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         if (-not $Plan)         {$Plan = Invoke-GraphRequest -Uri "$GraphUri/me/planner/plans" -ValueOnly -AsType ([MicrosoftGraphPlannerPlan]) -ExcludeProperty '@odata.etag' | Select-Object -First 1 }
         if ($Plan.title)        {$planTitle = $Plan.title}
         if ($Plan.id)           {$Plan      = $Plan.id}
@@ -132,7 +132,7 @@ function Set-GraphPlanDetails    {
         [switch]$Force
     )
     process {
-        if (ContextHas -Not -WorkOrSchoolAccount ) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         if ($Plan.id) {$detailsURI = "$GraphUri/planner/plans/$($plan.id)/details" ; $planTitle = $Plan.Title}
         else          {$detailsURI = "$GraphUri/planner/plans/$plan/details"       ; $planTitle = "."   }
         try {
@@ -178,7 +178,7 @@ function Remove-GraphPlan  {
     begin {
     }
     process {
-        if (ContextHas -Not -WorkOrSchoolAccount ) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         if (-not $Plan)         {$Plan = Invoke-GraphRequest -Uri "$GraphUri/me/planner/plans" -ValueOnly -AsType ([MicrosoftGraphPlannerPlan]) -ExcludeProperty '@odata.etag' | Select-Object -First 1 }
 
         if ($Plan.Title )   {$target = $Plan.Title}
@@ -226,7 +226,7 @@ function Add-GraphPlanBucket     {
         $orderHint = " !"
     }
     process {
-        if (ContextHas -Not -WorkOrSchoolAccount ) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         if     ($Plan.id)           {$Planid = $plan.id}
         elseif ($Plan -is [String]) {$planid = $Plan}
         else   {Write-Warning 'Could not get the plan ID' ; return }
@@ -414,7 +414,7 @@ function Add-GraphPlanTask       {
         }
     }
     process {
-        if (ContextHas -Not -WorkOrSchoolAccount ) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         $settings =  [ordered]@{"planId"=$Plan; "title"=$title}
 
         if ($Bucket) {
@@ -555,7 +555,7 @@ function Set-GraphPlanTask       {
         $planHash = @{}
     }
     process {
-        if (ContextHas -Not -WorkOrSchoolAccount ) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         #Did we get a task object with an ID , a title, a Plan ID and an etag ? Or and ID with the need to look up the others up
         $tag = $plan = $promptTitle = $null
         if ($Task.planID)        {$plan        = $Task.planID}
@@ -932,7 +932,7 @@ function Add-GraphPlannerTab     {
     #If Plan and/or channel were objects with IDs use the ID
     if       ($Channel.id) {$Channel = $Channel.id}
     if       ($Plan.id)    {$Plan    = $Plan.id}
-    $tabURI = "https://tasks.office.com/{0}/Home/PlannerFrame?page=7&planId={1}" -f [Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext.TenantId  , $Plan
+    $tabURI = "https://tasks.office.com/{0}/Home/PlannerFrame?page=7&planId={1}" -f $global:GraphUser  , $Plan
 
     $webparams = @{'Method'      = 'Post';
                    'Uri'         = "https://graph.microsoft.com/beta/teams/$team/channels/$channel/tabs" ;
