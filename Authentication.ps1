@@ -378,6 +378,7 @@ Function Connect-Graph     {
             $Global:WorkOrSchool = $false #Legacy
         }
         $user             =   Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/me/"
+        $Global:GraphUser =  $user.userPrincipalName
         Add-Member -Force -InputObject $authcontext -NotePropertyName UserDisplayName        -NotePropertyValue $user.displayName
         Add-Member -Force -InputObject $authcontext -NotePropertyName UserID                 -NotePropertyValue $user.ID
         Add-Member -Force -InputObject $authcontext -NotePropertyName RefreshTokenPresent    -NotePropertyValue ($script:RefreshToken -as [bool])
@@ -420,13 +421,14 @@ Function Show-GraphSession {
 }
 
 Function ContextHas {
+[cmdletbinding()]
     <#
     #>
     param (
         [string[]]$scopes,
         [switch]$Not,
-        [switch]$WorkOrSchoolAccount
-
+        [switch]$WorkOrSchoolAccount,
+        [switch]$BreakIfNot
     )
     if ($WorkOrSchoolAccount)  {
           $state =  [GraphSession]::Instance.AuthContext.WorkOrSchool -or $global:WorkOrSchool  #Global var is legacy.
@@ -435,6 +437,10 @@ Function ContextHas {
     foreach ($s in $scopes)  {
           $state = $state -and ([GraphSession]::Instance.AuthContext.Scopes -contains $s)
     }
-    if ($Not) {return (-not $state)}
-    else      {return       $state }
+    if ($BreakIfNot ) {
+        if ($scopes              -and -not $state) {Write-Warning "This requires the $($scopes -join ', ') scope(s)." ; break}
+        if ($WorkOrSchoolAccount -and -not $state) {Write-Warning "This requires a work or school account."           ; break}
+    }
+    #otherwise return true or false
+    else  {return ( $state -xor $not )}
 }
