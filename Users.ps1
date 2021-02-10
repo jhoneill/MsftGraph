@@ -30,7 +30,7 @@ function Get-GraphUserList {
         Get-GraphUserList -filter "Department eq 'Accounts'"
 
     #>
-    [OutputType([MicrosoftGraphUser])]
+    [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser])]
     [cmdletbinding(DefaultparameterSetName="None")]
     param(
         #If specified searches for users whose first name, surname, displayname, mail address or UPN start with that name.
@@ -57,9 +57,12 @@ function Get-GraphUserList {
         [Alias('OrderBy')]
         [string]$Sort,
 
-        #Filter clause for the query
+        #Filter clause for the query for example "startswith(displayname,'Bob') or startswith(displayname,'Robert')"
         [parameter(Mandatory=$true, parameterSetName='FilterByString')]
         [string]$Filter,
+
+        [validateSet('directReports', 'manager', 'memberOf', 'ownedDevices', 'ownedObjects', 'registeredDevices', 'transitiveMemberOf',  'extensions')]
+        [string]$ExpandProperty,
 
         # The URI for the proxy server to use
         [Parameter(DontShow)]
@@ -231,15 +234,16 @@ function Get-GraphUser     {
         }
         foreach ($id in $UserID) {
             #region set up the user part of the URI we will call
-            if ($id -eq 'me') { $Uri = "$GraphUri/me" }
-            else              { $Uri = "$GraphUri/users/$id" }
 
             # -Teams requires a GUID, photo doesn't work for "me"
             if (  ($Teams -and $id -notmatch $GuidRegex ) -or
                   ($Photo -and $id -eq 'me')        ) {
-                   $id =   (Invoke-GraphRequest -Method GET -Uri $uri).id
-                   $Uri = "$GraphUri/users/$id"
+                                    $id  =   (Invoke-GraphRequest -Method GET -Uri $uri).id
+                                    $Uri = "$GraphUri/users/$id"
             }
+            elseif ($id -eq 'me') { $Uri = "$GraphUri/me" ; $id ; $id = $global:GraphUser }
+            else                  { $Uri = "$GraphUri/users/$id" }
+
             Write-Progress -Activity 'Getting user information' -CurrentOperation "UserID = $id"
             #endregion
             #region add the data-specific part of the URI, make the rest call and convert the result to the desired objects
@@ -287,21 +291,26 @@ function Get-GraphUser     {
                 elseif ($Teams             ) {
                     Invoke-GraphRequest -Uri ($uri + '/joinedTeams')              -All                                                  -As ([MicrosoftGraphTeam])}
                 elseif ($ToDoLists         ) {
-                    Invoke-GraphRequest -Uri ($uri + '/todo/lists')               -All  -Exclude "@odata.etag"                          -As ([MicrosoftGraphTodoTaskList])}
+                    Invoke-GraphRequest -Uri ($uri + '/todo/lists')               -All  -Exclude "@odata.etag"                          -As ([MicrosoftGraphTodoTaskList]) |
+                      Add-Member -PassThru -NotePropertyName UserId -NotePropertyValue $id
+                    }
                 # Calendar wants a property added so we can find it again
                 elseif ($Calendars         ) {
                     Invoke-GraphRequest -Uri ($uri + '/Calendars?$orderby=Name' ) -All                                                  -As ([MicrosoftGraphCalendar]) |
                         Add-Member -PassThru -NotePropertyName CalendarPath -NotePropertyValue  "$userID/Calendars/$($r.id)"
                 }
                 elseif ($Notebooks         ) {
-                    $bookobj = Invoke-GraphRequest -Uri ($uri +
+                    $result = Invoke-GraphRequest -Uri ($uri +
                                           '/onenote/notebooks?$expand=sections' ) -All  -Exclude 'sections@odata.context'               -As ([MicrosoftGraphNotebook])
                     #Section fetched this way won't have parentNotebook, so make sure it is available when needed
-                    foreach ($b in $bookobj) {
-                        $parentobj = New-Object -TypeName psobject -Property @{'id'=$b.id; 'displayname'=$b.displayName; 'Self'=$b.self}
-                        $b.Sections | Add-Member -NotePropertyName Parent -NotePropertyValue $parentobj
+                    foreach ($bookobj in $result) {
+                        foreach ($s in $b.Sections) {
+                                $s.parentNotebook.id          = $b.id
+                                $s.parentNotebook.displayname = $b.displayname
+                                $s.parentNotebook.self        = $b.self
+                        }
+                        $bookobj
                     }
-                    $bookobj
                 }
                 # for site, get the user's MySite. Convert it into a graph URL and get that, expand drives subSites and lists, and add formatting types
                 elseif ($Site              ) {
@@ -467,7 +476,7 @@ function Set-GraphUser     {
     }
 
     Process {
-        if (ContextHas -Not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         #xxxx todo check scopes  User.ReadWrite, User.ReadWrite.All, Directory.ReadWrite.All,        or Directory.AccessAsUser.All scope.
 
         #allow an array of users to be passed.
@@ -483,7 +492,7 @@ function Set-GraphUser     {
             elseif ($U.id)  {
                     $webparams['uri']   = "$Graphuri/users/$($U.id)/"
             }
-            elseif ($user.UserPrincipalName) {
+            elseif ($U.UserPrincipalName) {
                     $webparams['uri']   = "$Graphuri/users/$($U.UserPrincipalName)/"
             }
             else {  $webparams['uri']   = "$Graphuri/users/$U/" }
@@ -593,6 +602,12 @@ function New-GraphUser     {
         [Parameter(ParameterSetName='DomainFromUPNLast')]
         [scriptblock]$NickNameRule    = {"$GivenName.$Surname"},
 
+        #A two letter country code (ISO standard 3166). Required for users that will be assigned licenses due to legal requirement to check for availability of services in countries.  Examples include: 'US', 'JP', and 'GB'
+        [ValidateNotNullOrEmpty()]
+        [UpperCaseTransformAttribute()]
+        [ValidateCountryAttribute()]
+        [string]$UsageLocation = 'GB',
+
         [string]$Initialpassword,
         [switch]$NoPasswordChange,
         [switch]$ForceMFAPasswordChange,
@@ -639,6 +654,7 @@ function New-GraphUser     {
         'displayName'       = $DisplayName
         'mailNickname'      = $MailNickName
         'userPrincipalName' = $UserPrincipalName
+        'usageLocation'     = $UsageLocation
         'passwordProfile'   =  @{
             'forceChangePasswordNextSignIn' = -not $NoPasswordChange
             'password' = $Initialpassword
@@ -669,6 +685,44 @@ function New-GraphUser     {
         }
     }
 
+}
+
+function Remove-GraphUser  {
+      <#
+      .Synopsis
+        Deletes a user
+    #>
+    [cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
+    param (
+        #ID for the user if not the current user
+        [parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        $UserID,
+        [Switch]$Force
+    )
+    process{
+       ContextHas -WorkOrSchoolAccount -BreakIfNot
+        #xxxx todo check scopes
+
+        #allow an array of users to be passed.
+        foreach ($u in $UserID ) {
+            if     ($u.displayName)       {$displayname = $u.displayname}
+            elseif ($u.UserPrincipalName) {$displayName = $u.UserPrincipalName}
+            else                          {$displayName = $u}
+            if     ($u.id)                {$u =$U.id}
+            elseif ($u.UserPrincipalName) {$u = $U.UserPrincipalName}
+            if ($Force -or $pscmdlet.ShouldProcess($displayname,"Delete User")) {
+                try {
+                    Remove-MgUser_Delete -UserId $u -ErrorAction Stop
+                }
+                catch {
+                    if ($_.exception.statuscode.value__ -eq 404) {
+                          Write-Warning -Message "'Not found' error while trying to delete '$displayname'."
+                    }
+                    else {throw $_}
+                }
+            }
+        }
+    }
 }
 
 function Find-GraphPeople  {
@@ -733,7 +787,9 @@ Function Import-GraphUser  {
         #Disables any prompt for confirmation
         [switch]$Force,
         #Supresses output of Added, Removed, or No action messages for each row in the file.
-        [switch]$Quiet
+        [switch]$Quiet,
+        #Fields which are lists will be split at , or ; by default but a replacement split expression may be given
+        [String]$ListSeparator = '\s*,\s*|\s*;\s*'
     )
     begin {
         $list = @()
@@ -748,25 +804,459 @@ Function Import-GraphUser  {
         if (-not $Quiet) { $InformationPreference = 'continue'  }
 
         foreach ($user in $list) {
-            $upn = $user.DisplayName
-            $exists = (Microsoft.Graph.Users.private\Get-MgUser_List -Filter "userprincipalName eq '$upn'") -as [bool]
-            if (($user.Action -eq 'Remove' -and $exists) -and
-                ($force -or $PSCmdlet.ShouldProcess($upn,"Remove user "))){
-                        Remove-Graphuser -Force -user $upn
-                        Write-Information "Removed user'$upn'"
+            $upn = $user.UserPrincipalName
+            if (-not $upn) {
+                Write-Warning "User was missing a UPN"
+                continue
             }
-            elseif (($user.Action -eq 'Add' -and -not $exists) -and
-                ($force -or $PSCmdlet.ShouldProcess($upn,"Add new user"))){
-                    $params = @{Force=$true; DisplayName=$user.DisplayName; UserPrincipalName= $user.UserPrincipalName;   }
-                    if ($user.Visibility)             {$params['Visibility'] = $user.Visibility}
-                    if ($user.Description)            {$params['Description'] = $user.Description}
-                    New-GraphUser -
-                    #@params
+            else {
+                 $exists = (Microsoft.Graph.Users.private\Get-MgUser_List -Filter "userprincipalName eq '$upn'") -as [bool]
+            }
 
-                    Write-Information "Added user'$upn'"
+            if     ($user.Action -eq 'Remove' -and (-not $exists)) {
+                Write-Warning "User '$upn' was marked for removal, but no matching user was found."
+                continue
             }
-            else {  Write-Information "No action taken for user '$displayName'"}
+            elseif ($user.Action -eq 'Remove' -and
+                   ($force -or $PSCmdlet.ShouldProcess($upn,"Remove user "))){
+                Remove-Graphuser -Force -user $user
+                Write-Information "Removed user'$upn'"
+                continue
+            }
+
+            if     ($user.Action -eq 'Add'    -and $exists) {
+                    Write-Warning  "User '$upn' was marked for addition, but that name already exists."
+                    continue
+            }
+            elseif ($user.Action -eq 'Add'    -and (-not $user.DisplayName) ) {
+                Write-Warning "User was missing a UPN"
+                continue
+            }
+            elseif ($user.Action -eq 'Add'    -and
+                ($force -or $PSCmdlet.ShouldProcess($upn,"Add new user"))){
+                $params = @{Force=$true; DisplayName=$user.DisplayName; UserPrincipalName= $user.UserPrincipalName;   }
+                if ($user.MailNickName)      {$params['MailNickName']    = $user.MailNickName   }
+                if ($user.GivenName)         {$params['GivenName']       = $user.GivenName      }
+                if ($user.Surname)           {$params['Surname']         = $user.Surname        }
+                if ($user.Initialpassword)   {$params['Initialpassword'] = $user.Initialpassword}
+                if ($user.PasswordPolicies)  {$params['Initialpassword'] = $user.PasswordPolicies -split $ListSeparator}
+                if ($user.NoPasswordChange -in @("Yes","True","1") ) {
+                            {$params['NoPasswordChange'] = $true}
+                }
+                if ($user.ForceMFAPasswordChange -in @("Yes","True","1") ) {
+                            {$params['ForceMFAPasswordChange'] = $true}
+                }
+                New-GraphUser @params
+                Write-Information "Added user '$($user.DisplayName)' as '$upn'"
+                $exists = $true
+                $user.Action = "Set"
+            }
+
+            if     ($user.Action -eq 'Set'    -and (-not $exists)) {
+                Write-Warning "User '$upn' was marked for update, but no matching user was found."
+                continue
+            }
+            if     ($user.Action -eq 'Set') {
+                $params = @{'UserId' = $upn}
+                $Setparameters = (Get-Command Set-GraphUser ).Parameters.Values |
+                    Where-Object name -notin (Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters  )
+
+                foreach ($p in $setparameters) {
+                    $pName = $p.name
+                    if     ($user.$pname -and ($p.parameterType -eq [string[]] )) {$params[$pName] = $user.$pName -split $ListSeparator  }
+                    elseif ($user.$pname -and ($p.switchParameter))               {$params[$pName] = $user.$pName -in @("Yes","True","1")  }
+                    elseif ($user.$pname)                                         {$params[$pName] = $user.$pName}
+                }
+                Set-GraphUser @params
+                Write-Information "Updated properties of user '$upn'"
+            }
         }
     }
+}
 
+Function Export-GraphUser  {
+<#
+    .synopsis
+       Imports a list of users from a CSV file
+    .description
+        Takes a list of CSV files and looks for xxxx columns
+        * Action is either Add, Remove or Set - other values will cause the row to be ignored
+        * DisplayName
+
+#>
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    param (
+        #Destination for CSV output
+        [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        $Path,
+        #Filter clause for the query for example "department eq 'accounts'"
+        $Filter,
+        #String to insert between parts of multi-part items.
+        $ListSeparator = "; "
+    )
+Microsoft.Graph.Users.private\Get-MgUser_List -Select 'UserPrincipalName',  'MailNickName','GivenName', 'Surname', 'DisplayName', 'UsageLocation',
+                        'accountEnabled', 'PasswordPolicies', 'Mail',  'MobilePhone', 'BusinessPhones',
+                        'JobTitle',  'Department',  'OfficeLocation', 'CompanyName',
+                        'StreetAddress', 'City', 'State', 'Country', 'PostalCode' -ExpandProperty manager -filter $Filter |
+    Select-Object      'UserPrincipalName', 'MailNickName',   'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
+                        @{n='AccountDisabled';e={-not 'accountEnabled'}} , 'PasswordPolicies', 'Mail',  'MobilePhone',
+                        @{n='BusinessPhones';e={$_.'BusinessPhones' -join $ListSeparator }},
+                        @{n='Manager';e={$_.manager.AdditionalProperties.userPrincipalName}},
+                        'JobTitle',  'Department', 'OfficeLocation', 'CompanyName',
+                        'StreetAddress', 'City', 'State', 'Country', 'PostalCode' | Export-Csv -NoTypeInformation -Path $Path
+}
+
+
+#To-do-list functions are here because they are in the Users.private module, not a module of their own
+
+function Get-GraphToDoList           {
+    <#
+      .Synopsis
+        Gets information about plans used in the Planner app.
+    #>
+    [cmdletbinding(DefaultParameterSetName="None")]
+    param   (
+        #The ID of the plan or a plan object with an ID property. if omitted the current users planner will be assumed.
+        [Parameter( ValueFromPipeline=$true,Position=0)]
+        [alias('id')]
+        $TodoTaskListId = 'defaultList',
+        $UserId,
+        #If specified returns the tasks in the list.
+        [Parameter(Mandatory=$true, ParameterSetName="Tasks")]
+        [switch]$Tasks
+    )
+    process {
+        contexthas -WorkOrSchoolAccount -BreakIfNot
+        if ($UserId) {$uri    = "$GraphUri/users/$userid/todo/lists"}
+        else         {$uri    = "$GraphUri/me/todo/lists"
+                      $UserId =  $global:GraphUser
+        }
+        if ( $ToDoList -is [string] -and  $ToDoList -match "\w{100}" ) {
+            try {
+                 $ToDoList  = Invoke-GraphRequest -Uri "$uri/$ToDoList" -ExcludeProperty  "@odata.etag", "@odata.context" -AsType ([MicrosoftGraphTodoTaskList]) |
+                                Add-Member -PassThru -NotePropertyName UserId -NotePropertyValue $UserId
+            }
+            catch {
+                $ToDoList = $PSBoundParameters['ToDoList']
+                Write-Warning 'To Do list parameter looks like a ID but did not return a list '
+            }
+        }
+        if ($ToDoList -is [String]) { #including if the last step tried and failed.
+             $ToDoList = Invoke-GraphRequest -Uri $uri -ValueOnly -ExcludeProperty "@odata.etag" -AsType ([MicrosoftGraphTodoTaskList]) |
+                            Where-Object {$_.displayname  -like $ToDoList -or $_.WellknownListName -like $ToDoList}
+        }
+        if (-not ($ToDoList.displayName -and $ToDoList.id)) {
+            Write-Warning "Could not get a To Do list from the information provided" ; return
+        }
+        if     (-not $Tasks) {return $ToDoList}
+        else  {
+            if (-not $UserId) {$UserId = $global:GraphUser }
+            Invoke-GraphRequest  -Method get  -uri "$uri/$($ToDoList.id)/tasks" -ValueOnly -ExcludeProperty "@odata.etag" -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTask]) |
+                Add-Member -PassThru -NotePropertyName UserId   -NotePropertyValue $userID |
+                Add-Member -PassThru -NotePropertyName ListID   -NotePropertyValue $ToDoList.Id |
+                Add-Member -PassThru -NotePropertyName ListName -NotePropertyValue $ToDoList.DisplayName
+        }
+    }
+}
+
+function New-GraphToDoList {
+[cmdletBinding(SupportsShouldProcess=$true)]
+Param(
+    [parameter(Mandatory=$true,Position=1)]
+    [string]$displayname    ,
+
+    $UserId =  $global:GraphUser,
+    [switch]$IsShared,
+    [switch]$Force
+)
+    if ($Force -or $pscmdlet.ShouldProcess($Displayname,"Create new To-Do list")){
+        Microsoft.Graph.Users.private\New-MgUserTodoList_CreateExpanded -UserId $UserId -DisplayName $displayname -IsShared:$IsShared -Confirm:$false |
+                Add-Member -PassThru -NotePropertyName UserId -NotePropertyValue $UserId
+    }
+}
+
+function New-GraphToDoTask {
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    Param (
+    # key: id of todoTaskList
+    [Parameter()]
+    [alias('TodoTaskListId')]
+    $ToDoList,
+
+    [Parameter()]
+    [string]
+    # key: id of user
+    $UserId =  $global:GraphUser,
+
+    # A brief description of the task.
+    [Parameter(mandatory=$true, position=1)]
+    [string]$Title,
+
+    [string]$BodyText,
+
+    [ValidateSet('text', 'html')]
+    [string]$BodyType = 'text',
+
+
+    [ValidateSet('low', 'normal', 'high')]
+    [string]$Importance = 'normal',
+
+    [datetime]$DueDateTime,
+
+    [ValidateSet('notStarted', 'inProgress', 'completed', 'waitingOnOthers', 'deferred')]
+    [string]$Status = 'notStarted',
+
+    [datetime]$CompletedDateTime,
+
+    [datetime]$ReminderDateTime,
+
+    $Recurrence,
+
+    [switch]$Force
+    )
+    if ($userID -and -not $ToDoList) {$ToDoList = Get-GraphToDoList}
+    if ($ToDoList.userID)  {$userID   = $ToDoList.userId}
+    if ($ToDoList.ID)      {$ToDoList = $ToDoList.Id}
+
+    $Params =  @{
+        UserId          = $UserId
+        TodoTaskListId  = $ToDoList
+        Title           = $Title
+        Body            = (New-Object -TypeName MicrosoftGraphItemBody -Property @{content=$BodyText; contentType=$BodyType} )
+        Importance      = $Importance
+        Status          = $status
+        IsReminderOn    = $ReminderDateTime -as [bool]
+    }
+    if ($Recurrence)        {$Params['Recurrence']        = $Recurrence
+                             if (-not $DueDateTime) {$DueDateTime = [datetime]::Today.AddDays(1)}
+    }
+    if ($ReminderDateTime)  {$Params['ReminderDateTime']  = (ConvertTo-GraphDateTimeTimeZone $ReminderDateTime)}
+    if ($CompletedDateTime) {$Params['CompletedDateTime'] = (ConvertTo-GraphDateTimeTimeZone $CompletedDateTime)}
+    if ($DueDateTime)       {$Params['DueDateTime']       = (ConvertTo-GraphDateTimeTimeZone $DueDateTime)}
+
+    if ($Force -or $PSCmdlet.ShouldProcess($title,"Add NewTask")) {
+        Microsoft.Graph.Users.private\New-MgUserTodoListTask_CreateExpanded @params |
+            Add-Member -PassThru -NotePropertyName UserId   -NotePropertyValue $userID |
+            Add-Member -PassThru -NotePropertyName ListID   -NotePropertyValue $ToDoList
+    }
+}
+
+function Update-GraphToDoTask {
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    Param (
+    [Parameter(mandatory=$true,ValueFromPipelineByPropertyName =$true, ValueFromPipeline=$true)]
+    [alias('ID')]
+    $Task,
+
+    [Parameter(ValueFromPipelineByPropertyName=$true)]
+    [alias('TodoTaskListId','ListID')]
+    $ToDoList,
+
+    [Parameter(ValueFromPipelineByPropertyName=$true)]
+    [string]$UserId =  $global:GraphUser,
+
+    # A brief description of the task.
+    [Parameter(position=1)]
+    [string]$Title,
+
+    [string]$BodyText,
+
+    [ValidateSet('text', 'html')]
+    [string]$BodyType = 'text',
+
+    [ValidateSet('low', 'normal', 'high')]
+    [string]$Importance,
+
+    [datetime]$DueDateTime,
+
+    [ValidateSet('notStarted', 'inProgress', 'completed', 'waitingOnOthers', 'deferred')]
+    [string]$Status ,
+
+    [datetime]$CompletedDateTime,
+
+    [datetime]$ReminderDateTime,
+
+    [switch]$ReminderOff,
+
+    $Recurrence,
+    [switch]$Force
+    )
+    if (-not $Task.ListID -and -not $ToDoList) {
+        Write-Warning "Could not obtain Task list ID" ; return
+    }
+    elseif (-not $ToDoList) {$ToDoList = $task.ListID}
+
+    if ((-not $userID)-and -not ($Task.userid -or $ToDoList.userID )) {
+        Write-Warning "Could not obtain Task list ID" ; return
+    }
+    elseif ((-not $PSBoundParameters['userID']) -and $Task.userid )     {$userID   = $Task.userId}
+    elseif ((-not $PSBoundParameters['userID']) -and $ToDoList.userid ) {$userID   = $ToDoList.userId}
+
+    if ($ToDoList.ID)      {$ToDoList = $ToDoList.Id}
+    if ($Task.id)          {$Task     = $Task.id}
+
+    $Params =  @{
+        TodoTaskId      = $Task
+        UserId          = $UserId
+        TodoTaskListId  = $ToDoList
+        IsReminderOn    = (-not $ReminderOff)
+    }
+    if ($Title)      {      $Params['Title']              = $Title}
+    if ($BodyText)   {      $Params['Body']               = New-Object -TypeName MicrosoftGraphItemBody -Property @{content=$BodyText; contentType=$BodyType} }
+    if ($Importance) {      $Params['Importance']         = $Importance}
+    if ($Status)     {      $Params['Status']             = $Status}
+    if ($Recurrence) {      $Params['Recurrence']         = $Recurrence ;  if (-not $DueDateTime) {
+                            $DueDateTime                  =  [datetime]::Today.AddDays(1)}
+    }
+    if ($ReminderDateTime)  {$Params['ReminderDateTime']  = (ConvertTo-GraphDateTimeTimeZone $ReminderDateTime)}
+    if ($CompletedDateTime) {$Params['CompletedDateTime'] = (ConvertTo-GraphDateTimeTimeZone $CompletedDateTime)}
+    if ($DueDateTime)       {$Params['DueDateTime']       = (ConvertTo-GraphDateTimeTimeZone $DueDateTime)}
+    if ($force -or $pscmdlet.ShouldProcess("Task update")) {
+        Microsoft.Graph.Users.private\Update-MgUserTodoListTask_UpdateExpanded @params
+    }
+}
+
+function Remove-GraphToDoTask {
+    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
+    Param (
+    [Parameter(mandatory=$true,ValueFromPipelineByPropertyName =$true, ValueFromPipeline=$true)]
+    [alias('ID')]
+    $Task,
+
+    [Parameter(ValueFromPipelineByPropertyName=$true)]
+    [alias('TodoTaskListId','ListID')]
+    $ToDoList,
+
+    [Parameter(ValueFromPipelineByPropertyName=$true)]
+    [string]$UserId =  $global:GraphUser,
+
+    [switch]$Force
+    )
+    if (-not $Task.ListID -and -not $ToDoList) {
+        Write-Warning "Could not obtain Task list ID" ; return
+    }
+    elseif (-not $ToDoList) {$ToDoList = $task.ListID}
+
+    if ((-not $userID)-and -not ($Task.userid -or $ToDoList.userID )) {
+        Write-Warning "Could not obtain Task list ID" ; return
+    }
+    elseif ((-not $PSBoundParameters['userID']) -and $Task.userid )     {$userID   = $Task.userId}
+    elseif ((-not $PSBoundParameters['userID']) -and $ToDoList.userid ) {$userID   = $ToDoList.userId}
+
+    if ($ToDoList.ID)      {$ToDoList = $ToDoList.Id}
+    if ($Task.Title)       {$Title    = $Task.title}
+    if ($Task.id)          {$Task     = $Task.id}
+
+    $Params =  @{
+        TodoTaskId      = $Task
+        UserId          = $UserId
+        TodoTaskListId  = $ToDoList
+    }
+    if ($force -or $pscmdlet.ShouldProcess($Title,'Task deletion')) {
+            Microsoft.Graph.Users.private\Remove-MgUserTodoListTask_Delete @Params
+    }
+}
+
+function Remove-GraphToDoList {
+    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
+    Param (
+    [Parameter(mandatory=$true,ValueFromPipelineByPropertyName =$true, ValueFromPipeline=$true)]
+    [alias('TodoTaskListId','ListID')]
+    $ToDoList,
+
+    [Parameter(ValueFromPipelineByPropertyName=$true)]
+    [string]$UserId =  $global:GraphUser,
+
+    [switch]$Force
+    )
+
+    if ((-not $userID)-and -not ($ToDoList.userID )) {
+        Write-Warning "Could not obtain Task list ID" ; return
+    }
+    elseif ((-not $PSBoundParameters['userID']) -and $ToDoList.userid )     {$userID   = $ToDoList.userId}
+    if ($ToDoList.Displayname)  {$Title    = $ToDoList.Displayname}
+    if ($ToDoList.ID)           {$ToDoList = $ToDoList.Id}
+
+    $Params =  @{
+        UserId          = $UserId
+        TodoTaskListId  = $ToDoList
+    }
+    if ($force -or $pscmdlet.ShouldProcess($Title,'Delete whole to-do list')) {
+            Microsoft.Graph.Users.private\Remove-MgUserTodoList_Delete @Params
+    }
+}
+
+function Get-GraphRecurrence {
+param(
+    [ValidateRange(1,31)]
+    [int]$DayOfMonth = 1,
+
+    [ValidateSet('sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday')]
+    [String[]]$DaysOfWeek = @(),
+
+    [ValidateSet('sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday')]
+    [String]$FirstDayOfWeek ='sunday',
+
+    [ValidateSet('first', 'second', 'third', 'fourth', 'last')]
+    [string]$Index  ="first",
+
+    [int]$Interval = 1,
+
+    [ValidateRange(1,12)]
+    [int]$Month,
+
+    [validateSet('daily', 'weekly', 'absoluteMonthly', 'relativeMonthly', 'absoluteYearly', 'relativeYearly')]
+    [string]$Type = 'daily',
+
+    #The number of times to repeat the event. Required and must be positive if type is numbered.
+    $NumberOfOccurrences = 0 ,
+    [DateTime]$startDate = ([datetime]::now),
+    [DateTime]$EndDate,
+    # 'Time zone for the startDate and endDate properties. Optional. If not specified, the time zone of the event is used.'
+    [string]$RecurrenceTimeZone
+)
+    if ($endDate) {
+        $range =  New-Object -TypeName MicrosoftGraphRecurrenceRange -Property @{
+            numberOfOccurrences = $numberOfOccurrences
+            startDate           = ($startDate.ToString('yyyy-MM-dd') )
+            endDate             = ($EndDate.ToString(  'yyyy-MM-dd') )
+            recurrenceTimeZone  = $RecurrenceTimeZone
+            type                = 'endDate'
+        }
+    }
+    elseif ($numberOfOccurrences) {
+        $range =  New-Object -TypeName MicrosoftGraphRecurrenceRange -Property @{
+            numberOfOccurrences = $numberOfOccurrences
+            startDate           = ($startDate.ToString('yyyy-MM-dd') )
+            type                = 'numbered'
+        }
+    }
+    else {
+        $range =  New-Object -TypeName MicrosoftGraphRecurrenceRange -Property @{
+            startDate           = ($startDate.ToString('yyyy-MM-dd') )
+            type                = 'noEnd'
+        }
+    }
+    $pattern = New-Object -TypeName MicrosoftGraphRecurrencePattern -Property @{
+        dayOfMonth     = $DayOfMonth
+        daysOfWeek     = $DaysOfWeek
+        firstDayOfWeek = $FirstDayOfWeek
+        index          = $Index
+        interval       = $Interval
+        month          = $month
+        type           = $type
+    }
+    New-object -TypeName MicrosoftGraphPatternedRecurrence -Property @{
+            pattern   = $pattern
+            range     = $range
+    }
+}
+
+function ConvertTo-GraphDateTimeTimeZone {
+    param ([dateTime]$d)
+        New-object MicrosoftGraphDateTimeZone -Property @{
+                Datetime = $d.ToString('yyyy-MM-ddTHH:mm:ss')
+                Timezone = (Get-TimeZone).id
+
+    }
 }

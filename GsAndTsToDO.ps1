@@ -602,7 +602,7 @@ function Add-GraphChannelThread {
     }
 }
 
-# can get replies in a thread , but can't send a reply, delete or update a thread
+ # can get replies in a thread , but can't send a reply, delete or update a thread
 
 function Get-GraphChannelReply {
     <#
@@ -767,3 +767,110 @@ function Add-GraphWikiTab {
 }
 # Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
 # https://products.office.com/en-us/microsoft-teams/appDefinitions.xml
+
+function Add-GraphOneNoteTab     {
+    <#
+      .Synopsis
+        Adds a tab in a Teams channel for a OneNote section or Notebook
+      .Description
+        This posts to https://graph.microsoft.com/v1.0/teams/{id}/channels/{id}/tabs
+        which requires consent to use the Group.ReadWrite.All scope.
+        The Notebook Parameter has an alias of 'Section' and will accept either
+        a OneNote Notebook object (or its 'Self' URI - which requires the tab name to be
+        set explicitly) or a Section object. If the notebook is specified it opens at the
+        first section.
+      .Example
+        >
+        > $section = Get-GraphTeam -ByName accounts -Notebooks | Select-Object -ExpandProperty sections  | where displayname -like "FY-19*"
+        > $channel = Get-GraphTeam -ByName accounts -Channels -ChannelName 'year-end'
+        > Add-GraphOneNoteTab  $section $channel -TabLabel "FY-19 Notes"
+
+        The first command gets the Notebook for the Accounts team and finds the "FY-19 Year End" section
+        The second command gets the channels for the same team and finds the "Year end" channel
+        The Third command creates a tab in the channel named 'FY-19 Notes' which opens the team notebook
+        at its 'FY-19 Year End' section.
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        #The Notebook or Section to associate with the tab
+        [Parameter(Mandatory=$true,Position=0)]
+        [Alias('Section')]
+        $Notebook,
+        #An ID or Channel object which may contain the team ID; the tab will be created in this channel
+        [Parameter(Mandatory=$true, Position=1)]
+        $Channel,
+        #A team ID, or a team object if the team can't be found from the the channel
+        $Team,
+        #The label for the tab, if left blank the name of the Notebook or Section will be sued
+        $TabLabel,
+        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
+        [Alias('PT')]
+        [switch]$PassThru,
+        #If Specified the tab will be added without pausing for confirmation, this is the default unless $ConfirmPreference has been set.
+        $Force
+    )
+    if (ContextHas -not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+    if       ($Channel.Team)           {$Team     = $Channel.Team }
+    elseif   ($Team.id)                {$Team     = $Team.id}
+    elseif   ($team -isnot [string])   {Write-Warning 'Unable to determine the team, please specify it explicitly'; return}
+    if       ($Channel.id) {           $Channel   = $Channel.id }
+    elseif   ($Channel-isnot [string]) {Write-Warning 'Unable to determine the channel'; return}
+    if       (-not $TabLabel -and
+                $notebook.displayName) {$TabLabel = $Notebook.displayName}
+    elseif   (-not $TabLabel)          {Write-warning 'Unable to determin a name for the tab, please specify one explicitly'; return}
+
+    $webparams = @{'Method'       = 'Post';
+                   'Uri'          = "https://graph.microsoft.com/beta/teams/$team/channels/$channel/tabs" ;
+                   'ContentType'  = 'application/json'
+    }
+    #This bit had to be reverse engineered, from a beta version of the API, so if it works past next week, be happy.
+    #If the "Notebook" object is actually a section, and it was fetched by one of the module commands (get-GraphTeam -notebook, or get-graphNotebook -section)
+    #then $Notebook it will have a a parentNotebook ID. This IF..Else is to make sure we have the real notebook ID, and catch a sectionID if there is one.
+    if   ($Notebook.parentNotebook.id) {
+                    $ParamsPt2    = '&notebookSource=PickSection&sectionId='+ $Notebook.id
+                    $NotebookID   = $Notebook.parentNotebook.id
+          }
+    else  {         $ParamsPt2    = '&notebookSource=New'
+                    $NotebookID   = $Notebook.id }
+
+    #if $Notebook is a section its url will end ?wd=(something). We need to split this off the URL and re-use it. The () need to be unescapted too,
+    if ($notebook.links.oneNoteWebUrl.href -match '\?(wd=.*$)') {
+                $ParamsPt2       += '&' + ( $Matches[1] -replace '%28','(' -replace '%29',')' )
+                $OnenoteWebUrl    = $notebook.links.oneNoteWebUrl.href  -replace  '\?wd=.*$', ''
+    }
+    else      { $OnenoteWebUrl    = $notebook.links.oneNoteWebUrl.href}
+
+    #We need the teamsite URL for the team who owns this channel, and the URL to the the Notebook. Both need to be escaped.
+    $OnenoteWebUrl  = $OnenoteWebUrl                           -replace "%", "%25" -replace '/','%2F' -replace ':','%3A'
+    $siteUrl        = (Get-GraphTeam -Team $Team -Site).webUrl -replace "%", "%25" -replace '/','%2F' -replace ':','%3A'
+
+    #Now we need to build up the mother and father of all URIs It contains the ID and URL for the notebook (not section). The Name, the teamsite. And Section specifics if applicable.
+    $URIParams      = "?entityid=%7BentityId%7D&subentityid=%7BsubEntityId%7D&auth_upn=%7Bupn%7D&ui={locale}&tenantId={tid}"+
+                      "&notebookSelfUrl=https%3A%2F%2Fwww.onenote.com%2Fapi%2Fv1.0%2FmyOrganization%2Fgroups%2F$Team%2Fnotes%2Fnotebooks%2F"+ $NotebookID   +
+                      "&oneNoteWebUrl=" + $oneNoteWebUrl +
+                      "&notebookName="  + [uri]::EscapeDataString( $notebook.displayName ) +
+                      "&siteUrl="       + $SiteUrl +
+                      $ParamsPt2
+
+    #Now we can create the JSON. Such information as there is can be found at https://docs.microsoft.com/en-us/graph/teams-configuring-builtin-tabs
+    $json = ConvertTo-Json ([ordered]@{
+                'TeamsAppId'      = '0d820ecd-def2-4297-adad-78056cde7c78'
+                'name'            = $TabLabel
+                'configuration'   = [ordered]@{
+                    'entityId'    = ((New-Guid).tostring() + "_" +  $Notebook.ID)
+                    'contentUrl'  = "https://www.onenote.com/teams/TabContent" + $URIParams
+                    'removeUrl'   = "https://www.onenote.com/teams/TabRemove"  + $URIParams
+                    'websiteUrl'  = "https://www.onenote.com/teams/TabRedirect?redirectUrl=$oneNoteWebUrl"
+                }})
+    $json= $json  -replace "\\u0026","&"
+    Write-Debug $json
+    if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {
+        $result = Invoke-GraphRequest -body $json
+        if ($PassThru) {
+            $result.pstypeNames.add('GraphTab')
+            #Giving a type name formats things nicely, but need to set the name to be used when the tab is displayed
+            Add-Member -InputObject $result -MemberType NoteProperty -Name teamsAppName -Value 'OneNote'
+            return $result
+        }
+    }
+}

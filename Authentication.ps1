@@ -60,6 +60,7 @@ else                  {$global:DefaultGraphScopes = @(
                 'Files.ReadWrite.All',
                  #'Group.ReadWrite.All', or read fails when logging on as non-admin
                 'Mail.ReadWrite',
+                'Mail.Send',
                 'MailboxSettings.ReadWrite',
                 'Notes.ReadWrite.All',
                 'Notes.Create',
@@ -117,7 +118,7 @@ Function Invoke-GraphRequest {
         [string]$ContentType,
 
         #Graph Authentication Type
-        [Models.GraphRequestAuthenticationType]
+        [Microsoft.Graph.PowerShell.Authentication.Models.GraphRequestAuthenticationType]
         $Authentication,
 
         #Specifies a web request session. Enter the variable name, including the dollar sign ($).You can''t use the SessionVariable and GraphRequestSession parameters in the same command.
@@ -181,7 +182,7 @@ Function Invoke-GraphRequest {
             }
         }
         else  {$result = $response}
-        if ($StatusCodeVariable) {Set-variable $StatusCodeVariable -Scope 1 -Value (Get-Variable $vname -ValueOnly) }
+        if ($StatusCodeVariable) {Set-variable $StatusCodeVariable -Scope 1 -Value (Get-Variable $StatusCodeVariable -ValueOnly) }
         foreach ($r in $result) {
             foreach ($p in $ExcludeProperty) {$r.remove($p)}
             if ($AsType) {New-Object -TypeName $AsType -Property $r}
@@ -360,7 +361,7 @@ Function Connect-Graph     {
     #endregion
     #region if succesful cache information about the user and session, and if necessary setup a trigger to auto-refresh tokens we fetched above
     if ($result-match "Welcome To Microsoft Graph") {
-        $authcontext      = [GraphSession]::Instance.AuthContext
+        $authcontext      = [Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext
         $result           = "Welcome To Microsoft Graph, $($authcontext.Account)."
         #we could call Get-Mgorganization but this way we don't depend on anything outside authentication module
         $Organization     = ( Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/organization/").value
@@ -377,6 +378,7 @@ Function Connect-Graph     {
             $Global:WorkOrSchool = $false #Legacy
         }
         $user             =   Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/me/"
+        $Global:GraphUser =  $user.userPrincipalName
         Add-Member -Force -InputObject $authcontext -NotePropertyName UserDisplayName        -NotePropertyValue $user.displayName
         Add-Member -Force -InputObject $authcontext -NotePropertyName UserID                 -NotePropertyValue $user.ID
         Add-Member -Force -InputObject $authcontext -NotePropertyName RefreshTokenPresent    -NotePropertyValue ($script:RefreshToken -as [bool])
@@ -419,13 +421,14 @@ Function Show-GraphSession {
 }
 
 Function ContextHas {
+[cmdletbinding()]
     <#
     #>
     param (
         [string[]]$scopes,
         [switch]$Not,
-        [switch]$WorkOrSchoolAccount
-
+        [switch]$WorkOrSchoolAccount,
+        [switch]$BreakIfNot
     )
     if ($WorkOrSchoolAccount)  {
           $state =  [GraphSession]::Instance.AuthContext.WorkOrSchool -or $global:WorkOrSchool  #Global var is legacy.
@@ -434,6 +437,10 @@ Function ContextHas {
     foreach ($s in $scopes)  {
           $state = $state -and ([GraphSession]::Instance.AuthContext.Scopes -contains $s)
     }
-    if ($Not) {return (-not $state)}
-    else      {return       $state }
+    if ($BreakIfNot ) {
+        if ($scopes              -and -not $state) {Write-Warning "This requires the $($scopes -join ', ') scope(s)." ; break}
+        if ($WorkOrSchoolAccount -and -not $state) {Write-Warning "This requires a work or school account."           ; break}
+    }
+    #otherwise return true or false
+    else  {return ( $state -xor $not )}
 }

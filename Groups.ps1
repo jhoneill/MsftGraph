@@ -868,7 +868,7 @@ function Export-GraphGroupMember {
         If a file is specified it will be treated as CSV file for export,
         otherwise the objects are output
 #>
-    param (
+    param  (
         [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
         #One or more group(s) to export
         [ArgumentCompleter([GroupCompleter])]
@@ -878,7 +878,7 @@ function Export-GraphGroupMember {
         #If specified , output will be in Group name order (default is User name.)
         [switch]$OrderByGroup
     )
-    begin {
+    begin  {
     $list = @()
     }
     process{
@@ -892,7 +892,7 @@ function Export-GraphGroupMember {
                                             Displayname
         }
     }
-    end {
+    end    {
         if ($OrderByGroup) {$list = $list | Sort-Object -Property Memberof, UserPrincipalName }
         else               {$list = $list | Sort-Object -Property UserPrincipalName, Memberof }
         if (-not $path) {return $list}
@@ -914,7 +914,7 @@ Function Import-GraphGroupMember {
         marked "add" in the file who are not in the group will be added.
 #>
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='high')]
-    param (
+    param   (
         #One or more files to read for input.
         [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
@@ -923,7 +923,7 @@ Function Import-GraphGroupMember {
         #Supresses output of Added, Removed, or No action messages for each row in the file.
         [switch]$Quiet
     )
-    begin {
+    begin   {
         $list = @()
     }
     process {
@@ -932,7 +932,7 @@ Function Import-GraphGroupMember {
             else { Write-Warning -Message "Cannot find $p" }
         }
     }
-    end {
+    end     {
         if (-not $Quiet) { $InformationPreference = 'continue'  }
         $groups = ($List | Group-Object -NoElement -Property memberof).Name
         foreach ($g in $groups) {
@@ -976,7 +976,7 @@ Function Import-GraphGroup       {
         IF the group exists no check is done to see that it matches the file settings.
 #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    param (
+    param   (
         #One or more files to read for input.
         [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
@@ -985,7 +985,7 @@ Function Import-GraphGroup       {
         #Supresses output of Added, Removed, or No action messages for each row in the file.
         [switch]$Quiet
     )
-    begin {
+    begin   {
         $list = @()
     }
     process {
@@ -994,7 +994,7 @@ Function Import-GraphGroup       {
             else { Write-Warning -Message "Cannot find $p" }
         }
     }
-    end {
+    end     {
         if (-not $Quiet) { $InformationPreference = 'continue'  }
         $existingGroups = Get-GraphGroupList
         $existingNames  = $existingGroups.DisplayName
@@ -1016,6 +1016,68 @@ Function Import-GraphGroup       {
                     Write-Information "Added group'$displayName'"
             }
             else {  Write-Information "No action taken for group '$displayName'"}
+        }
+    }
+}
+
+function New-GraphTeamPlan       {
+    <#
+      .Synopsis
+        Creates new a plan for a team.
+    #>
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    param   (
+        #The ID of the team
+        [parameter(ValueFromPipeline=$true, Mandatory=$true, Position=0)]
+        [Alias("Group")]
+        [ArgumentCompleter([GroupCompleter])]
+        $Team,
+        #Name(s) of the plan(s) to add to this team.
+        [parameter(Mandatory=$true, Position=1)]
+        $PlanName,
+        #If Specified the plan will be added without confirmation
+        [Switch]$Force
+    )
+    begin   {
+    }
+    process {
+        if (ContextHas -Not -WorkOrSchoolAccount ) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        if     ($Team.id)                   {$settings =  @{owner = $team.id} }
+        elseif ($Team -is [string] -and
+                $Team -match $GUIDRegex )   {$settings =  @{owner = $team} }
+        elseif ($Team -is [string]) {
+                $Team = Get-GraphTeam $Team; $settings =  @{owner = $team.id}
+        }
+
+        foreach ($p in $PlanName) {
+            $settings["title"] = $p
+            $webParams = @{Method      = 'Post'
+                           URI         = "$GraphUri/planner/plans"
+                           Contenttype = 'application/json'
+                           Body        = (ConvertTo-Json $settings)
+            }
+            Write-Debug $webParams.Body
+            if ($Force -or  $PSCmdlet.ShouldProcess($P,"Add Team Planner")) {
+                $result    = Invoke-GraphRequest @webParams -ErrorAction Stop
+                $etag      =  $result.'@odata.etag'
+                $odatakeys =  $result.Keys.Where({$_ -match "@odata\."})
+                foreach ($k in $odatakeys) {$result.Remove($k)}
+                $planobj = New-Object  -Property $result -TypeName MicrosoftGraphPlannerPlan |
+                    Add-Member -PassThru -NotePropertyName  etag -NotePropertyValue $etag |
+                    Add-Member -PassThru -NotePropertyName  Team -NotePropertyValue $Team
+                if ($planObj.owner) {
+                    $owner = (Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/$($planObj.owner)").displayname
+                    Add-Member -InputObject $planObj -NotePropertyName OwnerName -NotePropertyValue $owner
+                }
+                if ($planObj.createdBy.user.id -and $planObj.createdBy.user.id  -eq $planObj.owner) {
+                    Add-Member -InputObject $planObj -MemberType NoteProperty -Name CreatorName -Value $owner
+                }
+                elseif ($planObj.createdBy.user.id) {
+                    $creator = (Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/$($planObj.createdBy.user.id)").displayname
+                    Add-Member -InputObject $planObj -MemberType NoteProperty -Name CreatorName -Value $creator
+                }
+                $planObj
+            }
         }
     }
 }
