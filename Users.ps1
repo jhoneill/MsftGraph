@@ -224,10 +224,10 @@ function Get-GraphUser         {
     #>
     [cmdletbinding(DefaultparameterSetName="None")]
     param   (
-        #UserID as a guid or User Principal name. If not specified defaults to "me"
+        #UserID as a guid or User Principal name. If not specified, it will assume "Current user" if other paraneters are given, or "All users" otherwise.
         [parameter(Position=0,valueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
         [alias('id')]
-        $UserID = 'me',
+        $UserID,
         #Get the user's Calendar(s)
         [parameter(Mandatory=$true, parameterSetName="Calendars")]
         [switch]$Calendars,
@@ -302,7 +302,10 @@ function Get-GraphUser         {
         'preferredLanguage', 'presence', 'provisionedPlans', 'proxyAddresses', 'registeredDevices', 'scopedRoleMemberOf', 'settings', 'showInAddressList',
         'signInSessionsValidFromDateTime',   'state', 'streetAddress', 'surname',
          'teamwork', 'todo', 'transitiveMemberOf', 'usageLocation', 'userPrincipalName', 'userType')]
-        [String[]]$Select
+        [String[]]$Select,
+
+        #Used to explicitly say "Current user" and will over-ride UserID if one is given.
+        [switch]$Current
 
     )
     begin   {
@@ -318,26 +321,40 @@ function Get-GraphUser         {
             # Group.Read.All, Drive needs Files.Read (or better), Notebooks needs either Notes.Create or  Notes.Read (or better).
         }
         #region resolve User name(s) to IDs,
-        #if we got an array and it contains
-        #names (not guid or UPN or "me") and also contains Guids we can't unravel that.
-        if     ($UserID.id) {$userID = $userID.id}
-        elseif ($UserID -is [array] -and $UserID -notmatch "$GuidRegex|\w@\w|me" -and
+        #If we got -Current use the "me" path - otherwise if we didn't get an ID return the list. So Get-Graphuser = list; Get-Graphuser -current = me ; Get-graphuser -memberof = memberships for me; otherwise we get a name or ID
+        if     ($Current -or ($PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters}) -and -not $UserID)  )  {$UserID = "me"}
+        elseif (-not $UserID) {
+            Get-GraphUserList ;
+            return
+        }
+
+        #if we got a user object use its ID, if we got an array and it contains names (not guid or UPN or "me") and also contains Guids we can't unravel that.
+        if ($UserID -is [array] -and $UserID -notmatch "$GuidRegex|\w@\w|me" -and
                                          $UserID -match     $GuidRegex ) {
             Write-Warning   -Message 'If you pass an array of values they cannot be names. You can pipe names or pass and array of IDs/UPNs' ; return
         }
         #if it is a string and not a guid or UPN - or an array where at least some members are not GUIDs/UPN/me try to resolve it
         elseif ($UserID -notmatch "$GuidRegex|\w@\w|me" ) {
-            $UserID = (Get-GraphUserList -Name $UserID).id
+                $UserID = Get-GraphUserList -Name $UserID
         }
         #endregion
         #if select is in use ensure we get ID, UPN and Display-name.
         if ($Select) {
             foreach ($s in @('ID','userPrincipalName','displayName')) {
-                if ($s -notin $select) {$select += $s }
+                 if ($s -notin $select) {$select += $s }
             }
         }
+        [void]$PSBoundParameters.Remove('UserID')
         foreach ($id in $UserID) {
-            #region set up the user part of the URI we will call
+            #region set up the user part of the URI that we will call
+            if ($id -is [MicrosoftGraphUser] -and -not  ($PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters})  )) {
+                $id
+                continue
+            }
+            if     ($id.id)       { $ID = $id.Id}
+            Write-Progress -Activity 'Getting user information' -CurrentOperation "User = $ID"
+            if     ($id -eq 'me') { $Uri = "$GraphUri/me"  }
+            else                  { $Uri = "$GraphUri/users/$id" }
 
             # -Teams requires a GUID, photo doesn't work for "me"
             if (  ($Teams -and $id -notmatch $GuidRegex ) -or
@@ -345,10 +362,7 @@ function Get-GraphUser         {
                                     $id  =   (Invoke-GraphRequest -Method GET -Uri $uri).id
                                     $Uri = "$GraphUri/users/$id"
             }
-            elseif ($id -eq 'me') { $Uri = "$GraphUri/me" ; $id ; $id = $global:GraphUser }
-            else                  { $Uri = "$GraphUri/users/$id" }
 
-            Write-Progress -Activity 'Getting user information' -CurrentOperation "UserID = $id"
             #endregion
             #region add the data-specific part of the URI, make the rest call and convert the result to the desired objects
             <#available:  but not implemented in this command (some in other commands )
@@ -404,7 +418,7 @@ function Get-GraphUser         {
                         Add-Member -PassThru -NotePropertyName CalendarPath -NotePropertyValue  "$userID/Calendars/$($r.id)"
                 }
                 elseif ($Notebooks         ) {
-                    $result = Invoke-GraphRequest -Uri ($uri +
+                    $result += Invoke-GraphRequest -Uri ($uri +
                                           '/onenote/notebooks?$expand=sections' ) -All  -Exclude 'sections@odata.context'               -As ([MicrosoftGraphNotebook])
                     #Section fetched this way won't have parentNotebook, so make sure it is available when needed
                     foreach ($bookobj in $result) {
@@ -438,15 +452,15 @@ function Get-GraphUser         {
                     }
                 }
                 elseif ($DirectReports            ) {
-                    $result = Invoke-GraphRequest -Uri ($uri + '/directReports')  -All       }
+                    $result += Invoke-GraphRequest -Uri ($uri + '/directReports')  -All       }
                 elseif ($Manager                  ) {
-                    $result = Invoke-GraphRequest -Uri ($uri + '/Manager') }
+                    $result += Invoke-GraphRequest -Uri ($uri + '/Manager') }
                 elseif ($MemberOf                 ) {
-                    $result = Invoke-GraphRequest -Uri ($uri + '/MemberOf')  -All       }
+                    $result += Invoke-GraphRequest -Uri ($uri + '/MemberOf')  -All       }
                 elseif ($Select                   ) {
-                    $result = Invoke-GraphRequest -Uri ($uri + '?$select=' + ($Select -join ','))}
+                    $result += Invoke-GraphRequest -Uri ($uri + '?$select=' + ($Select -join ','))}
                 else                                {
-                    $result = Invoke-GraphRequest -Uri $uri  }
+                    $result += Invoke-GraphRequest -Uri $uri  }
             }
             #if we get a not found error that's propably OK - bail for any other error.
             catch {
@@ -467,9 +481,10 @@ function Get-GraphUser         {
     end     {
         Write-Progress -Activity 'Getting user information' -Completed
         foreach ($r in $result) {
-            if     ($r.'@odata.type' -match 'directoryRole$')  { $r.pstypenames.Add('GraphDirectoryRole') }
-            elseif ($r.'@odata.type' -match 'device$')         { $r.pstypenames.Add('GraphDevice')        }
-            elseif ($r.'@odata.type' -match 'group$') {
+           #if     ($r.'@odata.type' -match 'directoryRole$')  { $r.pstypenames.Add('GraphDirectoryRole') }
+           #elseif ($r.'@odata.type' -match 'device$')         { $r.pstypenames.Add('GraphDevice')        }
+           #else
+            if     ($r.'@odata.type' -match 'group$') {
                     $r.remove('@odata.type')
                     $r.remove('@odata.context')
                     $r.remove('creationOptions')
