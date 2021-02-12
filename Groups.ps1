@@ -145,9 +145,8 @@ function Get-GraphGroup          {
         Gets the teams conversation threads which have been updated in the last 7 days.
     #>
     [Cmdletbinding(DefaultparameterSetName="None")]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',  Justification='Write-warning could be used, but the is informational non-output.')]
-
     [Alias("Get-GraphTeam")]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',  Justification='Write-warning could be used, but the is informational non-output.')]
     param   (
         #The name of a team.
         #One more Team IDs or team objects containing and ID. If omitted the current user's teams will be used.
@@ -213,22 +212,29 @@ function Get-GraphGroup          {
         [Parameter(Mandatory=$true, parameterSetName='BareGroups')]
         [switch]$NoTeamInfo
     )
-    begin {
+    begin   {
         $usersAndGroups = @()
     }
-#>(irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/groupsettings/$($team.id)") ##may be empty
-
     process {
-        if     (ContextHas -Not -WorkOrSchoolAccount)  {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return }
-        #check scopes - Scopes Group.Read.All, Files.Read, Sites.Read.All, Notes.Create, Notes.Read, depending on params passed.
-        elseif ($id -is [string] -and
-                $id -notmatch $guidregex)   {$id = Get-GraphGroupList -Name $id}
-        # if we didn't get passed a group get the current user's groups
-        elseif (-not $ID)                   {$ID = Get-GraphUser      -Teams}
-        if     (-not $ID)                   {Write-Warning 'Could not Get a team from the parameters provided' ; return}
-        foreach ($i in   $ID) {
-            if  ($i.id) {$groupid = $teamid = $i.id}
-            else        {$groupid = $teamid = $i }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
+        #xxxx toDo check scopes - Scopes Group.Read.All, Files.Read, Sites.Read.All, Notes.Create, Notes.Read, depending on params passed.
+        # if we didn't get passed a group but something about a group or groups was wanted, get the current user's groups,
+        # if we got a single string that looks like a name (not a GUID) resolve it.
+        # If we got nothing return the list, We'll loop through an array and (or single object) with either GUIDs or objects.
+        if      ($PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters}) -and -not $ID) {
+                       $ID = Get-GraphUser -Current -MemberOf
+        }
+        elseif  ($ID -is [string] -and  $ID -notmatch $guidregex)   {
+                       $ID = Get-GraphGroupList -Name $id
+        }
+        elseif  (-not  $ID) {Get-GraphGroupList ; return }
+
+        foreach ($i in $ID) {
+            if  ($i -is [string] -and  $ID -notmatch $guidregex)   {$i = Get-GraphGroupList -Name $i}
+            if  ($i.DisplayName)  {$displayname       = $i.DisplayName}
+            else                  {$displayname       = $i            }
+            if  ($i.id)           {$groupid = $teamid = $i.id         }
+            else                  {$groupid = $teamid = $i            }
             $groupURI = "$GraphURI/groups/$groupid"
             $teamURI  = "$GraphURI/teams/$teamid"
             try   {
@@ -237,7 +243,8 @@ function Get-GraphGroup          {
                 Write-Progress -Activity 'Getting Group Information'
                 if     ($Site)          {
                     $uri = ("$groupURI/sites/root?expand=drives,sites,lists(expand=columns,contenttypes,drive)")
-                    $result  =  Invoke-GraphRequest -Uri $uri -ExcludeProperty 'sites@odata.context', '@odata.context', 'drives@odata.context', 'lists@odata.context' -AsType ([MicrosoftGraphSite])
+                    $result  =  Invoke-GraphRequest -Uri $uri -ExcludeProperty 'sites@odata.context', '@odata.context', 'drives@odata.context', 'lists@odata.context' -AsType ([MicrosoftGraphSite]) |
+                            Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
                     foreach ($siteObj in $result) {
                         foreach ($l in $siteObj.lists) {
                             Add-Member -InputObject $l -NotePropertyName SiteID    -NotePropertyValue  $r.id
@@ -251,24 +258,29 @@ function Get-GraphGroup          {
                 elseif ($Calendar)      {
                     Invoke-GraphRequest -Uri  "$groupURI/calendar" -ExcludeProperty "@odata.context" -AsType ([MicrosoftGraphCalendar]) |
                         Add-Member -PassThru -NotePropertyName GroupID      -NotePropertyValue $groupid   |
-                        Add-Member -PassThru -NotePropertyName CalendarPath -NotePropertyValue "groups/$groupid/Calendar"
+                        Add-Member -PassThru -NotePropertyName CalendarPath -NotePropertyValue "groups/$groupid/Calendar" |
+                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
                     continue
                 }
                 elseif ($Drive)         {
                     $uri = ("$groupURI/drive" + '?$expand=root($expand=children)' )
-                    Invoke-GraphRequest  -Uri $uri -ExcludeProperty "@odata.context", "root@odata.context" -AsType ([MicrosoftGraphDrive])
+                    Invoke-GraphRequest  -Uri $uri -ExcludeProperty "@odata.context", "root@odata.context" -AsType ([MicrosoftGraphDrive]) |
+                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
                     continue
                 }
                 elseif ($Members)       { #can do group ?$expand=Memebers, the others don't expand
-                    $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/members"  -AllValues
+                    $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/members"  -AllValues |
+                        ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
                 elseif ($Owners)        {
-                    $usersqAndGroups +=  Invoke-GraphRequest  -Uri  "$groupURI/Owners" -AllValues
+                    $usersqAndGroups +=  Invoke-GraphRequest  -Uri  "$groupURI/Owners" -AllValues|
+                        ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
                 elseif ($Notebooks)     {
                     #if groups can have more than one book , then add if name ... uri = blah + "?`$expand=sections&`$filter=startswith(tolower(displayname),'$name')"
                     $uri = $groupURI + '/onenote/notebooks?$expand=sections'
-                    $result = Invoke-GraphRequest  -Uri $uri -ValueOnly -ExcludeProperty 'sections@odata.context'  -AsType ([MicrosoftGraphNotebook])
+                    $result = Invoke-GraphRequest  -Uri $uri -ValueOnly -ExcludeProperty 'sections@odata.context'  -AsType ([MicrosoftGraphNotebook]) |
+                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
                     foreach ($bookobj in $result) {
                         #Section fetched this way won't have parentNotebook, so make sure it is available when needed
                         foreach ($s in $bookobj.sections) {
@@ -282,7 +294,8 @@ function Get-GraphGroup          {
                 }
                 elseIf ($Plans)         {
                     #would like to have expand details here but it only works with a single plan.
-                    $result  = Invoke-GraphRequest  -Uri  "$groupURI/planner/plans"  -AllValues -ExcludeProperty  "@odata.etag" -AsType ([MicrosoftGraphPlannerPlan])
+                    $result  = Invoke-GraphRequest  -Uri  "$groupURI/planner/plans"  -AllValues -ExcludeProperty  "@odata.etag" -AsType ([MicrosoftGraphPlannerPlan]) |
+                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
                     if (-not $result) { Write-Host "The team $($ID.DisplayName) has not created any plans" ;   continue}
                     $dirObjectsHash = @{}
                     if ($i.displayName) {$dirObjectsHash[$teamId] = $i.displayName}
@@ -292,20 +305,23 @@ function Get-GraphGroup          {
                         }
                     }
                     foreach ($r in $result) {
-                        Add-Member -InputObject $r  -NotePropertyName OwnerName   -NotePropertyValue $dirObjectsHash[$r.owner] -PassThru |
-                               Add-Member -PassThru -NotePropertyName CreatorName -NotePropertyValue $dirObjectsHash[$r.createdBy.user.id]
+                        Add-Member -PassThru  -InputObject $r  -NotePropertyName OwnerName   -NotePropertyValue $dirObjectsHash[$r.owner] |
+                        Add-Member -PassThru                   -NotePropertyName CreatorName -NotePropertyValue $dirObjectsHash[$r.createdBy.user.id]
                     }
                 }
                 elseif ($Threads)       {
                     Invoke-GraphRequest  -Uri  "$groupURI/threads"  -AllValues -AsType ([MicrosoftGraphConversationThread]) |
-                            Add-Member  -NotePropertyName Group -NotePropertyValue $groupid -PassThru
+                        Add-Member -PassThru -NotePropertyName Group       -NotePropertyValue $groupid  |
+                        Add-Member -PassThru -NotePropertyName GroupName   -NotePropertyValue $displayname
                 }
                 elseif ($Conversations) {
                      $result = Invoke-GraphRequest  -Uri ($groupURI + '/conversations?$expand=Threads')  -AllValues -As ([MicrosoftGraphConversation]) |
-                                    Add-Member -NotePropertyName Group -NotePropertyValue $groupid -PassThru
+                        Add-Member -PassThru -NotePropertyName Group        -NotePropertyValue $groupid  |
+                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
                     foreach ($convobj in $result) {
                         foreach ($t in $convObj.threads) {
-                            Add-Member -InputObject $t -NotePropertyName Group -NotePropertyValue $groupid
+                            Add-Member -InputObject $t -NotePropertyName Group      -NotePropertyValue $groupid  |
+                            Add-Member -InputObject $t -NotePropertyName GroupName  -NotePropertyValue $displayname
                         }
                         $convObj
                     }
@@ -316,7 +332,8 @@ function Get-GraphGroup          {
                     if ($ChannelName)   { $uri =  "$teamURI/channels?`$filter=startswith(tolower(displayname), '$($ChannelName.ToLower())')"}
                     else                { $uri =  "$teamURI/channels"}
                     Invoke-GraphRequest  -Uri $uri -ValueOnly -As ([MicrosoftGraphChannel]) |
-                        Add-Member  -MemberType NoteProperty -Name Team -Value $teamid -PassThru
+                        Add-Member -PassThru -NotePropertyName Team      -NotePropertyValue $teamid |
+                        Add-Member -PassThru -NotePropertyName TeamName  -NotePropertyValue $displayname
                 }
                 elseif ($Apps -or
                         $AppName)       {
@@ -325,7 +342,8 @@ function Get-GraphGroup          {
                                     "startswith(tolower(teamsappdefinition/displayname),'$($AppName.ToLower())')"
                     }
                     Invoke-GraphRequest  -Uri $uri -ValueOnly  -As ([MicrosoftGraphTeamsAppDefinition]) |
-                            Add-Member  -MemberType NoteProperty -Name Team -Value $teamid -PassThru
+                        Add-Member -PassThru -NotePropertyName Team      -NotePropertyValue $teamid |
+                        Add-Member -PassThru -NotePropertyName TeamName  -NotePropertyValue $displayname
                 }
                 elseif ($Select)        {
                     $SelectList = (@('id','displayName') + $Select ) -join','
@@ -351,17 +369,23 @@ function Get-GraphGroup          {
             }
         }
     }
-    end {
+    end     {
         foreach( $g in $UsersAndGroups.where({$_.'@odata.type' -match 'group$'})) {
+            $displayname = $g.GroupName
+            $g.Remove('GroupName')
             $g.remove('@odata.type')
             $g.remove('@odata.context')
             $g.remove('creationOptions')
-            New-Object -Property  $g -TypeName MicrosoftGraphGroup
+            New-Object -Property  $g -TypeName MicrosoftGraphGroup |
+                Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
         }
         foreach( $u in $UsersAndGroups.where({$_.'@odata.type' -match 'user$'})) {
+            $displayname = $u.GroupName
+            $u.Remove('GroupName')
             $u.Remove('@odata.type')
             $u.Remove('@odata.context')
-            New-Object -Property $u -TypeName MicrosoftGraphUser
+            New-Object -Property $u -TypeName MicrosoftGraphUser |
+                Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
         }
     }
 }
@@ -416,7 +440,7 @@ function New-GraphGroup          {
         #if specified group will be added without prompting
         [Switch]$Force
     )
-    if (ContextHas -Not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+    ContextHas -WorkOrSchoolAccount -BreakIfNot
 
     if (Invoke-GraphRequest -Uri "$GraphURI/groups?`$filter=displayname eq '$Name'" -ValueOnly) {
         throw "There is already a group with the display name '$Name'." ; return
@@ -512,6 +536,8 @@ function Set-GraphGroup          {
         [Parameter(Mandatory=$true, ValueFromPipeline=$true,Position=0)]
         [ArgumentCompleter([GroupCompleter])]
         $Group ,
+        #If specified, updates the group's displayName
+        $DisplayName,
         #If specified, the group can receive external email; the option can be disabled with -AllowExternalSenders:$false.
         [switch]$AllowExternalSenders,
         #A new description for the group
@@ -522,7 +548,7 @@ function Set-GraphGroup          {
         [switch]$Force
     )
     process {
-        if     (ContextHas -Not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         #ensure we have an ID for the group(s) we were passed. If we got a GUID in a string, we'll confirm it's a group and get the display name.
         $Group = foreach ($g in $Group) {
                   if     ($g.ID) {$g}
@@ -532,6 +558,7 @@ function Set-GraphGroup          {
         foreach ($g in $Group)  {
             $settings = @{}  #theme, preferredLanguage, preferredDataLocation, hideFromOutlookClients , hideFromAddressLists , classification, displayname
             if ($Description)       {$settings['description']           = $Description}
+            if ($DisplayName)       {$settings['displayName']           = $DisplayName}
             if ($PSBoundparameters.ContainsKey('AllowExternalSenders')) {
                                      $settings['allowExternalSenders']  = [bool]$AllowExternalSenders
             }
@@ -738,6 +765,7 @@ function Add-GraphGroupMember    {
     param   (
         #The group / team either as an ID or a group/team object with an IDn
         [Parameter(Mandatory=$true, Position=0)]
+        [ArgumentCompleter([GroupCompleter])]
         [Alias("Team")]
         $Group,
         #The user or nested-group to add, either as a UPN or ID or as a object with an ID
@@ -759,7 +787,7 @@ function Add-GraphGroupMember    {
         }
     }
     process {
-        if   (ContextHas -Not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
 
         foreach ($g in $Group) {
             #group(s) resolved in begin block so should have an ID and display name.
@@ -824,7 +852,7 @@ function Remove-GraphGroupMember {
         }
     }
     process {
-        if     (ContextHas -Not -WorkOrSchoolAccount) { Write-Warning -Message "This command only works when you are logged in with a work or school account."; return}
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         foreach ($g in $Group) {
             #I'm not really expecting an array of users so I have left this is one call fo.r each user.
             #To optimize it piped users could be collected in the process block and the work done in the end block
@@ -937,7 +965,7 @@ Function Import-GraphGroupMember {
         $groups = ($List | Group-Object -NoElement -Property memberof).Name
         foreach ($g in $groups) {
             $w = $Null
-            $Members = (Get-GraphGroup -Members $g -WarningAction SilentlyContinue -WarningVariable W).UserPrincipalName
+            $Members = (Get-GraphGroup $g -Members -WarningAction SilentlyContinue -WarningVariable W).UserPrincipalName
             if ($w) {Write-Warning "Skipping Group $g it did not match a group." ; continue}
             foreach    ($member in $list.where({$_.memberof -eq $g}) ) {
                 $upn =  $member.UserPrincipalName
@@ -1041,7 +1069,7 @@ function New-GraphTeamPlan       {
     begin   {
     }
     process {
-        if (ContextHas -Not -WorkOrSchoolAccount ) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
         if     ($Team.id)                   {$settings =  @{owner = $team.id} }
         elseif ($Team -is [string] -and
                 $Team -match $GUIDRegex )   {$settings =  @{owner = $team} }

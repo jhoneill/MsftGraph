@@ -274,6 +274,9 @@ function Grant-GraphUserLicense   {
             Write-Warning "No Valid SKUs were passed"
             return
         }
+        if ($UserID -is [string] -and $userid -notmatch "me|$GUIDRegex" ) {
+            $userId = Get-GraphUser $UserID
+        }
         foreach ($u in $UserID ) {
             #region Add the user to web parameters: allow for mulitple users - potentially with an ID or a UPN
             if ($u -eq "me") {
@@ -288,8 +291,19 @@ function Grant-GraphUserLicense   {
                     $webparams['uri']   = "$GraphUri/users/$($u.UserPrincipalName)/assignLicense"
                     $userDisplayName    = $u.UserPrincipalName  #hope to change this if we have a display name
             }
-            else {  $webparams['uri']   = "$GraphUri/users/$u/assignLicense"
+            elseif ($u -is [string] -and $u -match $GUIDRegex) {
+                    $webparams['uri']   = "$GraphUri/users/$u/assignLicense"
                     $userDisplayName    = $u
+            }
+            elseif ($u -is [string]) {
+                $u = Get-GraphUser $u
+                if ($u.count -eq 1) {
+                    $webparams['uri']   = "$GraphUri/users/$($u.id)/assignLicense"
+                }
+                else {
+                    Write-Warning "Could not resolve $u to a single user. Ignoring"
+                    continue
+                }
             }
             if ($u.DisplayName) {$userDisplayName = $u.DisplayName }
 

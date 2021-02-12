@@ -2012,7 +2012,7 @@
                         <Alignment>Left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>Reminder/Label>
+                        <Label>Reminder</Label>
                         <Alignment>Left</Alignment>
                     </TableColumnHeader>
                 </TableHeaders>

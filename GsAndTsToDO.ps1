@@ -809,7 +809,7 @@ function Add-GraphOneNoteTab     {
         #If Specified the tab will be added without pausing for confirmation, this is the default unless $ConfirmPreference has been set.
         $Force
     )
-    if (ContextHas -not -WorkOrSchoolAccount) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+    ContextHas -WorkOrSchoolAccount -BreakIfNot
     if       ($Channel.Team)           {$Team     = $Channel.Team }
     elseif   ($Team.id)                {$Team     = $Team.id}
     elseif   ($team -isnot [string])   {Write-Warning 'Unable to determine the team, please specify it explicitly'; return}
@@ -865,7 +865,7 @@ function Add-GraphOneNoteTab     {
     $json= $json  -replace "\\u0026","&"
     Write-Debug $json
     if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {
-        $result = Invoke-GraphRequest -body $json
+        $result = Invoke-GraphRequest -body $json @webparams
         if ($PassThru) {
             $result.pstypeNames.add('GraphTab')
             #Giving a type name formats things nicely, but need to set the name to be used when the tab is displayed

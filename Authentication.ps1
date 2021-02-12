@@ -10,6 +10,7 @@ using namespace Microsoft.Graph.PowerShell.Models
     Portions of this file are   Copyright 2021 Justin Grote @justinwgrote
 #>
 
+
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Write host used for colored information message telling user to make a change and remove the message')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Initialization clears drive cache and work or school status available outside the module')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification='False positive for global vars.')]
@@ -17,9 +18,9 @@ using namespace Microsoft.Graph.PowerShell.Models
 #Write-Host -ForegroundColor Red "Using the default / sample app ID. You should edit the .PSM1 file and either replace the ID with your own, or remove this message"
 #$Script:ClientID      = "bf546ecc-067d-4030-9edd-7b0d74913411"  #You can also try  "1950a258-227b-4e31-a9cf-717495945fc2"  # Well known client ID for PowerShell
 #$script:Tenant    = Guid-for-your-tennant **if the Client ID is set up as below**
-$Script:ClientID      = "6413d5f3-eba6-4af4-860b-e9334ff7b762"
-$Script:Client_Secret = "a1c-Pr~XaqB.Sy4.e-HN064myE_0u7USze"
-$Script:Tenant        = "e6af5578-6d03-49e0-af3b-383cf5ec0b5f"
+#$Script:ClientID      = "6413d5f3-eba6-4af4-860b-e9334ff7b762"
+#$Script:Client_Secret = "a1c-Pr~XaqB.Sy4.e-HN064myE_0u7USze"
+#$Script:Tenant        = "e6af5578-6d03-49e0-af3b-383cf5ec0b5f"
 
 <#
     You can create an app in Azure AD or at https://apps.dev.microsoft.com/
@@ -48,6 +49,9 @@ $Script:Tenant        = "e6af5578-6d03-49e0-af3b-383cf5ec0b5f"
     18. Copy the secret and paste into this script as the value for $script:clientSecret.
 #>
 
+#Sometimes when we want to convert an opaque drive ID (e.g. on a file or folder) to a name; save extra calls to the server by caching the id-->name
+$global:drivecache  = @{}
+
 #The scopes requested. You can shorten this of you don't need all things provided in the module
 if ($Env:GraphScopes) {$global:DefaultGraphScopes = $Env:GraphScopes -split ',\s*'}
 else                  {$global:DefaultGraphScopes = @(
@@ -74,9 +78,6 @@ else                  {$global:DefaultGraphScopes = @(
                 'openid',
                 'profile'#,        'offline_access'
 )}
-
-#Sometimes when we want to convert an opaque drive ID (e.g. on a file or folder) to a name; save extra calls to the server by caching the id-->name
-$global:drivecache  = @{}
 
 Remove-item Alias:\Invoke-GraphRequest -ErrorAction SilentlyContinue
 Function Invoke-GraphRequest {
