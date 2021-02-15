@@ -432,7 +432,7 @@ Function ContextHas {
         [switch]$BreakIfNot
     )
     if ($WorkOrSchoolAccount)  {
-          $state =  [GraphSession]::Instance.AuthContext.WorkOrSchool -or $global:WorkOrSchool  #Global var is legacy.
+          $state =  [Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext.WorkOrSchool -or $global:WorkOrSchool  #Global var is legacy.
     }
     else {$state =  $true}
     foreach ($s in $scopes)  {

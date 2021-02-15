@@ -1834,7 +1834,7 @@
             </TableControl>
         </View>
         <View>
-          <Name>Graph Event</Name><ViewSelectedBy><TypeName>GraphEvent</TypeName></ViewSelectedBy>
+          <Name>Graph Event</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent</TypeName></ViewSelectedBy>
           <ListControl>
             <ListEntries>
               <ListEntry>
@@ -1849,11 +1849,11 @@
                   </ListItem>
                   <ListItem>
                     <Label>Start</Label>
-                    <ScriptBlock>([datetime]$_.start.datetime).ToString("g") + $_.start.timezone </ScriptBlock>
+                    <ScriptBlock>$_.startdatetime.tostring("g") + $_.start.timezone </ScriptBlock>
                   </ListItem>
                   <ListItem>
                     <Label>End</Label>
-                    <ScriptBlock>([datetime]$_.end.datetime).ToString("g") + $_.end.timezone </ScriptBlock>
+                    <ScriptBlock>$_.enddatetime.ToString("g") + $_.end.timezone </ScriptBlock>
                   </ListItem>
                   <ListItem>
                     <Label>Location</Label>
@@ -1895,6 +1895,45 @@
               </ListEntry>
             </ListEntries>
           </ListControl>
+        </View>
+        <View>
+          <Name>Graph Reminder</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphReminder</TypeName></ViewSelectedBy>
+
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                        <Label>Subject</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader><TableColumnHeader>
+                        <Label>When</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Reminder</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>Subject</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>When</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <ScriptBlock>$_.reminder.tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
         </View>
         <View>
             <Name>Graph App</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphTeamsAppDefinition</TypeName></ViewSelectedBy>

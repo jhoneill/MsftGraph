@@ -168,20 +168,6 @@ function Get-GraphMailItem       {
     }
 }
 
-function New-MailAddress         {
-    param (
-        # The recipient's email address, e.g Alex@contoso.com
-        [Parameter(Mandatory=$true,Position=0, ValueFromPipeline=$true)]
-        [String]$Mail,
-        #The displayname for the recipient
-        $DisplayName
-    )
-    $recip = @{address=$Mail}
-    if ($DisplayName) {$recip['name'] = $DisplayName}
-
-    $recip
-}
-
 function New-Recipient           {
     <#
       .Synopsis
