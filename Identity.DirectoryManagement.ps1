@@ -454,3 +454,53 @@ function Get-GraphSkuLicensedUser {
         }
     }
 }
+
+
+# Invoke-GraphRequest -Uri "$GraphUri/directory/deleteditems/microsoft.graph.user" -ValueOnly | foreach {Invoke-GraphRequest " https://graph.microsoft.com/beta/directory/deleteditems/$($_.id)/restore" -method post -body " "}
+
+#Invoke-GraphRequest -Uri "$GraphUri/directoryroles" -ValueOnly -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryRole])
+<#
+   $g = Invoke-GraphRequest -Uri "$GraphUri/directoryroles" -ValueOnly -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryRole]) |where displayname -like "global admin*"  ;
+   $m =  Invoke-GraphRequest -Uri "$GraphUri/directoryroles/$($g.id)/members" -ValueOnly
+        foreach( $g in $m.where({$_.'@odata.type' -match 'group$'})) {
+            $g.Remove('GroupName')
+            $g.remove('@odata.type')
+            $g.remove('@odata.context')
+            $g.remove('creationOptions')
+            New-Object -Property  $g -TypeName MicrosoftGraphGroup
+        }
+        foreach( $u in $m.where({$_.'@odata.type' -match 'user$'})) {
+            $u.Remove('@odata.type')
+            New-Object -Property $u -TypeName MicrosoftGraphUser
+        }
+        POST /directoryRoles/{id}/members/$ref
+        #You can use a specific resource set like users or groups in the request body, or you can use generic directoryObjects.
+        Content-type: application/json
+            {
+                "@odata.id":"https://graph.microsoft.com/beta/users/0f933635-5b77-4cf4-a577-f78a5eb090a2"
+            }
+            {
+               "@odata.id":"https://graph.microsoft.com/beta/directoryObjects/2c891f12-928d-4da2-8d83-7d2434a0d8dc"
+            }
+        DELETE https://graph.microsoft.com/beta/directoryRoles/{id}/members/{id}/$ref
+
+#>
+#see applications.
+#(Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/microsoft.graph.servicePrincipal" -all)
+#Get-MgServicePrincipal -filter "servicePrincipalType  eq 'Application'" | sort DisplayName -Descending
+#Get-MgServicePrincipal -filter "servicePrincipalType  eq 'managedIdentity'" | sort DisplayName -Descending
+#Get-MgServicePrincipal  | sort DisplayName -Descending
+# https://graph.microsoft.com/v1.0/servicePrincipals/3506bbf0-27e1-4450-be44-a7855c3dac29
+<#
+(Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/microsoft.graph.group" -all)
+    microsoft.graph.administrativeUnit:
+  microsoft.graph.contract:
+  microsoft.graph.device:
+
+  microsoft.graph.directoryRole:
+  microsoft.graph.directoryRoleTemplate
+
+      microsoft.graph.orgContact:
+microsoft.graph.organization:
+
+#>

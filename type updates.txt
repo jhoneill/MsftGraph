@@ -5,7 +5,7 @@
         Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization        # GraphOrganization
         Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTaskList
         Microsoft.Graph.PowerShell.Models.MicrosoftGraphPresence
-
+        Microsoft.Graph.PowerShell.Models.mailtips
 
 Done
 # GraphUser             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser
@@ -25,6 +25,7 @@ Done
 # GraphDrive            --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphDrive
 # GraphDomain           --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphVerifiedDomain
 # GraphContact (always?)--> Microsoft.Graph.PowerShell.Models.MicrosoftGraphPerson
+# GraphContact
 # GraphColumn           --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphColumnDefinition
 # GraphCalendar         --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphCalendar
 
@@ -33,20 +34,36 @@ Invites
    Other sign ins
 Justins bits
 
-    9 Outlook-Calendar.ps1
+
     7 Outlook-Contacts.ps1
     4 Excel.ps1
    15 GsAndTsToDO.ps1
     9 ActionCard.ps1
    21 Sharepoint.ps1
+9 Outlook-Mail.ps1
 
     4 Reports.ps1
     5 Authentication.ps1
     5 OneDrive.ps1
     6 Identity.DirectoryManagement.ps1
-    9 Outlook-Mail.ps1
     9 Notes.ps1
    12 Groups.ps1
    14 Planner.ps1
    16 Users.ps1 (incl to do )
 
+#Most functions for this are in files based on the application where they would surface
+# OneDrive, OneNote, Outlook-Calendar, Outlook-Contacts, Outlook-Mail, Planner, SharePoint, Teams.
+# Those in this file don't belong to an application.
+
+<#
+ Others to explore
+ (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/directoryRoles").value | ft id,displayname,description               https://docs.microsoft.com/en-us/graph/api/directoryrole-list?view=graph-rest-1.0
+ (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/directoryRoleTemplates").value | sort displayname |  ft id,displayname,description
+ (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/groupsettingTemplates").value | ft displayname,description -wrap -aut
+ (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices").value | ft approximateLastSignInDateTime,displayName,operatingsystem,operatingsystemversion
+ (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/registeredOwners").value
+ (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/memberof").value
+ (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/me/owneddevices").value | ft displayname,operatingsystemversion,trusttype
+#>
+
+#Get-PSCallStack | Out-File -Append ~\graph.txt

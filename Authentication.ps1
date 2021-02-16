@@ -18,9 +18,9 @@ using namespace Microsoft.Graph.PowerShell.Models
 #Write-Host -ForegroundColor Red "Using the default / sample app ID. You should edit the .PSM1 file and either replace the ID with your own, or remove this message"
 #$Script:ClientID      = "bf546ecc-067d-4030-9edd-7b0d74913411"  #You can also try  "1950a258-227b-4e31-a9cf-717495945fc2"  # Well known client ID for PowerShell
 #$script:Tenant    = Guid-for-your-tennant **if the Client ID is set up as below**
-#$Script:ClientID      = "6413d5f3-eba6-4af4-860b-e9334ff7b762"
-#$Script:Client_Secret = "a1c-Pr~XaqB.Sy4.e-HN064myE_0u7USze"
-#$Script:Tenant        = "e6af5578-6d03-49e0-af3b-383cf5ec0b5f"
+$Script:ClientID      = "6413d5f3-eba6-4af4-860b-e9334ff7b762"
+$Script:Client_Secret = "a1c-Pr~XaqB.Sy4.e-HN064myE_0u7USze"
+$Script:Tenant        = "e6af5578-6d03-49e0-af3b-383cf5ec0b5f"
 
 <#
     You can create an app in Azure AD or at https://apps.dev.microsoft.com/
@@ -55,26 +55,29 @@ $global:drivecache  = @{}
 #The scopes requested. You can shorten this of you don't need all things provided in the module
 if ($Env:GraphScopes) {$global:DefaultGraphScopes = $Env:GraphScopes -split ',\s*'}
 else                  {$global:DefaultGraphScopes = @(
-            #    'AuditLog.Read.All',
-                #'Directory.AccessAsUser.All', #Grant same rights to the directory as the user has
+                'AuditLog.Read.All',
+                'Directory.AccessAsUser.All', #Grant same rights to the directory as the user has
                 'Calendars.ReadWrite',
                 'Calendars.ReadWrite.Shared'
+                'ChannelMessage.Read.All',
+                'ChannelMessage.Delete',
+                'ChannelMessage.Edit',
                 'Contacts.ReadWrite',
                 'Contacts.ReadWrite.Shared',
                 'Files.ReadWrite.All',
-                 #'Group.ReadWrite.All', or read fails when logging on as non-admin
+                'Group.ReadWrite.All',# or read fails when logging on as non-admin
                 'Mail.ReadWrite',
                 'Mail.Send',
                 'MailboxSettings.ReadWrite',
                 'Notes.ReadWrite.All',
                 'Notes.Create',
-                #'People.Read.All',
+                'People.Read.All',
                 'Presence.Read.All',
-               # 'Reports.Read.All',
+                'Reports.Read.All',
                 'Sites.ReadWrite.All',
                 'Sites.Manage.All',       #Needed to create lists.
                 'Tasks.ReadWrite',        #Needed for Todo access
-                #'User.ReadWrite.all',    # Read write users and groups may not be needed if Directory is granted ?
+                'User.ReadWrite.all',    # Read write users and groups may not be needed if Directory is granted ?
                 'openid',
                 'profile'#,        'offline_access'
 )}
@@ -365,7 +368,7 @@ Function Connect-Graph     {
         $authcontext      = [Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext
         $result           = "Welcome To Microsoft Graph, $($authcontext.Account)."
         #we could call Get-Mgorganization but this way we don't depend on anything outside authentication module
-        $Organization     = ( Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/organization/").value
+        $Organization     = Invoke-GraphRequest -Method GET -Uri "$GraphURI/organization/" -ValueOnly
         if ($Organization.id) {
             Write-Verbose -Message "Account is from $($Organization.DisplayName)"
             Add-Member -force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyValue $Organization.DisplayName
@@ -374,8 +377,8 @@ Function Connect-Graph     {
         }
         else                  {
             Write-Verbose -Message "Account is from Windows live"
-            Add-Member-force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyValue $Organization.DisplayName
-            Add-Member-force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $true
+            Add-Member -force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyValue $Organization.DisplayName
+            Add-Member -force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $true
             $Global:WorkOrSchool = $false #Legacy
         }
         $user             =   Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/me/"
@@ -436,7 +439,7 @@ Function ContextHas {
     }
     else {$state =  $true}
     foreach ($s in $scopes)  {
-          $state = $state -and ([GraphSession]::Instance.AuthContext.Scopes -contains $s)
+          $state = $state -and ([Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext.Scopes -contains $s)
     }
     if ($BreakIfNot ) {
         if ($scopes              -and -not $state) {Write-Warning "This requires the $($scopes -join ', ') scope(s)." ; break}

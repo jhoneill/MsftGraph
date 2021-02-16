@@ -921,7 +921,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Tabs</Name><ViewSelectedBy><TypeName>GraphTab</TypeName></ViewSelectedBy>
+            <Name>Graph Tabs</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphTeamsTab</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -960,24 +960,24 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Team messages</Name><ViewSelectedBy><TypeName>GraphTeamMsg</TypeName></ViewSelectedBy>
+            <Name>Graph Team messages</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphChatMessage</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
-                    <TableColumnHeader>
-                      <Label>From</Label>
-                      <Alignment>left</Alignment>
-                    </TableColumnHeader>
                     <TableColumnHeader>
                       <Label>Created</Label>
                       <Alignment>left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                      <Label>Isreply</Label>
+                      <Label>From</Label>
                       <Alignment>left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>Deleted</Label>
+                        <Label>Subject</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                      <TableColumnHeader>
+                        <Label>Summary</Label>
                         <Alignment>Left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
@@ -985,7 +985,15 @@
                         <Alignment>Left</Alignment>
                     </TableColumnHeader>
                     <TableColumnHeader>
-                        <Label>Content</Label>
+                      <Label>Isreply</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Is Deleted</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Body Content</Label>
                         <Alignment>Left</Alignment>
                     </TableColumnHeader>
                 </TableHeaders>
@@ -994,25 +1002,33 @@
                         <Wrap/>
                         <TableColumnItems>
                             <TableColumnItem>
-                                <PropertyName>FromUserName</PropertyName>
+                                <ScriptBlock>$_.createdDateTime.tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>($_.From.Application.DisplayName,$_.From.Device.DisplayName,$_.From.User.DisplayName).where{$_} -join ", " </ScriptBlock>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <ScriptBlock>$_.created.tostring("g")</ScriptBlock>
+                                <PropertyName>Subject</PropertyName>
                                 <Alignment>Left</Alignment>
-                           </TableColumnItem>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Summary</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Importance</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
                             <TableColumnItem>
                                 <ScriptBlock>$_.replyToId -as [bool]</ScriptBlock>
                                 <Alignment>Left</Alignment>
                             </TableColumnItem>
                             <TableColumnItem>
-                                <PropertyName>deleted</PropertyName>
+                                <ScriptBlock>$_.DeletedDateTime -as [bool]</ScriptBlock>
                                 <Alignment>Left</Alignment>
-                           </TableColumnItem>
-                            <TableColumnItem>
-                                <PropertyName>Importance</PropertyName>
-                                <Alignment>Left</Alignment>
-                           </TableColumnItem>
+                            </TableColumnItem>
                             <TableColumnItem>
                                 <ScriptBlock>$_.body.content</ScriptBlock>
                                 <Alignment>Left</Alignment>
@@ -1550,7 +1566,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Conversation</Name><ViewSelectedBy><TypeName>GraphConversation</TypeName></ViewSelectedBy>
+            <Name>Graph Conversation</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphConversation</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1598,7 +1614,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Post</Name><ViewSelectedBy><TypeName>GraphPost</TypeName></ViewSelectedBy>
+            <Name>Graph Post</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPost</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1755,7 +1771,10 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Contact</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPerson</TypeName></ViewSelectedBy>
+            <Name>Graph Contact</Name><ViewSelectedBy>
+                <TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact</TypeName>
+                <TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPerson</TypeName>
+            </ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>

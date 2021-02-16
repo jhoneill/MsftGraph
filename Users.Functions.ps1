@@ -52,4 +52,3 @@ function Get-GraphReminderView   {
         }
     }
 }
-
