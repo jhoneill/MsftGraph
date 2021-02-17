@@ -719,22 +719,24 @@ function Expand-GraphTask        {
         $i = 0 #Counter for progress bar.
         Write-Progress -Activity "Getting task details" -Status "Extending Tasks" -PercentComplete 0
         foreach ($t in $allTasks) {
-            $details   = Invoke-GraphRequest  -Uri "$GraphUri/planner/tasks/$($t.id)/details"
             $assignees = $t.assignments.keys |  foreach-object {$userhash[$_]}
-            Add-Member -Force -InputObject $t -NotePropertyName Assignees   -NotePropertyValue ($assignees -join ", ")
-            Add-Member -Force -InputObject $t -NotePropertyName Bucketname  -NotePropertyValue  $buckethash[$t.bucketId]
-            Add-Member -Force -InputObject $t -NotePropertyName PlanTitle   -NotePropertyValue  $planhash[$t.planID]
-            Add-Member -Force -InputObject $t -NotePropertyName DetailTag   -NotePropertyValue  $details.'@odata.etag'
-            Add-Member -Force -InputObject $t -NotePropertyName References  -NotePropertyValue  $details.references
-            Add-Member -Force -InputObject $t -NotePropertyName Checklist   -NotePropertyValue  $details.checklist
-            Add-Member -Force -InputObject $t -NotePropertyName Description -NotePropertyValue  $details.description
-            Add-Member -Force -InputObject $t -NotePropertyName PreviewType -NotePropertyValue  $details.previewType
-            $t.pstypeNames.Add("GraphExtendedTask")
+            $details   = Invoke-GraphRequest  -Uri "$GraphUri/planner/tasks/$($t.id)/details"
+            $expandedTask = $t | Select-Object -Property * -ExcludeProperty keys,values,additionalproperties,count   |
+                Add-Member -Force -PassThru -NotePropertyName Assignees   -NotePropertyValue ($assignees -join ", ") |
+            Add-Member -Force -PassThru -NotePropertyName Bucketname  -NotePropertyValue  $buckethash[$t.bucketId]   |
+            Add-Member -Force -PassThru -NotePropertyName PlanTitle   -NotePropertyValue  $planhash[$t.planID]       |
+            Add-Member -Force -PassThru -NotePropertyName DetailTag   -NotePropertyValue  $details.'@odata.etag'     |
+            Add-Member -Force -PassThru -NotePropertyName References  -NotePropertyValue  $details.references        |
+            Add-Member -Force -PassThru -NotePropertyName Checklist   -NotePropertyValue  $details.checklist         |
+            Add-Member -Force -PassThru -NotePropertyName Description -NotePropertyValue  $details.description       |
+            Add-Member -Force -PassThru -NotePropertyName PreviewType -NotePropertyValue  $details.previewType
+            $expandedTask.pstypeNames.Add("GraphExtendedTask")
             $i += 100 #To give percentage
             Write-Progress -Activity "Getting task details" -Status "Extending Tasks" -PercentComplete ($i/$allTasks.count)
+            $expandedTask
         }
         Write-Progress -Activity "Getting task details" -Completed
-        return $allTasks
+
     }
 }
 
@@ -885,78 +887,4 @@ function Set-GraphTaskDetails    {
         Invoke-GraphRequest @webParams | Out-Null
     }
     Write-Progress -Activity "Updating task" -Completed
-}
-
-function Add-GraphPlannerTab     {
-    <#
-      .Synopsis
-        Adds a planner tab to a team-channel for a pre-existing plan
-      .Description
-        This posts to https://graph.microsoft.com/v1.0/teams/{id}/channels/{id}/tabs
-        which requires consent to use the Group.ReadWrite.All scope.
-      .Example
-        >
-        >$channel = Get-GraphTeam -ByName accounts -Channels -ChannelName 'year-end'
-        >$plan   = Get-GraphTeam -ByName accounts  -Plans | where title -Like "year end*"
-        >Add-GraphPlannerTab -Plan $plan -Channel $channel -TabLabel "Planner"
-        The first line gets the 'year-end' channel for the accounts team
-        The second gets a plan with tile which matches 'year end'
-        and the third creates a tab labelled 'Planner' in the channel for that plan.
-    #>
-    [CmdletBinding(SupportsShouldProcess=$true)]
-    param(
-        #An ID or Plan object for a plan within the team
-        [Parameter(Mandatory=$true,Position=0)]
-        $Plan,
-        #An ID or Channel object for a channel (which may contain the team ID)
-        [Parameter(Mandatory=$true,Position=1)]
-        $Channel,
-        #A team ID, or a team object, if not specified as part of the channel
-        $Team,
-        #The label for the tab.
-        $TabLabel,
-        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
-        $PassThru,
-        #If Specified the tab will be added without confirming
-        $Force
-    )
-
-    #We got a team ID use it. If the the channel had a team, use that. If we didn't get a team, throw an error.
-    if       ($Team.id)      {$Team = $Team.id}
-    elseif   ($Channel.Team) {$Team = $Channel.Team}
-    if ( -not $Team)         {throw 'Can not determine the team from the channel; please specify it explicitly' }
-    if ((-not $TabLabel) -and $Plan.Title) {
-        Write-Verbose -Message "No Tab label was specified, using the Plan title '$($Plan.Title)'"
-        $TabLabel = $Plan.Title
-    }
-    #If Plan and/or channel were objects with IDs use the ID
-    if       ($Channel.id) {$Channel = $Channel.id}
-    if       ($Plan.id)    {$Plan    = $Plan.id}
-    $tabURI = "https://tasks.office.com/{0}/Home/PlannerFrame?page=7&planId={1}" -f $global:GraphUser  , $Plan
-
-    $webparams = @{'Method'      = 'Post';
-                   'Uri'         = "https://graph.microsoft.com/beta/teams/$team/channels/$channel/tabs" ;
-                   'ContentType' = 'application/json'
-    }
-
-    $json = ConvertTo-Json ([ordered]@{
-                'name'          = $TabLabel
-                'TeamsAppId'    = 'com.microsoft.teamspace.tab.planner'
-                'configuration' = [ordered]@{
-                   'entityId'   = $plan
-                   'contentUrl' = $tabURI
-                   'websiteUrl' = $tabURI
-                   'removeUrl'  = $tabURI
-                }
-            })
-    Write-Debug $json
-    if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {
-        $result = Invoke-GraphRequest @webParams -body $json
-        if ($PassThru) {
-            $result.pstypeNames.add('GraphTab')
-            #Giving a type name formats things nicely, but need to set the name to be used when the tab is displayed
-            Add-Member -InputObject $result -MemberType NoteProperty -Name teamsAppName -Value 'Planner'
-            return $result
-        }
-    }
 }

@@ -1,61 +1,7 @@
 using namespace System.Management.Automation
+#Uses functions from  and MicrosoftGraphSubscribedSku type from  Microsoft.Graph.Identity.DirectoryManagement.private.dll
 
 #xxxx todo: check context is a workorschool account and that it has the right scopes and warn / error / throw if not.
-
-class SkuCompleter : IArgumentCompleter     {
-    [Microsoft.Graph.PowerShell.Models.MicrosoftGraphSubscribedSku[]]$skus = @()
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    )
-    {
-        $result = [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
-        if (-not $this.skus)  {$this.skus = Get-GraphSKU }
-        $wildcard          = ("*" + ($wordToComplete  -replace "['""]",'' )+ "*")
-        $this.skus.where({$_.skuPartNumber -like $wildcard}).skuPartNumber |
-            Sort-Object | ForEach-Object {$result.Add([System.Management.Automation.CompletionResult]::new($_))}
-        return $result
-    }
-}
-
-class SkuPlanCompleter : IArgumentCompleter {
-    [Microsoft.Graph.PowerShell.Models.MicrosoftGraphSubscribedSku[]]$skus = @()
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    )
-    {
-        $result = [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
-        if (-not $this.skus)  {$this.skus = Get-GraphSKU }
-        $wildcard          = ("*" + ($wordToComplete  -replace "['""]",'' )+ "*")
-        if ($FakeBoundParameters['SKUID']) {
-            $selectedSkus  = $this.skus.where({$_.skuID -in $FakeBoundParameters['SKUID'] -or $_.skuPartNumber -in $FakeBoundParameters['SKUID'] })
-        }
-        else {
-            $selectedSkus = $this.skus
-        }
-        $selectedSkus.ServicePlans.where({$_.ServicePlanName -like $wildcard}).ServicePlanName |
-            Sort-Object | ForEach-Object {$result.Add([System.Management.Automation.CompletionResult]::new($_))}
-        return $result
-    }
-}
-
-class DomainCompleter : IArgumentCompleter {
-    [Microsoft.Graph.PowerShell.Models.MicrosoftGraphDomain[]]$Domains = @()
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    )
-    {
-        $result = [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
-        if (-not $this.Domains)  {$this.Domains = Get-GraphDomain }
-        $wildcard          = ("*" + ($wordToComplete  -replace "['""]",'' )+ "*")
-
-        $this.domains.id.where({$_ -like $wildcard}) |
-            Sort-Object | ForEach-Object {$result.Add([System.Management.Automation.CompletionResult]::new($_))}
-        return $result
-    }
-}
 function Get-GraphDomain          {
     <#
       .synopsis
@@ -186,7 +132,7 @@ function Get-GraphSKU             {
         foreach ($s in $sku) {
             $null = $PSBoundParameters.Remove("ServicePlans") ,  $PSBoundParameters.Remove("SKU")
             if ($s.skuid)          {$s = ($s.skuid) }
-            if ($s -notmatch '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$') {
+            if ($s -notmatch $GuidRegex) {
                 $result += Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_List @PSBoundParameters |
                             Where-Object -Property SkuPartNumber -like $s
             }
@@ -234,7 +180,7 @@ function Grant-GraphUserLicense   {
 
         foreach  ($s in $SKUID) {
             if   ($s.skuid) {$s = ($s.skuid) }
-            if   ($s -match '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$') {
+            if   ($s -match $GuidRegex) {
                   $sku = Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_Get -SubscribedSkuId $s
             }
             else {$sku = Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_List  |
@@ -354,7 +300,7 @@ function Revoke-GraphUserLicense  {
         $request        = @{'addLicenses' = @() ; 'removeLicenses' = @()}
         foreach ($s in $SKUID) {
             if  ($s.skuid) {$s = ($s.skuid) }
-            if  ($s -match '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$') {
+            if  ($s -match $GuidRegex) {
                 $request.removeLicenses += $s
             }
             else {
@@ -406,7 +352,7 @@ function Revoke-GraphUserLicense  {
 function Get-GraphSkuLicensedUser {
     <#
       .Synopsis
-        Revokes a user's licence to use a particular stock-keeping-unit (SKU)
+        Get0 stock-keeping-unit (SKU)
     #>
     param   (
         #The SKU to get either as an ID or a SKU object containing an ID
@@ -428,10 +374,10 @@ function Get-GraphSkuLicensedUser {
     process {
         foreach ($s in $SKUID) {
             if      ($s.skuid) {$s = ($s.skuid) }
-            elseif  ($s -notmatch '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$' -and $partNoToID[$s]) {
+            elseif  ($s -notmatch $GuidRegex -and $partNoToID[$s]) {
                      $s =  $partNoToID[$s]
             }
-            elseif  ($s -notmatch '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$') {
+            elseif  ($s -notmatch $GuidRegex) {
                 Write-Warning "$s doesn't look like a valid SKU" ; continue
             }
             $uri     = '$GraphUri/users?$Select=id,displayName,userPrincipalName,assignedLicenses&$filter=assignedLicenses/any(x:x/skuId eq {0})' -f  $s

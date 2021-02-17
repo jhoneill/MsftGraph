@@ -1,9 +1,9 @@
 using namespace Microsoft.Graph.PowerShell.Models
 
-Function Get-GraphReport {
+Function Get-GraphReport       {
     <#
         .Synopsis
-            Use BETA functionality to get reports from MS Graph
+            Gets reports from MS Graph
         .Example
             >Get-GraphReport -Report MailboxUsageDetail | ft "Display Name",  "Storage Used (Byte)"
             Displays mailbox storage used by users - note that
@@ -70,7 +70,7 @@ Function Get-GraphReport {
     else       { Invoke-GraphRequest -Method GET -uri $uri | ConvertFrom-Csv }
 }
 
-Function Get-GraphSignInLog {
+Function Get-GraphSignInLog    {
     <#
       .synopsis
         Gets the audit log -requires a priviledged account
@@ -92,7 +92,10 @@ Function Get-GraphSignInLog {
     Write-Progress -Activity 'Getting Sign-in Auditlog'
 
     $result  = Invoke-GraphRequest  -Method get -Uri "$GraphUri/auditLogs/signIns" -SkipHttpErrorCheck -StatusCodeVariable status
-    if ($result.error)              {Write-Warning "An error was returned: '$($result.error.message)' - code: $($result.error.code) "}
+    if ($result.error)              {
+            Write-Progress -Activity 'Getting Sign-in Auditlog' -Completed
+            Write-Warning "An error was returned: '$($result.error.message)' code: $($result.error.code) "
+    }
     if ($status -notmatch "2\d\d")  {Write-Warning "Status code returned was $Status ($([System.Net.HttpStatusCode]$status)) which does not look like success."}
 
     $records = $result.value

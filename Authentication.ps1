@@ -9,11 +9,17 @@ using namespace Microsoft.Graph.PowerShell.Models
 
     Portions of this file are   Copyright 2021 Justin Grote @justinwgrote
 #>
-
-
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Write host used for colored information message telling user to make a change and remove the message')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Initialization clears drive cache and work or school status available outside the module')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification='False positive for global vars.')]
+
+#Script / global environment variables.
+#Global:driveCache caches drive to name mappings, Global:__MgAzContext sets the profile for Azure logons,
+#GLOBAL:__MgAzTokenExpires, records when the token will expire if we need to manage refreshing it
+#global:__MgToken, allows an  global:DefaultGraphScopes
+#Global:GraphUser, GLOBAL:PSDefaultParameterValues,
+#$Env:GraphScopes will provide as set of scopes to request
+#RefreshToken, RefreshParameters (to call connect graph with will the token expires) clent app (clientID and Client Secret) & tennant are script level vars
 
 #Write-Host -ForegroundColor Red "Using the default / sample app ID. You should edit the .PSM1 file and either replace the ID with your own, or remove this message"
 #$Script:ClientID      = "bf546ecc-067d-4030-9edd-7b0d74913411"  #You can also try  "1950a258-227b-4e31-a9cf-717495945fc2"  # Well known client ID for PowerShell
@@ -85,15 +91,16 @@ else                  {$global:DefaultGraphScopes = @(
 Remove-item Alias:\Invoke-GraphRequest -ErrorAction SilentlyContinue
 Function Invoke-GraphRequest {
     param(
-        #Uri to call can be segments such as /beta/me or fully qualified https://graph.microsoft.com/beta/me
+        #Uri to call can be a segment such as /beta/me or a fully qualified https://graph.microsoft.com/beta/me
         [Parameter(Mandatory=$true, Position=1 )]
         [uri]$Uri,
 
         #Http Method
+        [ValidateSet('GET','POST','PUT','PATCH','DELETE')]
         [Parameter(Position=2 )]
         $Method,
 
-        # HelpMessage='Request Body. Required when Method is Post or Patch'
+        #Request Body. Required when Method is Post or Patch'
         [Parameter(Position=3,ValueFromPipeline=$true)]
         $Body,
 
@@ -103,8 +110,7 @@ Function Invoke-GraphRequest {
         #Output file where the response body will be saved
         [string]$OutputFilePath,
 
-        #Infer output filename
-        [switch]$InferOutputFileName,
+       [switch]$InferOutputFileName,
 
         #Input file to send in the request
         [string]$InputFilePath,
@@ -112,16 +118,16 @@ Function Invoke-GraphRequest {
         #Indicates that the cmdlet returns the results, in addition to writing them to a file. Only valid when the OutFile parameter is also used.
         [switch]$PassThru,
 
-        #OAuth or Bearer Token to use instead of already acquired token
+        #OAuth or Bearer Token to use instead of acquired token
         [securestring]$Token,
 
         #Add headers to Request Header collection without validation
         [switch]$SkipHeaderValidation,
 
-        #Custom Content Type
+        #Body Content Type, for exmaple 'application/json'
         [string]$ContentType,
 
-        #Graph Authentication Type
+        #Graph Authentication Type - default or userProvived Token
         [Microsoft.Graph.PowerShell.Authentication.Models.GraphRequestAuthenticationType]
         $Authentication,
 
@@ -129,26 +135,23 @@ Function Invoke-GraphRequest {
         [Alias('SV')]
         [string]$SessionVariable,
 
-        #Response Headers Variable
         [Alias('RHV')]
         [string]$ResponseHeadersVariable,
 
-        #Response Status Code Variable
         [string]$StatusCodeVariable,
 
-        #Skip Checking Http Errors
         [switch]$SkipHttpErrorCheck,
 
         #If specified returns the .values property instead of the whole JSON object returned by the API call
         [switch]$ValueOnly,
 
-        #If specified, loops through multipaged results indicated by an '@odata.nextLink' property
+        #If specified, loops through multi-paged results indicated by an '@odata.nextLink' property
         [switch]$AllValues,
 
-        #If Specified removes properties found in the JSON before converting to a type or returning the objct
+        #If specified removes properties found in the JSON before converting to a type or returning the object
         [string[]]$ExcludeProperty,
 
-        #If specified converts the JSON object to properties of the a new object of the requested type. Any properties which are in the JSON but not the type should be excluded.
+        #If specified converts the JSON object to properties of the a new object of the requested type. Any properties which are expected in the JSON but not defined in the type should be excluded.
         [string]$AsType
     )
 
@@ -196,7 +199,7 @@ Function Invoke-GraphRequest {
 }
 
 Remove-item Alias:\Connect-Graph -ErrorAction SilentlyContinue
-Function Connect-Graph     {
+Function Connect-Graph      {
     <#
         .Synopsis
             Starts a session with Microsoft Graph
@@ -373,13 +376,11 @@ Function Connect-Graph     {
             Write-Verbose -Message "Account is from $($Organization.DisplayName)"
             Add-Member -force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyValue $Organization.DisplayName
             Add-Member -force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $true
-            $Global:WorkOrSchool = $true #legacy support
         }
         else                  {
             Write-Verbose -Message "Account is from Windows live"
             Add-Member -force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyValue $Organization.DisplayName
             Add-Member -force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $true
-            $Global:WorkOrSchool = $false #Legacy
         }
         $user             =   Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/me/"
         $Global:GraphUser =  $user.userPrincipalName
@@ -406,7 +407,7 @@ Function Connect-Graph     {
     if (-not $Quiet) {return $result}
 }
 
-Function Show-GraphSession {
+Function Show-GraphSession  {
     <#
         .Synopsis
             Returns Basic information about the current sesssion
@@ -419,27 +420,35 @@ Function Show-GraphSession {
         [Parameter(ParameterSetName='Scopes')]
         [switch]$Scopes
     )
-    if ($Scopes)  {[GraphSession]::Instance.AuthContext.Scopes}
+    if  ($Scopes) {[GraphSession]::Instance.AuthContext.Scopes}
     elseif ($Who) {[GraphSession]::Instance.AuthContext.Account}
     else          {Get-MgContext}
 }
 
-Function ContextHas {
-[cmdletbinding()]
+Function ContextHas         {
     <#
+        .Syopsis
+            Checks if the the current context is a work/school account and/or has access with the right scopes
     #>
+    [cmdletbinding()]
     param (
+        #list of scopes. will return true if at least one IS present.
         [string[]]$scopes,
-        [switch]$Not,
+        #if specifies returns ture for a work-or-school account and false for "Live" accounts
         [switch]$WorkOrSchoolAccount,
-        [switch]$BreakIfNot
+        #If specified break instead of turning false
+        [switch]$BreakIfNot,
+        #If specified reverses the output.
+        [switch]$Not
     )
     if ($WorkOrSchoolAccount)  {
-          $state =  [Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext.WorkOrSchool -or $global:WorkOrSchool  #Global var is legacy.
+          $state =  [Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext.WorkOrSchool
     }
-    else {$state =  $true}
-    foreach ($s in $scopes)  {
-          $state = $state -and ([Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext.Scopes -contains $s)
+    elseif ($scopes) {
+        $state =  $false
+        foreach ($s in $scopes)  {
+            $state = $state -or ([Microsoft.Graph.PowerShell.Authentication.GraphSession]::Instance.AuthContext.Scopes -contains $s)
+        }
     }
     if ($BreakIfNot ) {
         if ($scopes              -and -not $state) {Write-Warning "This requires the $($scopes -join ', ') scope(s)." ; break}

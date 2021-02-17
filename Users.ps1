@@ -39,7 +39,8 @@ function Get-GraphUserList     {
         Returns a list of Azure active directory users for the current tennant.
       .Example
         Get-GraphUserList -filter "Department eq 'Accounts'"
-
+        Gets the list with a custom filter this is typically fieldname eq 'value' for equals or
+        startswith(fieldname,'value') clauses can be joined with and / or.
     #>
     [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser])]
     [cmdletbinding(DefaultparameterSetName="None")]
@@ -425,7 +426,7 @@ function Set-GraphUser         {
         or Directory.AccessAsUser.All scope.
     #>
     [cmdletbinding(SupportsShouldprocess=$true)]
-    param (
+    param   (
         #ID for the user if not the current user
         [parameter(Position=1,ValueFromPipeline=$true)]
         $UserID = "me",
@@ -501,13 +502,11 @@ function Set-GraphUser         {
         [switch]$AccountDisabled,
         [Switch]$Force
     )
-    begin {
-
+    begin   {
         #things we don't want to put in the JSON body when we send the changes.
         $excludedParams = [Cmdlet]::CommonParameters +  @('Photo','UserID','AccountDisabled', 'UsageLocation', 'Manager')
     }
-
-    Process {
+    process {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
         #xxxx todo check scopes  User.ReadWrite, User.ReadWrite.All, Directory.ReadWrite.All,        or Directory.AccessAsUser.All scope.
 
@@ -532,6 +531,7 @@ function Set-GraphUser         {
             #region Convert Settings other than manager and Photo into a block of JSON and send it as a request body
             $settings = @{}
             foreach ($p in $PSBoundparameters.Keys.where({$_ -notin $excludedParams})) {
+                #turn "Param" to "param" make dates suitable text, and switches booleans
                 $key   = $p.toLower()[0] + $p.Substring(1)
                 $value = $PSBoundparameters[$p]
                 if ($value -is [datetime]) {$value = $value.ToString("yyyy-MM-ddT00:00:00Z")}  # 'o' for ISO date time may work here
@@ -539,7 +539,7 @@ function Set-GraphUser         {
                 $settings[$key] = $value
             }
             if ($PSBoundparameters['AccountDisabled']) {$settings['accountEnabled'] = -not $AccountDisabled} #allows -accountDisabled:$false
-            if ($PSBoundparameters['UsageLocation'])   {$settings['usageLocation']  = $UsageLocation.ToUpper() } #Case matters I should have a transformer attribute.
+         # if ($PSBoundparameters['UsageLocation'])   {$settings['usageLocation']  = $UsageLocation.ToUpper() } #Case matters now do this with a transformer attribute.
             if ($settings.count -eq 0 -and -not $Photo -and -not $Manager) {
                 Write-Warning -Message "Nothing to set" ; continue
             }
@@ -578,16 +578,22 @@ function Set-GraphUser         {
 }
 
 function New-GraphUser         {
+    <#
+        .synopsis
+            Creates a new user in Azure Active directory
+
+    #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', '', Justification="False positive and need to support plain text here")]
     [cmdletbinding(SupportsShouldProcess=$true)]
     Param (
-
+        #User principal name for the new user. If not specified it can be built by specifying Mail nickname and domain name.
         [Parameter(ParameterSetName='DomainFromUPNLast',Mandatory=$true)]
         [Parameter(ParameterSetName='DomainFromUPNDisplay',Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
         [alias("UPN")]
         [string]$UserPrincipalName,
 
+        #Mail nickname for the new user. If not specified the part of the UPN before the @sign will be used, or using the displayname or first/last name
         [Parameter(ParameterSetName='UPNFromDomainLast')]
         [Parameter(ParameterSetName='UPNFromDomainDisplay',Mandatory=$true)]
         [Parameter(ParameterSetName='DomainFromUPNLast')]
@@ -596,6 +602,7 @@ function New-GraphUser         {
         [Alias("Nickname")]
         [string]$MailNickName,
 
+        #Domain for the new user - used to create UPN name if the UPN paramater is not provided
         [Parameter(ParameterSetName='UPNFromDomainLast',Mandatory=$true)]
         [Parameter(ParameterSetName='UPNFromDomainDisplay',Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
@@ -626,10 +633,12 @@ function New-GraphUser         {
         [Alias('LastName')]
         [string]$Surname,
 
+        #A script block specifying how the displayname should be built, by default if is {"$GivenName $Surname"};
         [Parameter(ParameterSetName='UPNFromDomainLast')]
         [Parameter(ParameterSetName='DomainFromUPNLast')]
         [scriptblock]$DisplayNameRule = {"$GivenName $Surname"},
 
+        #A script block specifying how the mailnickname should be built, by default if is {"$GivenName.$Surname"};
         [Parameter(ParameterSetName='UPNFromDomainLast')]
         [Parameter(ParameterSetName='DomainFromUPNLast')]
         [scriptblock]$NickNameRule    = {"$GivenName.$Surname"},
@@ -640,14 +649,26 @@ function New-GraphUser         {
         [ValidateCountryAttribute()]
         [string]$UsageLocation = 'GB',
 
+        #The initial password for the user. If none is specified one will be generated and output by the command
         [string]$Initialpassword,
+
+        #If specified the user will not have to change their password on first logon
         [switch]$NoPasswordChange,
+
+        #If specified the user will need to use Multi-factor authentication when changing their password.
         [switch]$ForceMFAPasswordChange,
 
+        #Specifies built-in password policies to apply to the user
         [ValidateSet('DisableStrongPassword','DisablePasswordExpiration')]
         [string[]]$PasswordPolicies,
+
+        #A hash table of properties which can be passed as parameters to Set-GraphUser command after the account is created
         [hashtable]$SetableProperties,
+
+        #If Specified prevents any confirmation dialog from appearing
         [switch]$Force,
+
+        #Unless passthru is specified, only passwords created when running the command are returned. When specified user objects are returned.
         [Alias('Pt')]
         [switch]$Passthru
     )
@@ -676,7 +697,7 @@ function New-GraphUser         {
     if (-not ($DisplayName -and $MailNickName -and $UserPrincipalName)) {
         throw "couldn't make sense of those parameters"
     }
-    #A simple way to create one in 100K temporaty passwords. You might get 10Oct2126 Easy to type and meets complexity rules.
+    #A simple way to create one in 100K temporaty passwords. You might get 10Oct2126 - easy to type and meets complexity rules.
     if (-not $Initialpassword)    {
              $Initialpassword   = ([datetime]"1/1/1800").AddDays((Get-Random 146000)).tostring("ddMMMyyyy")
              Write-Output "$UserPrincipalName, $Initialpassword"
@@ -716,61 +737,12 @@ function New-GraphUser         {
         $_
         }
     }
-
-}
-
-function New-GraphInvitation   {
-    [cmdletbinding(SupportsShouldProcess=$true)]
-    param(
-        #The email address of the user being invited.
-        #The characters  #~ ! $ %  ^  & * ( [ { < > } ] ) +  = \ /  | ; : " " ? , are not permitted
-        #A  . or - is permitted except at the beginning or end of the name. A _  is permitted anywhere.
-        [Parameter(Position=1,ValueFromPipeline=$true)]
-        [string]$EmailAddress,
-        #The display name of the user being invited.
-        [string]$DisplayName,
-        #The userType of the user being invited. By default, this is Guest. You can invite as Member if you are a company administrator.'
-        [string]$UserType,
-        #The URL the user should be redirected to once the invitation is redeemed. Required.
-        [string]$RedirectUrl  = 'https://mysignins.microsoft.com/',
-        #Indicates whether an email should be sent to the user being invited or not.
-        [switch]$SendInvitationMessage
-    )
-
-    ContextHas -WorkOrSchoolAccount -BreakIfNot
-    $settings = @{
-        'invitedUserEmailAddress'    = $EmailAddress
-        'sendInvitationMessage'      = $SendInvitationMessage -as [bool]
-        'inviteRedirectUrl'          = $RedirectUrl
-    }
-    if ($DisplayName) {$settings['invitedUserDisplayName']  = $DisplayName}
-    if ($UserType)    {$settings['invitedUserType']         = $UserType}
-
-    $webparams = @{
-        'Method'            = 'POST'
-        'Uri'               = "$GraphUri/invitations"
-        'Contenttype'       = 'application/json'
-        'Body'              = (ConvertTo-Json $settings -Depth 5)
-        'AsType'            = [MicrosoftGraphInvitation]
-        'ExcludeProperty'   = '@odata.context'
-    }
-    Write-Debug $webparams.Body
-    if ($force -or $pscmdlet.ShouldProcess($EmailAddress, 'Invite User')){
-        try {
-            $u = Invoke-GraphRequest @webparams
-            if ($Passthru ) {return $u }
-        }
-        catch {
-        # xxxx Todo figure out what errors need to be handled (illegal name, duplicate user)
-        $_
-        }
-    }
 }
 
 function Remove-GraphUser      {
-      <#
+    <#
       .Synopsis
-        Deletes a user
+        Deletes a user from Azure Active directory
     #>
     [cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
     param (
@@ -808,13 +780,13 @@ function Remove-GraphUser      {
 
 function Find-GraphPeople      {
     <#
-       .Synopsis
-          Searches people in your inbox / contacts / directory
-       .Example
-          Find-GraphPeople -Topic timesheet -First 6
-          Returns the top 6 results for people you have discussed timesheets with.
-        .Description
-            Requires consent to use either the People.Read or the People.Read.All scope
+      .Synopsis
+        Searches people in your inbox / contacts / directory
+     .Example
+        Find-GraphPeople -Topic timesheet -First 6
+        Returns the top 6 results for people you have discussed timesheets with.
+      .Description
+        Requires consent to use either the People.Read or the People.Read.All scope
     #>
     [cmdletbinding(DefaultparameterSetName='Default')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification="Person would be incorrect")]
@@ -861,7 +833,7 @@ Function Import-GraphUser      {
 
 #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    param (
+    param   (
         #One or more files to read for input.
         [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
@@ -872,7 +844,7 @@ Function Import-GraphUser      {
         #Fields which are lists will be split at , or ; by default but a replacement split expression may be given
         [String]$ListSeparator = '\s*,\s*|\s*;\s*'
     )
-    begin {
+    begin   {
         $list = @()
     }
     process {
@@ -881,7 +853,7 @@ Function Import-GraphUser      {
             else { Write-Warning -Message "Cannot find $p" }
         }
     }
-    end {
+    end     {
         if (-not $Quiet) { $InformationPreference = 'continue'  }
 
         foreach ($user in $list) {
@@ -958,12 +930,7 @@ Function Import-GraphUser      {
 Function Export-GraphUser      {
 <#
     .synopsis
-       Imports a list of users from a CSV file
-    .description
-        Takes a list of CSV files and looks for xxxx columns
-        * Action is either Add, Remove or Set - other values will cause the row to be ignored
-        * DisplayName
-
+       Exports a list of users to a CSV file
 #>
     [cmdletbinding(SupportsShouldProcess=$true)]
     param (
@@ -975,21 +942,26 @@ Function Export-GraphUser      {
         #String to insert between parts of multi-part items.
         $ListSeparator = "; "
     )
-Microsoft.Graph.Users.private\Get-MgUser_List -Select 'UserPrincipalName',  'MailNickName','GivenName', 'Surname', 'DisplayName', 'UsageLocation',
-                        'accountEnabled', 'PasswordPolicies', 'Mail',  'MobilePhone', 'BusinessPhones',
-                        'JobTitle',  'Department',  'OfficeLocation', 'CompanyName',
-                        'StreetAddress', 'City', 'State', 'Country', 'PostalCode' -ExpandProperty manager -filter $Filter |
-    Select-Object      'UserPrincipalName', 'MailNickName',   'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
+    Microsoft.Graph.Users.private\Get-MgUser_List -filter $Filter -ExpandProperty manager -Select 'UserPrincipalName',
+                        'MailNickName','GivenName', 'Surname', 'DisplayName', 'UsageLocation', 'accountEnabled',
+                        'PasswordPolicies', 'Mail',  'MobilePhone', 'BusinessPhones', 'JobTitle',  'Department',
+                        'OfficeLocation', 'CompanyName','StreetAddress', 'City', 'State', 'Country',
+                        'PostalCode' |
+        Select-Object   'UserPrincipalName', 'MailNickName',   'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
                         @{n='AccountDisabled';e={-not 'accountEnabled'}} , 'PasswordPolicies', 'Mail',  'MobilePhone',
                         @{n='BusinessPhones';e={$_.'BusinessPhones' -join $ListSeparator }},
                         @{n='Manager';e={$_.manager.AdditionalProperties.userPrincipalName}},
                         'JobTitle',  'Department', 'OfficeLocation', 'CompanyName',
-                        'StreetAddress', 'City', 'State', 'Country', 'PostalCode' | Export-Csv -NoTypeInformation -Path $Path
+                        'StreetAddress', 'City', 'State', 'Country', 'PostalCode' |
+            Export-Csv -NoTypeInformation -Path $Path
 }
 
-#MailBox: only needs items found in the user module, so we don't give it it's own PS1 file
-
+#MailBox commands: these only depend on the user module from the SDK so go in the same file as user commands
 function New-GraphMailAddress  {
+    <#
+      .synopsis
+        Helper function to create a email addresses
+    #>
     param (
         # The recipient's email address, e.g Alex@contoso.com
         [Parameter(Mandatory=$true,Position=0, ValueFromPipeline=$true)]
@@ -999,28 +971,29 @@ function New-GraphMailAddress  {
         [Alias('DisplayName')]
         $Name
     )
-    New-Object -TypeName MicrosoftGraphEmailAddress -Property $PSBoundParameters
+    @{name=$name;Address=$Address}
 }
 
-function New-Recipient         {
+function New-GraphRecipient    {
     <#
       .Synopsis
         Creats a new meeting attendee, with a mail address and the type of attendance.
     #>
     param(
         # The recipient's email address, e.g Alex@contoso.com
-        [Parameter(Mandatory=$true,Position=0, ValueFromPipeline=$true)]
+        [Parameter(Mandatory=$true,Position=1, ValueFromPipeline=$true)]
         $Mail,
         #The displayname for the recipient
+        [Parameter(Position=2)]
         $DisplayName
     )
-    @{ 'emailAddress' = (New-MailAddress -Mail:$mail -DisplayName:$DisplayName )}
+    @{ 'emailAddress' =  @{'address'=$mail; name=$DisplayName }}
 }
 
 function New-GraphAttendee     {
     <#
       .Synopsis
-        Creats a new meeting attendee, with a mail address and the type of attendance.
+        Helper function to create a new meeting attendee, with a mail address and the type of attendance.
     #>
     [cmdletbinding(DefaultParameterSetName='Default')]
     [outputType([system.collections.hashtable])]
@@ -1040,10 +1013,10 @@ function New-GraphAttendee     {
         [Parameter(ValueFromPipeline=$true,ParameterSetName='PipedStrings',Mandatory=$true)]
         $InputObject
     )
-    $EmailAddress = New-MailAddress -Address $Address -DisplayName $DisplayName
-    New-Object -TypeName MicrosoftGraphAttendee -Property @{emailaddress=$EmailAddress ; Type=$AttendeeType}
+    #$EmailAddress = New-GraphMailAddress -Address $Address -DisplayName $DisplayName
+    # New-Object -TypeName MicrosoftGraphAttendee -Property @{emailaddress=$EmailAddress ; Type=$AttendeeType}
 
-    @{ 'type'= $AttendeeType ; 'emailAddress' = (New-MailAddress -Mail:$mail -DisplayName:$DisplayName )}
+    @{ 'type'= $AttendeeType ; 'emailAddress' =  @{'address'=$mail; name=$DisplayName }}
 }
 
 function New-GraphPhysicalAddress {
@@ -1058,7 +1031,6 @@ function New-GraphPhysicalAddress {
         It can then be used like this. Set-GraphContact $pavel -BusinessAddress $fabrikamAddress
     #>
     [cmdletbinding()]
-    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphPhysicalAddress1])]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
     param (
         #Street address. This can contain carriage returns for a district, e.g. "101 London Road`r`nBotley"
@@ -1067,13 +1039,16 @@ function New-GraphPhysicalAddress {
         [String]$City,
         #State, Province, County, the administrative level below country
         [String]$State,
-        #Postal code. Even it parses as a number it will be converted to a string
+        #Postal code. Even it parses as a number, as with US ZIP codes, it will be converted to a string
         [String]$PostalCode,
         #Usually a country but could be some other geographical entity
         [String]$CountryOrRegion
     )
-    New-Object -TypeName  Microsoft.Graph.PowerShell.Models.MicrosoftGraphPhysicalAddress1 -Property $PSBoundParameters
-
+    $Address = @{}
+    foreach ($P in $PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters})) {
+        $Address[$p] + $PSBoundParameters[$p]
+    }
+    $Address
 }
 
 function New-GraphRecurrence   {
@@ -1170,13 +1145,13 @@ function New-GraphRecurrence   {
 }
 
 function Expand-GraphEvent     {
-    param (
+    param   (
         [Parameter(Position=1,ValueFromPipeline=$true)]
         $Event,
         $CalendarPath
 
     )
-    begin {
+    begin   {
         $whensb = {
             $s = [convert]::ToDateTime($this.Start.datetime)
             $e = [convert]::ToDateTime($this.end.datetime)
@@ -1292,7 +1267,7 @@ function Get-GraphMailFolder   {
         New-object -TypeName MicrosoftGraphMailFolder -Property $f |
             Add-Member -PassThru -NotePropertyName SizeInBytes -NotePropertyValue $size
         }
-    #endregion
+    #endregion\\
 }
 
 function Get-GraphMailItem     {
@@ -1475,26 +1450,27 @@ function Send-GraphMailMessage {
     #My personal coding style is to use inital CAPS for parameters and inital lower case for variables (though Powershell doesn't care)
     #so the parameter is $Body and the hash table key name and JSON label is body.
 
-    $msgSettings   =  @{   body = @{ contentType  = $BodyType;
-                                         content  = $Body}
-                                         subject  = $Subject
-                                      importance  = $Importance
-                                     toRecipients = @()
+    $msgSettings   =  @{   'body' = @{
+            'contentType'  = $BodyType;
+                'content'  = $Body}
+                'subject'  = $Subject
+             'importance'  = $Importance
+            'toRecipients' = @()
     }
     foreach ($recip in $To ) {
-            if     ($recip  -is [string] ) { $msgSettings[ 'toRecipients'] += New-Recipient $recip}
+            if     ($recip  -is [string] ) { $msgSettings[ 'toRecipients'] += New-GraphRecipient $recip}
             else                           { $msgSettings[ 'toRecipients'] += $recip}
     }
     if ($CC) {
         $msgSettings['ccRecipients']      = @()
         foreach ($recip in $cc ) {
-            if     ($recip  -is [string] ) { $msgSettings[ 'ccRecipients'] += New-Recipient $recip}
+            if     ($recip  -is [string] ) { $msgSettings[ 'ccRecipients'] += New-GraphRecipient $recip}
             else                           { $msgSettings[ 'ccRecipients'] += $recip}}
     }
     if ($BCC) {
         $msgSettings['bccRecipients']      = @()
         foreach ($recip in $bcc ) {
-            if     ($recip  -is [string] ) { $msgSettings['bccRecipients'] += New-Recipient $recip}
+            if     ($recip  -is [string] ) { $msgSettings['bccRecipients'] += New-GraphRecipient $recip}
             else                           { $msgSettings['bccRecipients'] += $recip}}
     }
     if ($Receipt)                          { $msgSettings['isDeliveryReceiptRequested'] = $true }
@@ -1567,10 +1543,70 @@ function Send-GraphMailMessage {
     }
 }
 
-#send replies and forwards.
+function Send-GraphMailReply   {
+    <#
+      .synopsis
+        Replies to a mail message.
+    #>
+    [Cmdletbinding(DefaultParameterSetName='None')]
+    param (
+        #Either a message ID or a Message object with an ID.
+        [parameter(Mandatory=$true,Position=0,ValueFromPipeline)]
+        $Message,
+        #Comment to attach when repling to the message - blank replies aren't allowed.
+        [parameter(Mandatory=$true,Position=1)]
+        $Comment,
+        #If specified changes reply mode from reply [to sender] to Reply-to-all
+        [Alias('All')]
+        [switch]$ReplyAll
+    )
+    $msgSettings =  @{'comment' = $Comment }
+    if ($Message.id) {$uri =  "$GraphUri/me/Messages/$($Message.id)/"}
+    else             {$uri =  "$GraphUri/me/Messages/$Message"}
+    if ($ReplyAll)   {$uri += '/replyAll' }
+    else             {$uri += '/reply' }
 
+    $json = ConvertTo-Json $msgSettings -depth 10
+    Write-Debug $Json
+    Invoke-GraphRequest -Method post -Uri $uri -ContentType 'application/json' -Body $json
+}
 
-function Get-GraphContact    {
+function Send-GraphMailForward {
+    <#
+      .synopsis
+        Forwards a mail message.
+      .example
+      >
+      > $alex = New-GraphRecipient Alex@contoso.com -DisplayName "Alex B."
+      > Get-GraphMailItem -top 1 | Send-GraphMailForward -to $Alex -Comment "FYI :-)"
+      Creates a recipient , and forwards the top mail in the users inbox to that recipent
+    #>
+    [Cmdletbinding(DefaultParameterSetName='None')]
+    param (
+        #Either a message ID or a Message object with an ID.
+        [parameter(Mandatory=$true,Position=0,ValueFromPipeline)]
+        $Message,
+        #Recipient(s) on the "to" line, each is either created with New-MailRecipient (a hash table), or a string holding an address.
+        [parameter(Mandatory=$true,Position=1)]
+        $To ,
+        #Comment to attach when forwarding the message.
+        $Comment
+    )
+    $msgSettings   =  @{     toRecipients = @() }
+    foreach ($recip in $To ) {
+        if     ($recip  -is [string] ) { $msgSettings[ 'toRecipients'] += New-GraphRecipient $recip}
+        else                           { $msgSettings[ 'toRecipients'] += $recip}
+    }
+    if ($Comment)                      { $msgSettings[ 'comment'] = $Comment}
+    if ($Message.id) {$uri = "$GraphUri/me/Messages/$($Message.id)/forward"}
+    else             {$uri = "$GraphUri/me/Messages/$Message/forward"}
+
+    $json = ConvertTo-Json $msgSettings -depth 10
+    Write-Debug $Json
+    Invoke-GraphRequest -Method post -Uri $uri -ContentType 'application/json' -Body $json
+}
+
+function Get-GraphContact      {
     <#
       .Synopsis
         Get the user's contacts
@@ -1633,8 +1669,7 @@ function Get-GraphContact    {
     #endregion
 }
 
-
-function New-GraphContact {
+function New-GraphContact      {
     <#
       .Synopsis
         Adds an entry to the current users Outlook contacts
@@ -1645,7 +1680,7 @@ function New-GraphContact {
        Creates a new contact; if no displayname is given, one will be decided using given name and suranme;
        .Example
        >
-       >$PavelMail = New-Recipient -DisplayName "Pavel Bansky [Fabikam]" -Mail  pavelb@fabrikam.onmicrosoft.com
+       >$PavelMail = New-GraphRecipient -DisplayName "Pavel Bansky [Fabikam]" -Mail  pavelb@fabrikam.onmicrosoft.com
        >New-GraphContact -GivenName Pavel -Surname Bansky -Email $pavelmail  -BusinessPhones  "+1 732 555 0102"
         This creates the same contanct but sets up their email with a display name.
         New recipient creates a hash table
@@ -1680,7 +1715,7 @@ function New-GraphContact {
         $Department,
         [Parameter(ValueFromPipelineByPropertyName)]
         $Manager,
-        #One or more instant messaging addresses, as a single string with semi colons between addresses or as an array of strings or MailAddress objects created with New-MailAddress
+        #One or more instant messaging addresses, as a single string with semi colons between addresses or as an array of strings or MailAddress objects created with New-GraphMailAddress
         [Parameter(ValueFromPipelineByPropertyName)]
         $Email,
         #One or more instant messaging addresses, as an array or as a single string with semi colons between addresses
@@ -1729,7 +1764,7 @@ function New-GraphContact {
     }
 }
 
-function Set-GraphContact {
+function Set-GraphContact      {
     <#
       .Synopsis
         Modifies or adds an entry in the current users Outlook contacts
@@ -1779,7 +1814,7 @@ function Set-GraphContact {
     $Department,
     [Parameter(ValueFromPipelineByPropertyName)]
     $Manager,
-    #One or more instant messaging addresses, as a single string with semi colons between addresses or as an array of strings or MailAddress objects created with New-MailAddress
+    #One or more mail addresses, as a single string with semi colons between addresses or as an array of strings or MailAddress objects created with New-GraphMailAddress
     [Parameter(ValueFromPipelineByPropertyName)]
     $Email,
     #One or more instant messaging addresses, as an array or as a single string with semi colons between addresses
@@ -1823,10 +1858,11 @@ function Set-GraphContact {
     [Switch]$Force
     )
     begin   {
-        $webParams = @{ContentType    = 'application/json'
-                      URI             = "$GraphUri/me/contacts"
-                      AsType          =  ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact])
-                      ExcludeProperty = @('@odata.etag', '@odata.context' )
+        $webParams = @{
+            'ContentType'    = 'application/json'
+            'URI'             = "$GraphUri/me/contacts"
+            'AsType'          =  ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact])
+            'ExcludeProperty' = @('@odata.etag', '@odata.context' )
         }
         $defaultProperties = @('displayname','jobtitle','companyname','mail','mobile','business','home')
         $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultProperties)
@@ -1838,7 +1874,6 @@ function Set-GraphContact {
         if ($Email -is [string])              {$Email = $Email -split '\s*;\s*'}
         foreach ($e in $Email) {
             if     ($e.emailAddress)          {$contactSettings.emailAddresses    += $e.emailAddress   }
-            elseif ($e -is [string])          {$contactSettings.emailAddresses    += @{'address' = $e} }
             elseif ($e -is [string])          {$contactSettings.emailAddresses    += @{'address' = $e} }
             else                              {$contactSettings.emailAddresses    += $e  }
         }
@@ -1899,7 +1934,7 @@ function Set-GraphContact {
     }
 }
 
-function Remove-GraphContact {
+function Remove-GraphContact   {
     <#
       .synopsis
          Deletes a contact from the default user's contacts
@@ -2040,11 +2075,11 @@ function Get-GraphEvent        {
     )
 
     begin {
-        $webParams = @{ Method          = 'Get'
-                        AllValues       = $true
-                        ValueOnly       = $true
-                        ExcludeProperty = 'icaluid','@odata.etag','calendar@odata.navigationLink','calendar@odata.associationLink'
-                        AsType          = ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent])
+        $webParams = @{
+            'AllValues'       = $true
+            'ValueOnly'       = $true
+            'ExcludeProperty' = 'icaluid','@odata.etag','calendar@odata.navigationLink','calendar@odata.associationLink'
+            'AsType'          = ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent])
         }
         if ($TimeZone) {$webParams['Headers'] =@{"Prefer"="Outlook.timezone=""$TimeZone"""}}
     }
@@ -2169,20 +2204,13 @@ function Add-GraphEvent        {
 
     )
     begin {
-        $webParams = @{Method          = 'Post'
-                    ExcludeProperty = 'icaluid','@odata.etag','@odata.context'
-                    AsType          = ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent])
-                    Contenttype     = 'application/json'
-                    Headers         = @{Prefer        = "Outlook.timezone=""$TimeZone"""}
+        $webParams = @{
+                    'Method'          = 'Post'
+                    'ExcludeProperty' = 'icaluid','@odata.etag','@odata.context'
+                    'AsType'          = ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent])
+                    'Contenttype'     = 'application/json'
+                    'Headers'         = @{Prefer        = "Outlook.timezone=""$TimeZone"""}
         }
-        $whensb = {
-            if ($this.Start.datetime.AddDays(1) -eq  $this.End.datetime -and
-                $this.Start.datetime.hour -eq 0 -and $this.Start.datetime.minute -eq 0 ) {
-                $this.Start.datetime.ToShortDateString() + ' All day'
-            }
-            else {$this.Start.datetime.ToString("g") + ' to ' +  $this.End.datetime.ToString("g") + $this.End.timezone}
-        }
-
     }
     process {
         $CalendarPath     = Get-GraphCalendarPath -Calendar $Calendar -Group $Group -User $User
@@ -2301,11 +2329,12 @@ function Set-GraphEvent        {
         [switch]$PassThru
     )
 
-    $webParams = @{Method          = 'Patch'
-                   ExcludeProperty = 'icaluid','@odata.etag','@odata.context'
-                   AsType          = ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent])
-                   Contenttype     = 'application/json'
-                   Headers         = @{Prefer        = "Outlook.timezone=""$TimeZone"""}
+    $webParams = @{
+                   'Method'          = 'Patch'
+                   'ExcludeProperty' = 'icaluid','@odata.etag','@odata.context'
+                   'AsType'          = ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent])
+                   'Contenttype'     = 'application/json'
+                   'Headers'         = @{Prefer        = "Outlook.timezone=""$TimeZone"""}
     }
 
     if   ($Event.calendarPath) {$CalendarPath = $Event.calendarPath}
@@ -2518,13 +2547,13 @@ function New-GraphToDoTask     {
     if ($ToDoList.ID)      {$ToDoList = $ToDoList.Id}
 
     $Params =  @{
-        UserId          = $UserId
-        TodoTaskListId  = $ToDoList
-        Title           = $Title
-        Body            = (New-Object -TypeName MicrosoftGraphItemBody -Property @{content=$BodyText; contentType=$BodyType} )
-        Importance      = $Importance
-        Status          = $status
-        IsReminderOn    = $ReminderDateTime -as [bool]
+        'UserId'          = $UserId
+        'TodoTaskListId'  = $ToDoList
+        'Title'           = $Title
+        'Body'            = (New-Object -TypeName MicrosoftGraphItemBody -Property @{content=$BodyText; contentType=$BodyType} )
+        'Importance'      = $Importance
+        'Status'          = $status
+        'IsReminderOn'    = $ReminderDateTime -as [bool]
     }
     if ($Recurrence)        {$Params['Recurrence']        = $Recurrence
                              if (-not $DueDateTime) {$DueDateTime = [datetime]::Today.AddDays(1)}

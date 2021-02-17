@@ -1,6 +1,8 @@
 using namespace Microsoft.Graph.PowerShell.Models
+#MicrosoftGraphMailTips object is isn Microsoft.Graph.Users.Actions.private.dll
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Scope='Function', Target='New*')]
 param()
+
 function Get-GraphMailTips       {
     <#
       .synopsis

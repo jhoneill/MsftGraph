@@ -5,48 +5,6 @@ using namespace System.Globalization
 $Script:GraphUri  = "https://graph.microsoft.com/v1.0"
 $Script:GUIDRegex = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
 
-class GroupCompleter : IArgumentCompleter {
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    ) {
-        $result = [System.Collections.Generic.List[CompletionResult]]::new()
-
-        #strip quotes from word to complete - replace " or ' with nothing
-        $wordToComplete = $wordToComplete -replace '"|''', ''
-
-        if ($wordToComplete) {$uri =  $script:GraphUri +  ("/Groups/?`$filter=startswith(displayName,'{0}') or startswith(mail,'{0}')" -f $wordToComplete)}
-        else                 {$uri = "$script:GraphUri/Groups/?`$Top=20"}
-
-        Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
-                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
-        }
-
-        return $result
-    }
-}
-
-class TeamCompleter : IArgumentCompleter {
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    ) {
-        $result = [System.Collections.Generic.List[CompletionResult]]::new()
-
-        #strip quotes from word to complete - replace " or ' with nothing
-        $wordToComplete = $wordToComplete -replace '"|''', ''
-
-
-        if ($wordToComplete) {$uri =  $script:GraphUri +  ("/groups?`$filter=startswith(displayname,'{0}')')" -f $wordToComplete)}
-        else                 {$uri = "$script:GraphUri/Groups/?`$Top=20"}
-        #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams so this is just completing groups for now
-        Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
-                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
-        }
-
-        return $result
-    }
-}
 
 function Get-GraphGroupList         {
     <#
@@ -1661,8 +1619,7 @@ function New-GraphChannel           {
         if     ($Team.id) {$team = $team.id }
         elseif ($Team  -is [string] -and $Team -notmatch $GUIDRegex) {
                 $Team = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
-                #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
-        }
+        }       #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
         #intentionally fail if the previous step returns an array or nothing - and it won't return groups which aren't team enabled. We should now have a GUID
         if     ($Team  -is [string] -and $Team -match $GUIDRegex) {
                 $webparams['uri'] = "$GraphUri/teams/$Team/channels"
@@ -1765,8 +1722,7 @@ function New-GraphChannelMessage    {
                 $Team -match $GUIDRegex)   {$teamID    = $Team}
         elseif ($Team -is [string])        {
                 $teamID = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
-                #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
-        }
+        }       #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
 
         if     ($Channel.id)               {$channelID = $Channel.ID   }
         elseif ($Channel -is [string] -and
@@ -1849,8 +1805,7 @@ function New-GraphChannelReply      {
             $Team -match $GUIDRegex)            {$teamID    = $Team}
     elseif ($Team -is [string])                 {
             $teamID = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
-            #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
-    }
+    }       #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
 
     if     ($Message.ChannelIdentity.ChannelId) {$channelid = $Message.ChannelIdentity.ChannelId}
     elseif ($Message.channel)                   {$channelid = $Message.channel}
@@ -1925,8 +1880,7 @@ function Get-GraphChannelReply      {
                 $Team -match $GUIDRegex)            {$teamID    = $Team}
         elseif ($Team -is [string])                 {
                 $teamID = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
-                #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
-        }
+        }        #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
 
         if     ($Message.ChannelIdentity.ChannelId) {$channelid = $Message.ChannelIdentity.ChannelId}
         elseif ($Message.channel)                   {$channelid = $Message.channel}
@@ -1953,69 +1907,7 @@ function Get-GraphChannelReply      {
     }
 }
 
-function New-GraphWikiTab           {
-    <#
-      .Synopsis
-        Adds a wiki tab to a channel in teams
-      .Example
-        >New-GraphWikiTab -Channel $Channel -TabLabel Wiki
-        Channel contains an object representing a channel in teams,
-        this adds a Wiki to it. The Wiki will need to be initialized
-        when the tab is first opened
-    #>
-    [CmdletBinding(SupportsShouldprocess=$true)]
-    param(
-        #An ID or Channel object which may contain the team ID
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
-        $Channel,
-        #A team ID, or a team object if the team can't be found from the the channel
-        $Team,
-        #The label for the tab
-        $TabLabel = "Wiki",
-        #If specified the tab will be added without prompting for confirmation
-        [switch]$Force
-    )
-    ContextHas -scopes 'Group.ReadWrite.All' -BreakIfNot
-    if     ($Channel.Team)             {$teamID  = $Channel.Team }
-    elseif ($Team.id)                  {$teamID  = $Team.id      }
-    elseif ($Team -is [string] -and
-            $Team -match $GUIDRegex)   {$teamID    = $Team}
-    elseif ($Team -is [string])        {
-            $teamID = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
-    }       #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
-    if     ($Channel.id)               {$channelID = $Channel.id }
-    elseif ($Channel -is [string] -and
-            $Channel -match '@thread') {$channelID = $channel  }
-    elseif ($Channel -is [string])    {
-            $Channelid = (Get-GraphTeam -Team $teamID -Channels -ChannelName $channel).id
-    }
-    if (-not ($teamID    -is [string] -and $teamId    -match $GUIDRegex -and
-              $channelID -is [string] -and $channelID -match '@thread'))  {
-        #we got zero matches or more than one for a team/channel name, or we got an object without an ID, or an object where the ID wasn't a guid
-        Write-Warning -Message 'Could not determine the team and channel IDs'; return
-    }
-    $webparams = @{'Method'          = 'Post'
-                   'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
-                   'ContentType'     = 'application/json'
-                   'AsType'          =  ([MicrosoftGraphTeamsTab])
-                   'ExcludeProperty' = '@odata.context'
-    }
-    $webparams['Body'] = ConvertTo-Json ([ordered]@{
-        'displayname'         = $TabLabel
-        'teamsApp@odata.bind' = 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/com.microsoft.teamspace.tab.wiki'}
-    )
-
-    Write-Debug $webparams.body
-    if ($Force -or $PSCmdlet.Shouldprocess($TabLabel,"Create wiki tab")) {
-       Invoke-GraphRequest @webparams | #newly created tabs have a teamsAppId property. Existing apps have to look at the teamsApp and its ID. Make them the same!
-                    Add-Member -PassThru -MemberType ScriptProperty -Name teamsAppName -Value {$this.teamsApp.displayName}
-    }
-}
-# Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
-# https://products.office.com/en-us/microsoft-teams/appDefinitions.xml
-
-
-function New-GraphWikiTab {
+function Add-GraphWikiTab {
     <#
       .Synopsis
         Adds a wiki tab to a channel in teams
@@ -2045,8 +1937,7 @@ function New-GraphWikiTab {
             $Team -match $GUIDRegex)  {$teamID    = $Team}
     elseif ($Team -is [string])       {
             $teamID = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
-    }
-            #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
+    }       #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
     if     ($Channel.id)           {$channelID = $Channel.id }
     elseif ($Channel -is [string] -and $Channel -notmatch '@thread') {
                 $Channelid = (Get-GraphTeam -Team $teamID -Channels -ChannelName $channel).id
@@ -2066,7 +1957,7 @@ function New-GraphWikiTab {
     }
     $webparams['Body'] = ConvertTo-Json ([ordered]@{
         'displayname'         = $TabLabel
-        'teamsApp@odata.bind' = 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/com.microsoft.teamspace.tab.wiki'}
+        'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/com.microsoft.teamspace.tab.wiki"}
     )
 
     Write-Debug $webparams.body
@@ -2078,6 +1969,92 @@ function New-GraphWikiTab {
 # Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
 # https://products.office.com/en-us/microsoft-teams/appDefinitions.xml
 
+function Add-GraphPlannerTab     {
+    <#
+      .Synopsis
+        Adds a planner tab to a team-channel for a pre-existing plan
+      .Description
+        This posts to https://graph.microsoft.com/v1.0/teams/{id}/channels/{id}/tabs
+        which requires consent to use the Group.ReadWrite.All scope.
+      .Example
+        >
+        >$channel = Get-GraphTeam -ByName accounts -Channels -ChannelName 'year-end'
+        >$plan   = Get-GraphTeam -ByName accounts  -Plans | where title -Like "year end*"
+        >Add-GraphPlannerTab -Plan $plan -Channel $channel -TabLabel "Planner"
+        The first line gets the 'year-end' channel for the accounts team
+        The second gets a plan with tile which matches 'year end'
+        and the third creates a tab labelled 'Planner' in the channel for that plan.
+    #>
+    [CmdletBinding(SupportsShouldProcess=$true)]
+    param(
+        #An ID or Plan object for a plan within the team
+        [Parameter(Mandatory=$true,Position=0)]
+        $Plan,
+        #An ID or Channel object for a channel (which may contain the team ID)
+        [Parameter(Mandatory=$true,Position=1)]
+        $Channel,
+        #A team ID, or a team object, if not specified as part of the channel
+        $Team,
+        #The label for the tab.
+        $TabLabel,
+        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
+        $PassThru,
+        #If Specified the tab will be added without confirming
+        $Force
+    )
+    #region get IDs needed
+    ContextHas -WorkOrSchoolAccount -BreakIfNot
+    if     ($Channel.Team)            {$teamID  = $Channel.Team }
+    elseif ($Team.id)                 {$teamID  = $Team.id      }
+    elseif ($Team -is [string] -and
+            $Team -match $GUIDRegex)  {$teamID    = $Team}
+    elseif ($Team -is [string])       {
+            $teamID = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
+    } #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
+    if     ($Channel.id)           {$channelID = $Channel.id }
+    elseif ($Channel -is [string] -and $Channel -notmatch '@thread') {
+                $Channelid = (Get-GraphTeam -Team $teamID -Channels -ChannelName $channel).id
+    }
+    elseif ($Channel -is [string]) {$channelID = $channel  }
+
+    if (-not ($teamID    -is [string] -and $teamId    -match $GUIDRegex -and
+                $channelID -is [string] -and $channelID -match '@thread'))  {
+        #we got zero matches or more than one for a team/channel name, or we got an object without an ID, or an object where the ID wasn't a guid
+        Write-Warning -Message 'Could not determine the team and channel IDs'; return
+    }
+    #endregion
+    if ((-not $TabLabel) -and $Plan.Title) {
+        Write-Verbose -Message "No Tab label was specified, using the Plan title '$($Plan.Title)'"
+        $TabLabel = $Plan.Title
+    }
+    #If Plan and/or channel were objects with IDs use the ID
+    if       ($Channel.id) {$Channel = $Channel.id}
+    if       ($Plan.id)    {$Plan    = $Plan.id}
+    $tabURI = "https://tasks.office.com/{0}/Home/PlannerFrame?page=7&planId={1}" -f $global:GraphUser  , $Plan
+
+    $webparams = @{'Method'          = 'Post'
+                   'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
+                   'ContentType'     = 'application/json'
+                   'AsType'          =  ([MicrosoftGraphTeamsTab])
+                   'ExcludeProperty' = '@odata.context'
+    }
+
+    $webparams['body'] = ConvertTo-Json ([ordered]@{
+        'displayname'         = $TabLabel
+        'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/com.microsoft.teamspace.tab.planner"
+        'configuration' = [ordered]@{
+                   'entityId'   = $plan
+                   'contentUrl' = $tabURI
+                   'websiteUrl' = $tabURI
+                   'removeUrl'  = $tabURI
+        }
+    })
+    Write-Debug $webparams.body
+    if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {
+       Invoke-GraphRequest @webparams | #newly created tabs have a teamsAppId property. Existing apps have to look at the teamsApp and its ID. Make them the same!
+                    Add-Member -PassThru -MemberType ScriptProperty -Name teamsAppName -Value {$this.teamsApp.displayName}
+    }
+}
 
 function Add-GraphOneNoteTab     {
     <#
@@ -2179,7 +2156,7 @@ function Add-GraphOneNoteTab     {
 
     #Now we can create the JSON. Such information as there is can be found at https://docs.microsoft.com/en-us/graph/teams-configuring-builtin-tabs
     $json = ConvertTo-Json ([ordered]@{
-                'teamsApp@odata.bind' = 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/0d820ecd-def2-4297-adad-78056cde7c78'
+                'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/0d820ecd-def2-4297-adad-78056cde7c78"
                 'displayname'         = $TabLabel
                 'configuration'       = [ordered]@{
                     'entityId'        = ((New-Guid).tostring() + "_" +  $Notebook.ID)

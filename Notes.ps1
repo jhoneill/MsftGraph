@@ -89,7 +89,7 @@ function Get-GraphOneNoteSection {
       form Get-GraphOneNotebook -Sections ) or the URL for a section.
     #>
     [cmdletbinding()]
-    param   (
+    param    (
         #A graph URI pointing to the section, or a section object where the .self property is a graph URI...
         [Parameter(Mandatory=$true, ValueFromPipeline=$true,ParameterSetName='Sections',Position=0)]
         $Section ,
@@ -102,6 +102,7 @@ function Get-GraphOneNoteSection {
         [string]$Name
     )
     process  {
+        if ($section -is [MicrosoftGraphNotebook]) {$Notebook = $Section}
         if     ($Notebook) {
             #A notebook has sections URL we'll use it. If not if it's an object with a self parameter try with that, otherwise if it is a string, assume it's the URI for the notebook
             if     ($Notebook.sectionsUrl)  {$uri  = $Notebook.sectionsUrl}
@@ -109,9 +110,12 @@ function Get-GraphOneNoteSection {
             elseif ($Notebook -is [string]) {$uri  = $Notebook      +"/sections?`$expand=parentNotebook"}
             else   {Write-warning -Message 'Could not process the notebook parameter provided'}
             if     ($Name)                  {$uri += ('?$filter=startswith(tolower(displayname),''{0}'')' -f ($Name.ToLower() -replace '\*$','')) }
-            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty 'parentSectionGroup@odata.context',  'parentNotebook@odata.context'
-
-            return
+            $results = Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty 'parentSectionGroup@odata.context',  'parentNotebook@odata.context'
+            if      ($Pages) {
+                $results | Get-GraphOneNoteSection -pages
+                return
+            }
+            else {return $results}
         }
         if     ($Section.self)         {$uri = $Section.self}
         elseif ($Section -is [string]) {$uri = $Section}

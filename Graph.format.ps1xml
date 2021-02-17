@@ -138,7 +138,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>DirectoryRole</Name><ViewSelectedBy><TypeName>GraphDirectoryRole</TypeName></ViewSelectedBy>
+            <Name>DirectoryRole</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryRole</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -219,7 +219,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Office 365 Service plan</Name><ViewSelectedBy><TypeName>GraphServicePlan</TypeName></ViewSelectedBy>
+            <Name>Office 365 Service plan</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphServicePlanInfo</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -689,70 +689,6 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Tasks</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerTask</TypeName></ViewSelectedBy>
-            <TableControl>
-                <AutoSize />
-                <TableHeaders>
-                    <TableColumnHeader>
-                      <Label>Title</Label>
-                      <Alignment>left</Alignment>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>% Complete</Label>
-                        <Alignment>Left</Alignment>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>Created Date/Time</Label>
-                        <Alignment>Left</Alignment>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>Start Date/Time</Label>
-                        <Alignment>Left</Alignment>
-                    </TableColumnHeader>
-                   <TableColumnHeader>
-                        <Label>Due Date/Time</Label>
-                        <Alignment>Left</Alignment>
-                    </TableColumnHeader>
-                    <TableColumnHeader>
-                        <Label>Completed Date/Time</Label>
-                        <Alignment>Left</Alignment>
-                    </TableColumnHeader>
-                </TableHeaders>
-                <TableRowEntries>
-                    <TableRowEntry>
-                        <Wrap/>
-                        <TableColumnItems>
-                            <TableColumnItem>
-                                <PropertyName>title</PropertyName>
-                                <Alignment>Left</Alignment>
-                           </TableColumnItem>
-                            <TableColumnItem>
-                                <PropertyName>percentComplete</PropertyName>
-                                <Alignment>Left</Alignment>
-                           </TableColumnItem>
-                            <TableColumnItem>
-                                <ScriptBlock>([datetime]$_.CreatedDatetime).tostring("g")</ScriptBlock>
-                                <Alignment>Left</Alignment>
-                            </TableColumnItem>
-                            <TableColumnItem>
-                                 <ScriptBlock>([datetime]$_.startDateTime).tostring("g")</ScriptBlock>
-                                <Alignment>Left</Alignment>
-                            </TableColumnItem>
-                            <TableColumnItem>
-                                <ScriptBlock>([datetime]$_.dueDateTime).tostring("g")</ScriptBlock>
-                                <Alignment>Left</Alignment>
-                            </TableColumnItem>
-                            <TableColumnItem>
-                                <ScriptBlock>([datetime]$_.completedDateTime).tostring("g")</ScriptBlock>
-                                <Alignment>Left</Alignment>
-                            </TableColumnItem>
-
-                        </TableColumnItems>
-                    </TableRowEntry>
-                </TableRowEntries>
-            </TableControl>
-        </View>
-        <View>
             <Name>Graph Extended Tasks</Name><ViewSelectedBy><TypeName>GraphExtendedTask</TypeName></ViewSelectedBy>
             <ListControl>
             <ListEntries>
@@ -818,6 +754,70 @@
               </ListEntry>
             </ListEntries>
           </ListControl>
+        </View>
+          <View>
+            <Name>Graph Tasks</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerTask</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Title</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>% Complete</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Created Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Start Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                   <TableColumnHeader>
+                        <Label>Due Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Completed Date/Time</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>title</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>percentComplete</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.CreatedDatetime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                 <ScriptBlock>([datetime]$_.startDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.dueDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <ScriptBlock>([datetime]$_.completedDateTime).tostring("g")</ScriptBlock>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
         </View>
         <View>
             <Name>Graph Plans</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerPlan</TypeName></ViewSelectedBy>
@@ -1337,7 +1337,7 @@
           </ListControl>
         </View>
         <View>
-          <Name>Graph OneNote Page</Name><ViewSelectedBy><TypeName>GraphOneNotePage</TypeName></ViewSelectedBy>
+          <Name>Graph OneNote Page</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotepage</TypeName></ViewSelectedBy>
           <ListControl>
             <ListEntries>
               <ListEntry>
