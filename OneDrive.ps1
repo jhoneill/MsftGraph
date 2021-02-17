@@ -430,7 +430,7 @@ function Copy-ToGraphFolder {
             $reg = Get-ItemProperty -Path "HKLM:\SOFTWARE\Classes\$($uploadItem.extension)"
             if ($reg.'Content Type') {
                 $ContentType= $reg.'Content Type'
-                Write-Verbose -Message "Selected content type of $contentType for a $($UploadItem.Extension) file."
+                Write-Verbose -Message "COPY-TOGRAPHFOLDER: Selected content type of $contentType for a $($UploadItem.Extension) file."
             }
             else {$ContentType = "application/octet-stream"}
         }
@@ -458,7 +458,7 @@ function Copy-ToGraphFolder {
                 #The path exists ... is it a folder or a file  ?
                 if ($x.folder) {
                       $uri = $uri +'/' + $uploadItem.Name
-                      Write-Verbose -Message "$Destination appears to be a folder, will upload to a file named $($uploadItem.Name) in it."
+                      Write-Verbose -Message "COPY-TOGRAPHFOLDER: $Destination appears to be a folder, will upload to a file named $($uploadItem.Name) in it."
                 }
                 else           {
                       #It's a file make sure the name in the JSON matches the the name in the URI
@@ -471,12 +471,12 @@ function Copy-ToGraphFolder {
                 if ($_.exception.response.statuscode.value__ -eq 404) {
                     #We couldn't find $uri - this is expected if we have been given the path to a file.
                     $folderURI  = $uri -replace "/[^/]*?$",""   #the last slash and everything after it (lazy regex)
-                    Write-Verbose -Message "$uri was not found,  checking for $folderURI"
+                    Write-Verbose -Message "COPY-TOGRAPHFOLDER: $uri was not found,  checking for $folderURI"
                     try {
                         $x = Invoke-RestMethod -Method get -Headers $Script:DefaultHeader -Uri $folderuri
                         if ($x.folder) {
                                 $settings['item'].name = $uri -replace '^.*/','' #get rid of everything up to the last slash (greedy regex)
-                                Write-Verbose -Message "$folderURI is a valid folder; will upload as a new file."
+                                Write-Verbose -Message "COPY-TOGRAPHFOLDER: $folderURI is a valid folder; will upload as a new file."
                         }
                         else  { Write-Warning -Message "There was a problem with $Destination as a target path. Neither it nor its parent look like valid folders."; return}
                     }
@@ -507,7 +507,7 @@ function Copy-ToGraphFolder {
                     else          { Write-Warning -Message $_.exception.tostring() ; return}
                 }
                 if (-not $UploadSession.uploadUrl) {Write-Warning -Message 'Server did not provide an upload destination' ; return}
-                else                               {Write-Verbose -Message "Have an upload session until $($UploadSession.expirationDateTime)" }
+                else                               {Write-Verbose -Message "COPY-TOGRAPHFOLDER: Have an upload session until $($UploadSession.expirationDateTime)" }
                 $oldprogressPref    = $ProgressPreference
                 $ProgressPreference = 'SilentlyContinue'
                 $result             = Invoke-WebRequest  -Method Put -Uri $UploadSession.uploadUrl -InFile $uploadItem.FullName -ContentType "application/octet-stream" -Headers @{"Content-Range"=$RangeText}

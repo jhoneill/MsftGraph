@@ -351,6 +351,9 @@ function Get-GraphGroup             {
                 if ($_.exception -match"Forbidden") {
                     Write-warning -Message "Server returned a 403 (Forbidden) error; you must be a memeber of the team $($t.displayname) to view some things [admin does not give access]. "
                 }
+                if ($_.exception.response.statuscode.value__ -eq 404) {
+                    Write-Verbose -Message "GET-GROUP: Nothing found the group $displayname"
+                }
                 else {throw $_  }
             }
         }
@@ -517,7 +520,7 @@ function Set-GraphGroup             {
        Finds the group(s) with a name which matches Consult* and sets the description without a confirmation prompt.
     #>
     [Cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
-    param (
+    param   (
         [Parameter(Mandatory=$true, ValueFromPipeline=$true,Position=0)]
         [ArgumentCompleter([GroupCompleter])]
         $Group ,
@@ -717,7 +720,7 @@ function Remove-GraphGroup          {
         foreach ($g in $Group){
             if ($Force -or $PSCmdlet.Shouldprocess("'$($g.displayname)'","Delete Group")) {
                 Invoke-GraphRequest -Method Delete  -Uri "$GraphUri/groups/$($g.id)/"
-                Write-Verbose "Removed Group $($g.displayname)"
+                Write-Verbose "REMOVED GROUP $($g.displayname)"
             }
         }
     }
@@ -791,7 +794,7 @@ function Add-GraphGroupMember       {
                 Write-Debug $body
                 if ($Force -or $PSCmdlet.shouldprocess($m.displayname,"Add to Group '$($g.displayname)'")) {
                     Invoke-GraphRequest -Method post -Uri $uri -Body $body -ContentType 'application/json'
-                    Write-Verbose "Added $($m.displayname) to group $($g.displayname)"
+                    Write-Verbose "ADDED $($m.displayname) to group $($g.displayname)"
                 }
             }
         }
@@ -854,7 +857,7 @@ function Remove-GraphGroupMember    {
                 if ($Force -or $PSCmdlet.Shouldprocess($m.displayName,"Remove from Group $($g.displayname)")) {
                     try {
                         Invoke-GraphRequest -Method Delete -Uri $uri
-                        Write-Verbose "Removed $($m.displayname) from group $($g.displayname)"
+                        Write-Verbose "REMOVED $($m.displayname) from group $($g.displayname)"
                     }
                     catch {
                         If (($_.exception.response.statuscode.value__ -eq 404)) {
@@ -1039,6 +1042,7 @@ function New-GraphTeamPlan          {
         Creates new a plan for a team.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
+    [outputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerPlan])]
     param   (
         #The ID of the team
         [parameter(ValueFromPipeline=$true, Mandatory=$true, Position=0)]
@@ -1110,24 +1114,28 @@ function Get-GraphGroupConversation {
     [Alias("Get-GraphTeamConversation","Get-GraphConversation")]  #Strictly Conversations belong to a group in Outlook, not a Team in Microsoft teams, but let either name be used.
     param   (
         #The Conversation, either as an ID or an object.
-        [Parameter(ValueFromPipeline=$true, Mandatory=$true, Position=0, ParameterSetName='OneConversation')]
+        [Parameter(ValueFromPipeline=$true, Mandatory=$true, Position=1, ParameterSetName='OneConversation')]
         $Conversation,
-        #The group where the conversation is found, either as an ID or as an object, if it can't be found from the conversation
-        [Parameter(ParameterSetName='AllInTeam', Mandatory=$true )]
-        [Parameter(ParameterSetName='OneConversation', Position=1)]
+        #The group where the conversation is found,it is not part of can't be found from the conversation object
+        [Parameter(ParameterSetName='InTeam')]
+        [Parameter(ParameterSetName='OneConversation')]
         [ArgumentCompleter([GroupCompleter])]
         [Alias("Team")]
         $Group,
+        #When selecting the Conversations for a group narrows the list by the name of the topic
+        [Parameter(ParameterSetName='InTeam', Position=3)]
+        $Topic = "*",
         #If specified selects the conversation's threads, otherwise an object representing the conversation itself is returned.
-        [Parameter(ParameterSetName='OneConversation', Position=1)]
         [Switch]$Threads
     )
     process {
-        if ($Group  -and -not $Conversation) {
-            Get-GraphGroup -Group $Group -Conversations
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
+        if ( -not $Conversation) {
+            $conversations = Get-GraphGroup -Group $Group -Conversations | Where-Object -Property Topic -like $Topic
+            if ($Threads) {$conversations | Get-GraphGroupConversation -Threads}
+            else          {$conversations}
             return
         }
-        ContextHas -WorkOrSchoolAccount -BreakIfNot
         if     ($Conversation.Group)       {$groupID = $Conversation.Group}
         elseif ($Group.ID)                 {$groupID = $Group.ID}
         elseif ($Group -is [String]  -and
@@ -1169,14 +1177,16 @@ function Get-GraphGroupThread       {
         #The group thread, either as an ID or as a thread object (which may have the team/group as property)
         [Parameter(ParameterSetName='SingleThread', Position=0, ValueFromPipeline=$true, Mandatory=$true)]
         $Thread,
-        #The group holding the thread, if it can't be found drm -thread
+        #The group holding the thread (s), if thread is either not passed or is just the ID of a thread.
         [Alias("Team")]
-        [Parameter(ParameterSetName='AllGroupThreads', Mandatory=$true)]
+        [Parameter(ParameterSetName='GroupThreads')]
         [Parameter(ParameterSetName='SingleThread', Position=1)]
         [ArgumentCompleter([GroupCompleter])]
         $Group,
+        #When selecting the threads for a group narrows the list by the name of the topic
+        [Parameter(ParameterSetName='GroupThreads')]
+        $Topic = '*',
         #If specified, returns the posts in the thread
-        [Parameter(ParameterSetName='SingleThread')]
         [Switch]$Posts
     )
     begin   {
@@ -1187,8 +1197,10 @@ function Get-GraphGroupThread       {
     }
     process {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
-        if     ($Group -and -not $Thread) {
-            Get-GraphGroup -Group $Group -Threads
+        if  (-not $Thread) {
+            $threads = Get-GraphGroup -Group $Group -Threads | Where-Object -Property Topic -like $topic
+            if ($posts) {$threads | Get-GraphGroupThread -Posts}
+            else        {$threads}
             return
         }
         if     ($Thread.Group)                 {$groupid  = $Thread.group}
@@ -1441,7 +1453,6 @@ Function Get-ChannelMessagesByURI   {
         $result   = (Invoke-GraphRequest -Uri $uri)
         $msgList  += $result.value
         while ($result.'@odata.nextLink' -and $result.'@odata.count' -gt 0 -and $msgList.Count -lt $top ) {
-            Write-Verbose  $result.'@odata.count'
             Write-progress -Activity 'Getting messages' -Status "Reading $($ch.displayname) Messages" -CurrentOperation "$($msglist.count) so far"
             $result   = Invoke-GraphRequest -Uri $result.'@odata.nextLink'
             $msgList += $result.value
@@ -2024,7 +2035,7 @@ function Add-GraphPlannerTab     {
     }
     #endregion
     if ((-not $TabLabel) -and $Plan.Title) {
-        Write-Verbose -Message "No Tab label was specified, using the Plan title '$($Plan.Title)'"
+        Write-Verbose -Message "ADD-GRAPHPLANNERTAB: No Tab label was specified, using the Plan title '$($Plan.Title)'"
         $TabLabel = $Plan.Title
     }
     #If Plan and/or channel were objects with IDs use the ID

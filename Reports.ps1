@@ -86,7 +86,9 @@ Function Get-GraphSignInLog    {
         Gets the sign-in Log and exports it Excel, creating a PivotTable
     #>
     [cmdletbinding()]
+    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphSignIn])]
     param (
+            $top = 200
     )
     $i = 1
     Write-Progress -Activity 'Getting Sign-in Auditlog'
@@ -99,26 +101,30 @@ Function Get-GraphSignInLog    {
     if ($status -notmatch "2\d\d")  {Write-Warning "Status code returned was $Status ($([System.Net.HttpStatusCode]$status)) which does not look like success."}
 
     $records = $result.value
-    while ($result.'@odata.nextLink') {
+    while ($result.'@odata.nextLink' -and $records.count -lt $top) {
         $i ++
         Write-Progress -Activity 'Getting Sign-in Auditlog' -CurrentOperation "Page $i"
         $result   = Invoke-GraphRequest  -Method get -Uri $result.'@odata.nextLink'
         $records += $result.value
     }
+
     foreach ($r in $records) {
         $r.pstypenames.add('GraphSigninLog')
-        Add-Member -InputObject $r -MemberType ScriptProperty -Name City    -Value {$this.location.city}
-        Add-Member -InputObject $r -MemberType ScriptProperty -Name State   -Value {$this.location.state}
-        Add-Member -InputObject $r -MemberType ScriptProperty -Name Country -Value {$this.location.countryOrRegion}
-        Add-Member -InputObject $r -MemberType ScriptProperty -Name Lat     -Value {$this.location.geoCoordinates.latitude}
-        Add-Member -InputObject $r -MemberType ScriptProperty -Name Long    -Value {$this.location.geoCoordinates.longitude}
-        Add-Member -InputObject $r -MemberType ScriptProperty -Name Browser -Value {$this.deviceDetail.browser}
-        Add-Member -InputObject $r -MemberType ScriptProperty -Name Device  -Value {$this.deviceDetail.displayName;}
-        Add-Member -InputObject $r -MemberType ScriptProperty -Name Date    -Value {[datetime]$this.createdDateTime}
+        $r['RiskEventTypesV2'] = $r['RiskEventTypes_V2'] ;
+        $r.Remove('RiskEventTypes_V2');
+        New-Object -TypeName MicrosoftGraphSignIn -Property $r |
+            Add-Member -PassThru -MemberType ScriptProperty -Name City    -Value {$this.location.city}    |
+            Add-Member -PassThru -MemberType ScriptProperty -Name State   -Value {$this.location.state}   |
+            Add-Member -PassThru -MemberType ScriptProperty -Name Country -Value {$this.location.countryOrRegion}          |
+            Add-Member -PassThru -MemberType ScriptProperty -Name Lat     -Value {$this.location.geoCoordinates.latitude}  |
+            Add-Member -PassThru -MemberType ScriptProperty -Name Long    -Value {$this.location.geoCoordinates.longitude} |
+            Add-Member -PassThru -MemberType ScriptProperty -Name Browser -Value {$this.deviceDetail.browser}              |
+            Add-Member -PassThru -MemberType ScriptProperty -Name Device  -Value {$this.deviceDetail.displayName;}         |
+            Add-Member -PassThru -MemberType ScriptProperty -Name Date    -Value {[datetime]$this.createdDateTime}
     }
     Write-Progress -Activity 'Getting Sign-in Auditlog'-Completed
 
-    $records
+
 }
 
 Function Get-GraphDirectoryLog {
@@ -131,6 +137,7 @@ Function Get-GraphDirectoryLog {
 
     #>
     [cmdletbinding()]
+    [outputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryAudit])]
     param (
     [switch]$all,
     $Top = 100
@@ -143,20 +150,16 @@ Function Get-GraphDirectoryLog {
     if ($result.error)              {Write-Warning "An error was returned: '$($result.error.message)' - code: $($result.error.code) "}
 
     $records = $result.value
-    while ($result.'@odata.nextLink' -and  $all) {
+    while ($result.'@odata.nextLink' -and  $records.Count -lt $top) {
         $i ++
         Write-Progress -Activity 'Getting Directory Audits log' -CurrentOperation "Page $i"
         $result   = Invoke-GraphRequest  -Method get -Uri $result.'@odata.nextLink'  -headers $Script:DefaultHeader
         $records += $result.value
     }
-    $defaultProperties = @('Date','User','ActivityDisplayName','result')
-    $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultProperties)
-    $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
     foreach ($r in $records) {
         New-Object -TypeName MicrosoftGraphDirectoryAudit -Property $r |
-            Add-Member -PassThru -MemberType ScriptProperty -Name User              -Value {$this.initiatedBy.user.userPrincipalName} |
-            Add-Member -PassThru -MemberType ScriptProperty -Name Date              -Value {[datetime]$this.activityDateTime}         |
-            Add-Member -PassThru -MemberType MemberSet      -Name PSStandardMembers -Value $PSStandardMembers
+            Add-Member -PassThru -MemberType ScriptProperty -Name User -Value {$this.initiatedBy.user.userPrincipalName} |
+                  Add-Member -PassThru -MemberType ScriptProperty -Name App  -Value {$this.initiatedBy.App.DisplayName}
     }
     Write-Progress -Activity 'Getting Directory Audits log' -Completed
 }

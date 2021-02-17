@@ -312,7 +312,7 @@
             </TableControl>
         </View>
         <View>
-            <Name>Graph Devices</Name><ViewSelectedBy><TypeName>GraphDevice</TypeName></ViewSelectedBy>
+            <Name>Graph Devices</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDevice</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1181,9 +1181,8 @@
                 </TableRowEntries>
             </TableControl>
         </View>
-
         <View>
-          <Name>Graph Sign-in log entryk</Name><ViewSelectedBy><TypeName>GraphSigninLog</TypeName></ViewSelectedBy>
+          <Name>Graph Sign-in log entryk</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphSignIn</TypeName></ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1245,7 +1244,6 @@
                 </TableRowEntries>
             </TableControl>
         </View>
-
         <View>
           <Name>Graph OneNote NoteBook</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphNotebook</TypeName></ViewSelectedBy>
           <ListControl>
@@ -1504,7 +1502,6 @@
                 </TableRowEntries>
             </TableControl>
         </View>
-
         <View>
             <Name>Graph List</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphList</TypeName></ViewSelectedBy>
                 <GroupBy>
@@ -2104,6 +2101,164 @@
                            </TableColumnItem>
                             <TableColumnItem>
                                 <Scriptblock>$_.ReminderDateTime.DateTime + " " + $_.ReminderDateTime.TimeZone</Scriptblock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Presence</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphPresence</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>ID</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Activity</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Availability</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>ID</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                              <TableColumnItem>
+                                <PropertyName>Activity</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Availability</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>MailTips</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphMailTips</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Address</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>Members</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>External Members</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Full</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Scope</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>MessageText</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>Address</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                              <TableColumnItem>
+                                <PropertyName>TotalMemberCount</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>ExternalMemberCount</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>MailboxFull</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>RecipientScope</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>MessageText</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                        </TableColumnItems>
+                    </TableRowEntry>
+                </TableRowEntries>
+            </TableControl>
+        </View>
+        <View>
+            <Name>Directory Log entryies</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryAudit</TypeName></ViewSelectedBy>
+            <TableControl>
+                <AutoSize />
+                <TableHeaders>
+                    <TableColumnHeader>
+                      <Label>Date</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                      <Label>InitiatedBy</Label>
+                      <Alignment>left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Category</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Activity</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>Result</Label>
+                        <Alignment>Left</Alignment>
+                    </TableColumnHeader>
+
+                </TableHeaders>
+                <TableRowEntries>
+                    <TableRowEntry>
+                        <Wrap/>
+                        <TableColumnItems>
+                            <TableColumnItem>
+                                <PropertyName>ActivityDateTime</PropertyName>
+                                <Alignment>Left</Alignment>
+                            </TableColumnItem>
+                            <TableColumnItem>
+                                <Scriptblock>$_.initiatedBy.user.userPrincipalName + $_.InitiatedBy.App.DisplayName</Scriptblock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>Category</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                            <TableColumnItem>
+                                <PropertyName>ActivityDisplayName</PropertyName>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+                           <TableColumnItem>
+                                <PropertyName>Result</PropertyName>
                                 <Alignment>Left</Alignment>
                            </TableColumnItem>
                         </TableColumnItems>

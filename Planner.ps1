@@ -37,8 +37,6 @@ function Get-GraphPlan           {
         else                    {
             Write-Warning "Could not get a plan ID from the information provided"
         }
-        Write-Verbose -Message "Geting information from $uri"
-
         if     ($Tasks -or
                 $FullTasks)     {
             #we need @odata.etag for changing items, but it isn't in the object definition ... grrr.
@@ -140,7 +138,7 @@ function Set-GraphPlanDetails    {
         }
         catch          {throw "Failed to get tag from $detailsURI" ; return }
         if (-not $tag) {throw "Failed to get tag from $detailsURI" ; return }
-        Write-Verbose -Message "Details uri is $detailsURI  will match etag of $tag"
+        Write-Verbose -Message "SET-GRAPHPLANDETAILS Details uri is $detailsURI  will match etag of $tag"
 
         $CategorySettings = @{}
         foreach ($x in (1..6)) {
@@ -815,7 +813,7 @@ function Set-GraphTaskDetails    {
         else {  throw "Failed to get tag from $detailsURI" ;  return}
     }
     if (-not $tag) {throw "Failed to get detail tag " ; return }
-    Write-Verbose -Message "Details uri is $detailsURI  will match etag of $tag"
+    Write-Verbose -Message "SET-GRAPHPLANDETAILS Details uri is $detailsURI  will match etag of $tag"
 
     #build up settings which will be converted into JSON later
     $Settings = @{}

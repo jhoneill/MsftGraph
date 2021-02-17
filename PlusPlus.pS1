@@ -4,7 +4,7 @@ $Script:GUIDRegex = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
 
 . "$PSScriptRoot\Authentication.ps1"
 
-foreach ($subModule in @('Users','Users.Functions','Users.Actions','Identity.DirectoryManagement')) {
+foreach ($subModule in @('Users','Users.Functions','Users.Actions','Identity.DirectoryManagement','Reports')) {
     $result = $null
     if (Test-path     (Join-path $PSScriptRoot -ChildPath "Microsoft.Graph.$subModule.private.dll")) {
         $result = Import-Module (Join-Path $PSScriptRoot -ChildPath "Microsoft.Graph.$subModule.private.dll") -PassThru
@@ -21,7 +21,6 @@ foreach ($subModule in @('Users','Users.Functions','Users.Actions','Identity.Dir
 . "$PSScriptRoot\Notes.ps1"
 . "$PSScriptRoot\OneDrive.ps1"
 . "$PSScriptRoot\Planner.ps1"
-. "$PSScriptRoot\Reports.ps1"
-
+#conv
 Update-FormatData -AppendPath "$PSScriptRoot\Graph.format.ps1xml"
 

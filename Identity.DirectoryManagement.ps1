@@ -255,7 +255,7 @@ function Grant-GraphUserLicense   {
 
             if ($Force -or $Pscmdlet.Shouldprocess($userdisplayname,"Grant licence for $licensePartNos")) {
                 $u = Invoke-GraphRequest  @webparams
-                Write-Verbose "$licensePartNos  Grantedto $($u.userPrincipalName)"
+                Write-Verbose "GRANT-GRAPHUSERLICENSE: $licensePartNos  Grantedto $($u.userPrincipalName)"
             }
         }
     }
@@ -343,7 +343,7 @@ function Revoke-GraphUserLicense  {
 
             if ($Force -or $Pscmdlet.Shouldprocess($userdisplayname,"Revoke licence(s) for $($request.removeLicenses.Count) SKU(s)")) {
                 $u = Invoke-GraphRequest  @webparams
-                Write-Verbose "Revoked licence(s) for $($request.removeLicenses.Count) SKU(s) $($u.userPrincipalName)"
+                Write-Verbose "REVOKE-GRAPHUSERLICENSE - licence(s) for $($request.removeLicenses.Count) SKU(s) from $($u.userPrincipalName)"
             }
         }
     }

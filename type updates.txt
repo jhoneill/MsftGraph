@@ -2,41 +2,6 @@
 
 #        Microsoft.Graph.PowerShell.Models.MicrosoftGraphProfilePhoto        ??GraphPhoto  ??
 #        Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization        # GraphOrganization
-#        Microsoft.Graph.PowerShell.Models.MicrosoftGraphPresence
-#        Microsoft.Graph.PowerShell.Models.mailtips
-
-Old types.
-#Graph Devices            ( not getting these ?)
-#Graph Sign-in log entryk (need a premium sub to test)
-
-Done
-# GraphUser             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser
-# GraphThread           --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphConversationThread
-# GraphTeam             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphTeam
-# GraphTask             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerTask
-# GraphSite             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphSite
-# GraphSKU              --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphSubscribedSku
-# GraphServicePlan      --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphServicePlanInfo
-# GraphPlan             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerPlan
-# GraphOneNoteSection   --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteSection
-# GraphOneNotePage      --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotepage
-# GraphOneNoteBook      --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphNotebook
-# GraphMailboxSettings  --> Microsoft.Graph.PowerShell.Models.IMicrosoftGraphMailboxSettings
-# GraphLicense          --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphLicenseDetails
-# GraphList             --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphList
-# GraphGroup            --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphGroup
-# GraphExtendedTask     -->
-# GraphDriveItem        --> Microsoft.Graph.PowerShell.Models.Microsoft
-# GraphDrive            --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphDrive
-# GraphDomain           --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphVerifiedDomain
-# GraphDirectoryRole    --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryRole
-# GraphContact (always?)--> Microsoft.Graph.PowerShell.Models.MicrosoftGraphPerson
-# GraphContact
-# GraphColumn           --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphColumnDefinition
-# GraphCalendar         --> Microsoft.Graph.PowerShell.Models.MicrosoftGraphCalendar
-
-new ? Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTaskList
-
 
   Other sign ins
   Justins bits
@@ -60,9 +25,13 @@ new ? Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTaskList
   Group             get transitive member-of
   Group             get transitive members,
   Group             assign licence,
-  Group             threads,
-  group             conversations.
   group             setting templates   Invoke-GraphRequest  -Uri "https://graph.microsoft.com/v1.0/groupsettingTemplates" -all
+
+  device           get                  invoke-GraphRequest  -Uri  "https://graph.microsoft.com/v1.0/devices" -ValueOnly | % {
+                                                $_.remove('createdDatetime'),$_.remove('mdmappid'),$_.remove('sourceType'),$_.remove('externalSourceName')
+                                                foreach ($k in $_.alternativeSecurityIds) {$k.key = [byte[]][char[]]$k.key }
+                                                new-object -type Microsoft.Graph.PowerShell.Models.MicrosoftGraphDevice -Property $_
+                                            }
     4 Excel.ps1
     9 ActionCard.ps1
    21 Sharepoint.ps1

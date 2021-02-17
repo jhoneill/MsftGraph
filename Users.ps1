@@ -1429,11 +1429,11 @@ function Send-GraphMailMessage {
                     return
                 }
                 else {
-                    Write-Verbose -Message "After BASE64 encoding attacments, message may exceed 4MB. Using Draft and sequential attachment method"
+                    Write-Verbose -Message "SEND-GRAPHMAILMESSAGE After BASE64 encoding attacments, message may exceed 4MB. Using Draft and sequential attachment method"
                     $asDraft= $true
                 }
             }
-            else { Write-Verbose -Message "$($Attachments).count attachment(s); small enough to send in a single operation"}
+            else { Write-Verbose -Message "SEND-GRAPHMAILMESSAGE $($Attachments).count attachment(s); small enough to send in a single operation"}
          }
     }
     elseif (-not $Subject -and -not $Body) {
@@ -1483,7 +1483,7 @@ function Send-GraphMailMessage {
         catch          {throw "There was an error creating the draft message."; return }
         if (-not $msg) {throw "The draft message was not created as expected" ; return }
         else           {
-            Write-Verbose -Message "Message created with id '$($msg.id)'"
+            Write-Verbose -Message "SEND-GRAPHMAILMESSAGE  Message created with id '$($msg.id)'"
             $uri = $uri + "/" + $msg.id
         }
     }
@@ -1910,7 +1910,7 @@ function Set-GraphContact      {
         if     ($Birthday                   ) {$contactSettings['birthday']        =       $Birthday.tostring('yyyy-MM-dd')} #note this is a different date format to most things !
 
         $json = ConvertTo-Json $contactSettings
-        Write-Verbose $json
+        Write-Debug $json
         if ($IsNew) {
             if ($force -or $PSCmdlet.ShouldProcess($DisplayName,'Create Contact')) {
                 Invoke-GraphRequest @webParams -method Post  -Body $json  |

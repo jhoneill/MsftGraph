@@ -373,12 +373,12 @@ Function Connect-Graph      {
         #we could call Get-Mgorganization but this way we don't depend on anything outside authentication module
         $Organization     = Invoke-GraphRequest -Method GET -Uri "$GraphURI/organization/" -ValueOnly
         if ($Organization.id) {
-            Write-Verbose -Message "Account is from $($Organization.DisplayName)"
+            Write-Verbose -Message "CONNECT: Account is from $($Organization.DisplayName)"
             Add-Member -force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyValue $Organization.DisplayName
             Add-Member -force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $true
         }
         else                  {
-            Write-Verbose -Message "Account is from Windows live"
+            Write-Verbose -Message "CONNECT: Account is from Windows live"
             Add-Member -force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyValue $Organization.DisplayName
             Add-Member -force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $true
         }
