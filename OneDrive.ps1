@@ -1,59 +1,4 @@
-﻿using namespace System.Management.Automation
-using namespace Microsoft.Graph.PowerShell.Models
-
-class OneDrivePathCompleter : IArgumentCompleter {
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    ) {
-        $result = [System.Collections.Generic.List[CompletionResult]]::new()
-
-        #strip quotes from word to complete - replace " or ' with nothing
-        $wordToComplete = $wordToComplete -replace '"|''', ''
-
-        If     ($wordToComplete -notmatch "/.+/" -or
-                $wordToComplete -eq "/root:?/" )   {$params =@{folderPath = '/'} }
-        elseif ($wordToComplete -Match '^/?root:') {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:'} } #catch after any leading / and before final /; and sandwich between / and :
-        else                                       {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:'} } #catch after any leading / and before final /; and sandwich between /root/ and :
-
-        if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
-        # #it would be better to order-by at the server, but consumer one drive doesn't support it.
-        Get-GraphDrive -quiet @params | Sort-Object -Property name | ForEach-Object {
-            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
-            if ($P -like "*$wordToComplete*") {
-                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
-            }
-        }
-        return $result
-    }
-}
-
-class OneDriveFolderCompleter : IArgumentCompleter {
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    ) {
-        $result = [System.Collections.Generic.List[CompletionResult]]::new()
-
-        #strip quotes from word to complete - replace " or ' with nothing
-        $wordToComplete = $wordToComplete -replace '"|''', ''
-
-        If     ($wordToComplete -notmatch "/.+/" -or
-                $wordToComplete -eq "/root:?/" )   {$params =@{folderPath = '/'} }
-        elseif ($wordToComplete -Match '^/?root:') {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:'} } #catch after any leading / and before final /; and sandwich between / and :
-        else                                       {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:'} } #catch after any leading / and before final /; and sandwich between /root/ and :
-
-        if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
-        # #it would be better to order-by at the server, but consumer one drive doesn't support it.
-        Get-GraphDrive @params -subFolders -quiet | Sort-Object -Property name | ForEach-Object {
-            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
-            if ($P -like "*$wordToComplete*") {
-                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
-            }
-        }
-        return $result
-    }
-}
+﻿using namespace Microsoft.Graph.PowerShell.Models
 
 function Get-GraphDrive {
     <#
@@ -156,7 +101,7 @@ function Get-GraphDrive {
             if  (ContextHas -WorkOrSchool) {$uri = "$GraphUri/$Drive`?`$expand=root(`$expand=children)"}
             else                           {$uri = "$GrpahUri/$Drive"} #The expand fails on consumer one drive
             $driveObj  =  Invoke-GraphRequest -uri $uri #Don't convert to a type yet
-            $global:drivecache[$driveObj.id] = $driveObj.name
+            $global:DriveCache[$driveObj.id] = $driveObj.name
         }
         catch {
             $driveObj = $null
@@ -293,7 +238,7 @@ function New-GraphFolder {
         $Drive = $Drive -replace '/$','' -replace '^/',''
         try   {
             $driveObj  =  (Invoke-GraphRequest -Method GET -Uri "$GraphUri/$Drive")
-            $global:drivecache[$driveObj.id] = $driveObj.name
+            $global:DriveCache[$driveObj.id] = $driveObj.name
         }
         catch {
             throw ('Error trying to get drive $drive - the code was ' + $_.exception.response.statuscode.value__  ) ; return

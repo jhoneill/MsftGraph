@@ -1,23 +1,4 @@
-﻿using namespace System.Globalization
-using namespace System.Management.Automation
-using namespace Microsoft.Graph.PowerShell.Models
-
-class UpperCaseTransformAttribute : System.Management.Automation.ArgumentTransformationAttribute  {
-    [object] Transform([System.Management.Automation.EngineIntrinsics]$EngineIntrinsics, [object] $InputData) {
-        if ($inputData -is [string]) {return $Inputdata.toUpper()}
-        else                         {return ($InputData) }
-    }
-}
-
-class ValidateCountryAttribute : ValidateArgumentsAttribute {
-    [void]Validate([object]$Argument, [EngineIntrinsics]$EngineIntrinsics)  {
-        if ($Argument -notin [cultureInfo]::GetCultures("SpecificCultures").foreach({
-                                New-Object -TypeName RegionInfo -ArgumentList $_.name
-                             }).TwoLetterIsoRegionName) {
-            Throw [ParameterBindingException]::new("'$Argument' is not an ISO 3166 country Code")
-        }
-    }
-}
+﻿using namespace Microsoft.Graph.PowerShell.Models
 
 function ConvertTo-GraphDateTimeTimeZone {
     <#

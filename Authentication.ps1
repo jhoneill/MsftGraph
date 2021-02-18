@@ -12,81 +12,10 @@ using namespace Microsoft.Graph.PowerShell.Models
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Write host used for colored information message telling user to make a change and remove the message')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Initialization clears drive cache and work or school status available outside the module')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification='False positive for global vars.')]
+param()
 
-#Script / global environment variables.
-#Global:driveCache caches drive to name mappings, Global:__MgAzContext sets the profile for Azure logons,
-#GLOBAL:__MgAzTokenExpires, records when the token will expire if we need to manage refreshing it
-#global:__MgToken, allows an  global:DefaultGraphScopes
-#Global:GraphUser, GLOBAL:PSDefaultParameterValues,
-#$Env:GraphScopes will provide as set of scopes to request
-#RefreshToken, RefreshParameters (to call connect graph with will the token expires) clent app (clientID and Client Secret) & tennant are script level vars
-
-#Write-Host -ForegroundColor Red "Using the default / sample app ID. You should edit the .PSM1 file and either replace the ID with your own, or remove this message"
-#$Script:ClientID      = "bf546ecc-067d-4030-9edd-7b0d74913411"  #You can also try  "1950a258-227b-4e31-a9cf-717495945fc2"  # Well known client ID for PowerShell
-#$script:Tenant    = Guid-for-your-tennant **if the Client ID is set up as below**
-$Script:ClientID      = "6413d5f3-eba6-4af4-860b-e9334ff7b762"
-$Script:Client_Secret = "a1c-Pr~XaqB.Sy4.e-HN064myE_0u7USze"
-$Script:Tenant        = "e6af5578-6d03-49e0-af3b-383cf5ec0b5f"
-
-<#
-    You can create an app in Azure AD or at https://apps.dev.microsoft.com/
-    I created mine as a native app, with a re-direct URI of https://login.microsoftonline.com/common/oauth2/nativeclient and
-    gave it a set of Microsoft graph permissions in Azure AD
-
-    You must use this route if you want people outside your Azure AD (Microsoft accounts) to use the app
-    If you ONLY Want to work with accounts in Azure AD you can set up your app with these instructions which I lifted from
-    https://msunified.net/2018/12/12/post-at-microsoftteams-channel-chat-message-from-powershell-using-graph-api/
-    1.  Log on to https://portal.azure.com with a GA administrator
-    2.  Navigate to Azure Active Directory
-    3   Go to App registrations
-    4.  Click + New registration
-    5.  Call it PowerShellMSGraphAPI (or another name of your choice)
-    6.  Leave who can use this API on the default of single tennant and leave the Redirect URI blank
-    7.  Click Register
-    8.  This will bring up the details of the new APP. Under call APIS click View API permissions to grant the required group read and write permissions
-    9.  Click + Add a permission
-    10. Choose Microsoft Graph, then Delegated permissions and choose Group.Read.All and ReadWrite.All (remember you need to expand Group)
-    12. I had to click the enterprise apps link and click "Grant admin Consent" from (this is where a GA admin is needed)
-    13. You now have admin consent granted for your tenant, so users can authenticate without a consent dialog.
-    14. Navigate back to Overview
-    15. Copy the Application (client) ID    Paste it into this script as the value for $Script:ClientID;
-    16. Also copy the tenant ID paste it into this script as the value for $script:Tenant
-    17. Click Certificates and Secrets, add a secret and chose never expires (unless you want to update the script later), click add
-    18. Copy the secret and paste into this script as the value for $script:clientSecret.
-#>
-
-#Sometimes when we want to convert an opaque drive ID (e.g. on a file or folder) to a name; save extra calls to the server by caching the id-->name
-$global:drivecache  = @{}
-
-#The scopes requested. You can shorten this of you don't need all things provided in the module
-if ($Env:GraphScopes) {$global:DefaultGraphScopes = $Env:GraphScopes -split ',\s*'}
-else                  {$global:DefaultGraphScopes = @(
-                'AuditLog.Read.All',
-                'Directory.AccessAsUser.All', #Grant same rights to the directory as the user has
-                'Calendars.ReadWrite',
-                'Calendars.ReadWrite.Shared'
-                'ChannelMessage.Read.All',
-                'ChannelMessage.Delete',
-                'ChannelMessage.Edit',
-                'Contacts.ReadWrite',
-                'Contacts.ReadWrite.Shared',
-                'Files.ReadWrite.All',
-                'Group.ReadWrite.All',# or read fails when logging on as non-admin
-                'Mail.ReadWrite',
-                'Mail.Send',
-                'MailboxSettings.ReadWrite',
-                'Notes.ReadWrite.All',
-                'Notes.Create',
-                'People.Read.All',
-                'Presence.Read.All',
-                'Reports.Read.All',
-                'Sites.ReadWrite.All',
-                'Sites.Manage.All',       #Needed to create lists.
-                'Tasks.ReadWrite',        #Needed for Todo access
-                'User.ReadWrite.all',    # Read write users and groups may not be needed if Directory is granted ?
-                'openid',
-                'profile'#,        'offline_access'
-)}
+if ($env:MGSettingsPath )  {. $env:MGSettingsPath}
+else {. "$PSScriptRoot\AuthSettings.ps1"}
 
 Remove-item Alias:\Invoke-GraphRequest -ErrorAction SilentlyContinue
 Function Invoke-GraphRequest {
@@ -360,10 +289,11 @@ Function Connect-Graph      {
     $paramsFromCurrentSet = $pscmdlet.MyInvocation.MyCommand.ParameterSets.Where({$_.name -eq $PSCmdlet.ParameterSetName})
     $paramsFromCurrentSet = $paramsFromCurrentSet.parameters.Name | Where-Object {$_ -in $paramsinTarget -and (Get-Variable $_ -ValueOnly -ErrorAction SilentlyContinue)}
     $paramsToPass         = @{}
-    foreach ($p in $paramsFromCurrentSet ) {$paramsToPass[$p] = Get-Variable $P -ValueOnly}
+    foreach ($p in $paramsFromCurrentSet ) {$paramsToPass[$p] = Get-Variable $P -ValueOnly   ; Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p]) }
     foreach ($p in [System.Management.Automation.Cmdlet]::CommonParameters.Where({$PSBoundParameters.ContainsKey($_)})) {
-        $paramsToPass[$p] = $PSBoundParameters[$p]
+        $paramsToPass[$p] = $PSBoundParameters[$p]  ; Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p])
     }
+
     $result = Connect-MgGraph @paramsToPass
     #endregion
     #region if succesful cache information about the user and session, and if necessary setup a trigger to auto-refresh tokens we fetched above

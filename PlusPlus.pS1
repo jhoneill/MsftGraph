@@ -2,6 +2,9 @@
 $Script:GraphUri  = "https://graph.microsoft.com/v1.0"
 $Script:GUIDRegex = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
 
+#Sometimes when we want to convert an opaque drive ID (e.g. on a file or folder) to a name; save extra calls to the server by caching the id-->name
+$global:drivecache  = @{}
+
 . "$PSScriptRoot\Authentication.ps1"
 
 foreach ($subModule in @('Users','Users.Functions','Users.Actions','Identity.DirectoryManagement','Reports')) {
