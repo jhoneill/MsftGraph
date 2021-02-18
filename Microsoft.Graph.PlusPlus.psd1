@@ -41,7 +41,9 @@
                         'Get-GraphChannel',
                         'Get-GraphChannelReply',
                         'Get-GraphContact',
+                        'Get-GraphDeletedObject',
                         'Get-GraphDirectoryLog',
+                        'Get-GraphDirectoryRole',
                         'Get-GraphDomain',
                         'Get-GraphDrive',
                         'Get-GraphEvent',
@@ -70,6 +72,7 @@
                         'Get-GraphToDoList'
                         'Get-GraphUser',
                         'Get-GraphUserList',
+                        'Grant-GraphDirectoryRole',
                         'Grant-GraphUserLicense',
                         'Import-GraphGroup',
                         'Import-GraphGroupMember',
@@ -115,6 +118,8 @@
                         'Remove-GraphToDoTask',
                         'Remove-GraphUser'
                         'Rename-GraphPlanBucket'
+                        'Restore-GraphDeletedObject',
+                        'Revoke-GraphDirectoryRole',
                         'Revoke-GraphUserLicense',
                         'Send-GraphGroupReply',
                         'Send-GraphMailForward',

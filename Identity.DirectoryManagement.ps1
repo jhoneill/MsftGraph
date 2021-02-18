@@ -1,4 +1,5 @@
 using namespace System.Management.Automation
+using namespace Microsoft.Graph.PowerShell.Models
 #Uses functions from  and MicrosoftGraphSubscribedSku type from  Microsoft.Graph.Identity.DirectoryManagement.private.dll
 
 #xxxx todo: check context is a workorschool account and that it has the right scopes and warn / error / throw if not.
@@ -137,7 +138,7 @@ function Get-GraphSKU             {
                             Where-Object -Property SkuPartNumber -like $s
             }
             elseif ($s -is [String]) {
-                $result += Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_Get  @PSBoundParameters -SubscribedSkuId $s}
+                $result += Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_Get1  @PSBoundParameters -SubscribedSkuId $s}
             else   {Write-Warning -Message 'Could not find the SKU ID from the parameter'; continue}
         }
     }
@@ -181,7 +182,7 @@ function Grant-GraphUserLicense   {
         foreach  ($s in $SKUID) {
             if   ($s.skuid) {$s = ($s.skuid) }
             if   ($s -match $GuidRegex) {
-                  $sku = Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_Get -SubscribedSkuId $s
+                  $sku = Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_Get1 -SubscribedSkuId $s
             }
             else {$sku = Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_List  |
                             Where-Object -Property SkuPartNumber -Like $s
@@ -366,7 +367,7 @@ function Get-GraphSkuLicensedUser {
         $result = @()
         $idToPartNo = @{}
         $partNoToID = @{}
-        Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_List | ForEach-Object {
+        Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_List1 | ForEach-Object {
             $idToPartNo[$_.SkuId]         = $_.SkuPartNumber
             $partNoToID[$_.SkuPartNumber] = $_.SkuId
         }
@@ -401,36 +402,146 @@ function Get-GraphSkuLicensedUser {
     }
 }
 
-
-# Invoke-GraphRequest -Uri "$GraphUri/directory/deleteditems/microsoft.graph.user" -ValueOnly | foreach {Invoke-GraphRequest " https://graph.microsoft.com/beta/directory/deleteditems/$($_.id)/restore" -method post -body " "}
-
-#Invoke-GraphRequest -Uri "$GraphUri/directoryroles" -ValueOnly -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryRole])
+function Get-GraphDirectoryRole   {
 <#
-   $g = Invoke-GraphRequest -Uri "$GraphUri/directoryroles" -ValueOnly -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryRole]) |where displayname -like "global admin*"  ;
-   $m =  Invoke-GraphRequest -Uri "$GraphUri/directoryroles/$($g.id)/members" -ValueOnly
-        foreach( $g in $m.where({$_.'@odata.type' -match 'group$'})) {
-            $g.Remove('GroupName')
-            $g.remove('@odata.type')
-            $g.remove('@odata.context')
-            $g.remove('creationOptions')
-            New-Object -Property  $g -TypeName MicrosoftGraphGroup
-        }
-        foreach( $u in $m.where({$_.'@odata.type' -match 'user$'})) {
-            $u.Remove('@odata.type')
-            New-Object -Property $u -TypeName MicrosoftGraphUser
-        }
-        POST /directoryRoles/{id}/members/$ref
-        #You can use a specific resource set like users or groups in the request body, or you can use generic directoryObjects.
-        Content-type: application/json
-            {
-                "@odata.id":"https://graph.microsoft.com/beta/users/0f933635-5b77-4cf4-a577-f78a5eb090a2"
-            }
-            {
-               "@odata.id":"https://graph.microsoft.com/beta/directoryObjects/2c891f12-928d-4da2-8d83-7d2434a0d8dc"
-            }
-        DELETE https://graph.microsoft.com/beta/directoryRoles/{id}/members/{id}/$ref
-
+    .synopsis
+        Gets a directory role or its members
+    .example
+        PS C:\> Get-GraphDirectoryRole external* -Members | ft displayname,role
+        Lists all members of groups whose names begin "external"
+        The command adds the role name to the user object making it possible
+        to show the roles and names in the output.
 #>
+    Param (
+        #The role to get, either as a display name (wildcards allowed), an ID, or a Role object containing an ID
+        [parameter(ValueFromPipeline=$true,Position=1)]
+        $Role = '*',
+        #If specified returns the members of the role as user objects
+        [switch]$Members
+    )
+    process {
+        if     ($role.count -gt 1) {
+            $Role | Get-GraphDirectoryRole -Members:$Members
+            return
+        }
+        if     ($Role -is [MicrosoftGraphDirectoryRole]) {$roles = $Role}
+        elseif ($Role -is [string] -and $role -match $GUIDRegex) {
+            $roles = Invoke-GraphRequest  -Uri "$GraphUri/directoryroles/$Role`?`$expand=members"       -AsType  ([MicrosoftGraphDirectoryRole] ) -ExcludeProperty '@odata.context'
+        }
+        else {
+            $roles = Invoke-GraphRequest  -Uri "$GraphUri/directoryroles?`$expand=members" -ValueOnly    -AsType  ([MicrosoftGraphDirectoryRole] )  |
+                        Where-Object -Property displayName -like $role
+        }
+        if      (-not $members) {$roles}
+        else {
+            foreach($r in $roles) {
+                foreach ($u in $r.Members.where({$_.AdditionalProperties.'@odata.type'-match 'user$'})) {
+                    [void]$u.AdditionalProperties.Remove('@odata.type')
+                    New-object -type MicrosoftGraphUser -Property $u.AdditionalProperties |
+                        Add-member -NotePropertyName Role -NotePropertyValue $r.DisplayName -PassThru
+                }
+                foreach ($g in $r.Members.where({$_.AdditionalProperties.'@odata.type'-match 'group$'})) {
+                    [void]$g.AdditionalProperties.Remove('@odata.type')
+                    [void]$g.Remove('GroupName')
+                    [void]$g.remove('@odata.context')
+                    [void]$g.remove('creationOptions')
+                    New-object -type MicrosoftGraphGroup -Property $g.AdditionalProperties |
+                        Add-member -NotePropertyName Role -NotePropertyValue $r.DisplayName -PassThru
+                }
+            }
+        }
+    }
+}
+
+function Grant-GraphDirectoryRole {
+    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
+    param (
+        #The member to add , can be a user name, or a user or group object
+        [Parameter(ValueFromPipeline=$true,Position=1,Mandatory=$true)]
+        $Member ,
+        #The role(s) to revoke, either as role names or a role objects.
+        [Parameter(Position=2,Mandatory=$true)]
+        [ArgumentCompleter([RoleCompleter])]
+        $Role ,
+        [switch]$Force
+    )
+    begin {
+        $Role = $Role | Get-GraphDirectoryRole
+    }
+    process {
+        if (-not $member.id) {$member = Get-GraphUserList -Name $Member}
+        if ($member.count -ne 1 -or -not $member.Id) {
+            Write-Warning "Could not process the role member."
+        }
+        foreach ($r in $role) {
+            $body = ConvertTo-Json @{ '@odata.id' = "$graphUri/directoryObjects/$($Member.Id)" }
+            Write-Debug $body
+            if ($Force -or $pscmdlet.ShouldProcess($Member.displayname,"Grant access to role '$($r.displayname)'")) {
+                try   { Invoke-GraphRequest -Uri "$graphuri/directoryroles/$($role.id)/members/`$ref" -Method post -Body $body -ContentType 'application/json'}
+                catch { Write-Warning "The request failed. This may be because the member has already been added to the role" }
+            }
+        }
+    }
+}
+
+function Revoke-GraphDirectoryRole {
+    [cmdletbinding(SupportsShouldProcess=$True,ConfirmImpact='High')]
+    param (
+        [Parameter(ValueFromPipeline=$true,Position=1)]
+        #The member to add , can be a user name, or a user or group object
+        $Member ,
+        [Parameter(Position=2,Mandatory=$true)]
+        #The role(s) to revoke, either as role names or a role objects.
+        [ArgumentCompleter([RoleCompleter])]
+        $Role ,
+        [switch]$Force
+    )
+    begin {
+        $Role = $Role | Get-GraphDirectoryRole
+    }
+    process {
+        if (-not $member.id) {$member = Get-GraphUserList -Name $Member}
+        if ($member.count -ne 1 -or -not $member.Id) {
+            Write-Warning "Could not process the role member."
+        }
+        foreach ($r in $role) {
+            if ($Force -or $pscmdlet.ShouldProcess($Member.displayname,"Revoke access from role '$($r.displayname)'")) {
+                try   {Invoke-GraphRequest -Uri "$graphuri/directoryroles/$($role.id)/members/$($member.Id)/`$ref" -Method Delete}
+                catch {Write-Warning "The request failed. This may be because the member was no in thethe role"}
+            }
+        }
+    }
+}
+
+function Get-GraphDeletedObject {
+    param (
+        $Name,
+        [switch]$Group
+    )
+    if ($name)  {$u    = "?`$filter=startswith(displayName,'{0}')" -f ($Name -replace "'","''" )}
+    else        {$u    = ''}
+    if ($Group) {$type = 'Group'} else {$type='User'}
+    Invoke-GraphRequest -Uri "$GraphUri/directory/deleteditems/microsoft.graph.$type$u" -AsType ([pscustomobject])  -ValueOnly
+}
+
+function Restore-GraphDeletedObject {
+    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
+    param (
+        [Parameter(ValueFromPipeline=$true,position=1)]
+        $ID,
+        [switch]$Group,
+        [switch]$Force
+    )
+    process {
+        if ($id.displayname) {$displayname = $id.Displayname} else {$displayname = ''}
+        if ($id.id) {$id = $id.id}
+        if ($Force -or $PSCmdlet.ShouldProcess($displayname,'Recover directory object')) {
+            Invoke-GraphRequest "$GraphUri/directory/deleteditems/$id/restore" -Method Post -body ' ' -AsType ([pscustomobject])
+        }
+    }
+}
+
+
 #see applications.
 #(Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/microsoft.graph.servicePrincipal" -all)
 #Get-MgServicePrincipal -filter "servicePrincipalType  eq 'Application'" | sort DisplayName -Descending

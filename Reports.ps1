@@ -111,7 +111,7 @@ Function Get-GraphSignInLog    {
     foreach ($r in $records) {
         $r.pstypenames.add('GraphSigninLog')
         $r['RiskEventTypesV2'] = $r['RiskEventTypes_V2'] ;
-        $r.Remove('RiskEventTypes_V2');
+        [void]$r.Remove('RiskEventTypes_V2');
         New-Object -TypeName MicrosoftGraphSignIn -Property $r |
             Add-Member -PassThru -MemberType ScriptProperty -Name City    -Value {$this.location.city}    |
             Add-Member -PassThru -MemberType ScriptProperty -Name State   -Value {$this.location.state}   |

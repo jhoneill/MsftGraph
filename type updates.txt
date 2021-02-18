@@ -2,11 +2,11 @@
 
 #        Microsoft.Graph.PowerShell.Models.MicrosoftGraphProfilePhoto        ??GraphPhoto  ??
 #        Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization        # GraphOrganization
+#        Microsoft.Graph.PowerShell.Models.MicrosoftGraphDomain
 
   Other sign ins
   Justins bits
   directory         Undelete objcts     # Invoke-GraphRequest -Uri "$GraphUri/directory/deleteditems/microsoft.graph.user" -ValueOnly | foreach {Invoke-GraphRequest " https://graph.microsoft.com/beta/directory/deleteditems/$($_.id)/restore" -method post -body " "}
-  directory         roles               # Invoke-GraphRequest  -Uri "$GraphUri/directoryroles" -all  /  Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/microsoft.graph.directoryrole" -all
   directory         roletemplates       # Invoke-GraphRequest  -Uri "$GraphUri/directoryroletemplates" -all
   directory         settings            # Invoke-GraphRequest  -Uri "https://graph.microsoft.com/beta/settings" -ValueOnly
   mail              delete              # DELETE /me/messages/{id}  DELETE /users/{id | userPrincipalName}/messages/{id} DELETE /me/mailFolders/{id}/messages/{id} DELETE /users/{id | userPrincipalName}/mailFolders/{id}/messag
@@ -14,6 +14,7 @@
   onenote page      preview,
   onenote page      copy to section
   onenote-section   copy to notebook
+  ToDoLists and task check the use of *1 cmdlets and type returned.
   User              find meeting times ,
   User              export personal data,
   User              get transitive member-of
@@ -22,12 +23,14 @@
   user              outlook Categories # Invoke-GraphRequest  -Uri  "$GraphUri/me/outlook/mastercategories" -ValueOnly
     https://graph.microsoft.com/v1.0/me/messages('AAMkADA1M-zAAA=')/attachments('AAMkADA1M-CJKtzmnlcqVgqI=')/?$expand=microsoft.graph.itemattachment/item
 
+
+
   Group             get transitive member-of
   Group             get transitive members,
   Group             assign licence,
   group             setting templates   Invoke-GraphRequest  -Uri "https://graph.microsoft.com/v1.0/groupsettingTemplates" -all
-
-  device           get                  invoke-GraphRequest  -Uri  "https://graph.microsoft.com/v1.0/devices" -ValueOnly | % {
+  group             dynamic membership
+  device            get                  invoke-GraphRequest  -Uri  "https://graph.microsoft.com/v1.0/devices" -ValueOnly | % {
                                                 $_.remove('createdDatetime'),$_.remove('mdmappid'),$_.remove('sourceType'),$_.remove('externalSourceName')
                                                 foreach ($k in $_.alternativeSecurityIds) {$k.key = [byte[]][char[]]$k.key }
                                                 new-object -type Microsoft.Graph.PowerShell.Models.MicrosoftGraphDevice -Property $_

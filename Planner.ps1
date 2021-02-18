@@ -43,7 +43,7 @@ function Get-GraphPlan           {
             $response = Invoke-GraphRequest  -Uri "$uri/Tasks" -ValueOnly | Sort-Object -Property orderHint
             $result   = foreach ($r in $response) {
                 $etag = $r.'@odata.etag'
-                $r.remove( '@odata.etag') ;
+                [void]$r.remove( '@odata.etag') ;
                 $taskobj = New-Object -Property $r -TypeName MicrosoftGraphPlannerTask
                 if ($planTitle) { Add-Member -InputObject $taskobj -NotePropertyName  PlanTitle -NotePropertyValue $planTitle}
 
@@ -59,7 +59,7 @@ function Get-GraphPlan           {
             #we need @odata.etag for changing items, but it isn't in the object definition ... grrr.
             Invoke-GraphRequest   -Uri "$uri/Buckets" -ValueOnly | Sort-Object -Property orderHint | ForEach-Object {
                 $etag = $_.'@odata.etag'
-                $_.remove('@odata.etag')
+                [void]$_.remove('@odata.etag')
                 $bucketobj = New-object -Property $_ -TypeName MicrosoftGraphPlannerBucket |
                     Add-Member -PassThru -NotePropertyName  etag -NotePropertyValue $etag
                 if ($planTitle) {Add-Member -PassThru -InputObject $bucketobj -NotePropertyName PlanTitle -NotePropertyValue $planTitle     }
@@ -71,7 +71,7 @@ function Get-GraphPlan           {
             $result    =  Invoke-GraphRequest  -Uri "$uri`?`$expand=details"
             $etag      =  $result.'@odata.etag'
             $odatakeys =  $result.Keys.Where({$_ -match "@odata\."})
-            foreach ($k in $odatakeys) {$result.Remove($k)}
+            foreach ($k in $odatakeys) {[void]$result.Remove($k)}
             $planObj = New-Object  -Property $result -TypeName MicrosoftGraphPlannerPlan |
                 Add-Member -PassThru -NotePropertyName  etag -NotePropertyValue $etag
 
@@ -234,8 +234,8 @@ function Add-GraphPlanBucket     {
             if ($force -or $PSCmdlet.ShouldProcess($Name,"Add Bucket to plan $($Plan.title)")){
             $result    = Invoke-GraphRequest @webParams -Body $json
             $etag = $result.'@odata.etag'
-            $result.remove('@odata.etag')
-            $result.remove('@odata.context')
+            [void]$result.remove('@odata.etag')
+            [void]$result.remove('@odata.context')
             $bucketobj = New-object -Property $result -TypeName MicrosoftGraphPlannerBucket |
                 Add-Member -PassThru -NotePropertyName  etag -NotePropertyValue $etag
             if ($plan.Title) {Add-Member -PassThru -InputObject $bucketobj -NotePropertyName PlanTitle -NotePropertyValue $plan.Title     }
@@ -331,7 +331,7 @@ function Get-GraphBucketTaskList {
         }
         $taskObjs = foreach ($r in $result) {
             $etag      =  $r.'@odata.etag'
-            $r.remove( "@odata.etag") ;
+            [void]$r.remove( "@odata.etag") ;
             New-Object -Property $r -TypeName MicrosoftGraphPlannerTask |
                 Add-Member -PassThru -NotePropertyName  etag -NotePropertyValue $etag
         }
@@ -459,7 +459,7 @@ function Add-GraphPlanTask       {
             if ($Passthru) {
                 $etag      =  $result.'@odata.etag'
                 $odatakeys =  $result.Keys.Where({$_ -match "@odata\."})
-                foreach ($k in $odatakeys) {$result.Remove($k)}
+                foreach ($k in $odatakeys) {[void]$result.Remove($k)}
                 New-Object -Property $result -TypeName  MicrosoftGraphPlannerTask |
                         Add-Member -NotePropertyName  etag -NotePropertyValue $etag -PassThru
             }
@@ -487,7 +487,7 @@ function Get-GraphPlanTask       {
         $result    = Invoke-GraphRequest  -URI "$GraphUri/planner/tasks/$Task"
         $etag      =  $result.'@odata.etag'
         $odatakeys =  $result.Keys.Where({$_ -match "@odata\."})
-        foreach ($k in $odatakeys) {$result.Remove($k)}
+        foreach ($k in $odatakeys) {[void]$result.Remove($k)}
         $taskobj  = New-Object -Property $result -TypeName  MicrosoftGraphPlannerTask |
                         Add-Member -NotePropertyName  etag -NotePropertyValue $etag -PassThru
         if ($Expand) { $taskobj | Expand-GraphTask}
@@ -639,7 +639,7 @@ function Set-GraphPlanTask       {
         if ($Passthru) {
             $etag      =  $UpdatedTask.'@odata.etag'
             $odatakeys =  $UpdatedTask.Keys.Where({$_ -match "@odata\."})
-            foreach ($k in $odatakeys) {$UpdatedTask.Remove($k)}
+            foreach ($k in $odatakeys) {[void]$UpdatedTask.Remove($k)}
             New-Object -Property $UpdatedTask -TypeName  MicrosoftGraphPlannerTask |
                             Add-Member -NotePropertyName  etag -NotePropertyValue $etag -PassThru
         }

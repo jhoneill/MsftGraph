@@ -158,8 +158,8 @@ function Get-GraphDrive {
             }
             $children.where({$_.folder -or -not $Subfolders}) |
                 ForEach-Object {
-                    $_.remove('@odata.etag')
-                    $_.remove('@odata.type')
+                    [void]$_.remove('@odata.etag')
+                    [void]$_.remove('@odata.type')
                     New-Object -TypeName MicrosoftGraphDriveItem -Property $_
                 } | Sort-Object -Property name
             #This may have returned nothing no subfolders.
@@ -172,8 +172,8 @@ function Get-GraphDrive {
                     Sort-Object -Property Name
         }
         else             {
-            $driveObj.remove('root@odata.context')
-            $driveObj.remove('@odata.context')
+            [void]$driveObj.remove('root@odata.context')
+            [void]$driveObj.remove('@odata.context')
             return (New-object -TypeName MicrosoftGraphDrive -Property $driveObj)
         }
         #endregion
@@ -458,7 +458,7 @@ function Copy-ToGraphFolder {
                 $result             = Invoke-WebRequest  -Method Put -Uri $UploadSession.uploadUrl -InFile $uploadItem.FullName -ContentType "application/octet-stream" -Headers @{"Content-Range"=$RangeText}
                 $resultHash         = ConvertFrom-Json $result.content -AsHashtable
                 $keysToRemove        = $resultHash.Keys.where({$_ -match '@'})
-                foreach ($k in $keysToRemove) {$resultHash.Remove($k)}
+                foreach ($k in $keysToRemove) {[void]$resultHash.Remove($k)}
                 New-Object -TypeName MicrosoftGraphDriveItem -Property $resultHash
                 $ProgressPreference = $oldprogressPref
             }

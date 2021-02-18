@@ -57,6 +57,24 @@ class GroupCompleter          : IArgumentCompleter {
     }
 }
 
+class RoleCompleter           : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result = [System.Collections.Generic.List[CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        if (-not $wordToComplete) {$wordToComplete = '*'}
+        else {$wordToComplete = "$wordToComplete*" -replace '"|''', '' }
+        Invoke-GraphRequest  -Uri "$Script:GraphUri/directoryroles?`$select=displayname" -ValueOnly |
+            Where-Object displayname -like $wordToComplete | Sort-Object -Property displayname | ForEach-Object {
+                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$($_.displayname)'", $_.displayname, ([CompletionResultType]::ParameterValue) , $_.displayname) )
+        }
+        return $result
+    }
+}
+
 class TeamCompleter           : IArgumentCompleter {
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
@@ -182,12 +200,12 @@ $Script:GUIDRegex   = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
 
 . "$PSScriptRoot\Authentication.ps1"
  $ImportCmds = [ordered]@{
-  'Users'                        = @('Get-MgUser_List' , 'New-MgUserTodoList_CreateExpanded',
-                                     'New-MgUserTodoListTask_CreateExpanded', 'Remove-MgUserTodoList_Delete',
-                                     'Remove-MgUserTodoListTask_Delete', 'Update-MgUserTodoListTask_UpdateExpanded')
+  'Users'                        = @('Get-MgUser_List1' , 'New-MgUserTodoList_CreateExpanded1',
+                                     'New-MgUserTodoListTask_CreateExpanded1', 'Remove-MgUserTodoList_Delete1',
+                                     'Remove-MgUserTodoListTask_Delete1', 'Update-MgUserTodoListTask_UpdateExpanded1')
   'Identity.DirectoryManagement' = @('Get-MgDomain_Get1', 'Get-MgDomain_List1', 'Get-MgDomainNameerenceByRef_List1',
                                      'Get-MgDomainServiceConfigurationRecord_List1' , 'Get-MgDomainVerificationDnsRecord_List1',
-                                     'Get-MgOrganization_List1', 'Get-MgSubscribedSku_Get', 'Get-MgSubscribedSku_List')
+                                     'Get-MgOrganization_List1', 'Get-MgSubscribedSku_Get1', 'Get-MgSubscribedSku_List1')
   'Users.Functions'              = @()
   'Users.Actions'                = @()
   'Identity.SignIns'             = @()

@@ -44,6 +44,12 @@ function Get-GraphUserList     {
         [Alias('Select')]
         [string[]]$Property,
 
+        #number of users to get
+        $Top=100,
+
+        #If Specified the value of Top is ignored and all users are retrieved.
+        [switch]$All,
+
         #Order by clause for the query - most fields result in an error and it can't be combined with some other query values.
         [parameter(Mandatory=$true, parameterSetName='Sorted')]
         [ValidateSet('displayName', 'userPrincipalName')]
@@ -73,17 +79,28 @@ function Get-GraphUserList     {
     )
     process {
         Write-Progress "Getting the List of users"
+        $webParameters =  @{
+            AsType = ([MicrosoftGraphUser])
+            AllValues = $All -as [bool]
+            ValueOnly = $true
+        }
+        if ($search -or $Filter -or $orderby -or $name) {
+            $webParameters['Headers'] = @{'ConsistencyLevel'='eventual'}
+        }
+        $uri = "$graphUri/users?`$top=$top"
+        if ($Select)  {$uri = $uri + '&$select='  + ($Select -join ',') }
+        if ($Filter)  {$uri = $uri + '&$Filter='  + $Filter }
+        if ($OrderBy) {$uri = $uri + '&$orderby=' + $orderby}
         if (-not $Name) {
-            Microsoft.Graph.Users.private\Get-MgUser_List  -ConsistencyLevel eventual -All @PSBoundParameters
+            Invoke-GraphRequest -Uri $uri @webParameters
         }
         else {
-            [void]$PSBoundParameters.Remove('Name')
             foreach ($n in $Name) {
-                $PSBoundParameters['Filter'] = ("startswith(displayName,'{0}') or startswith(givenName,'{0}') or startswith(surname,'{0}') or startswith(mail,'{0}') or startswith(userPrincipalName,'{0}')" -f $n )
-                Microsoft.Graph.Users.private\Get-MgUser_List  -ConsistencyLevel eventual -All @PSBoundParameters
+                $filter = "&`$Filter=startswith(displayName,'{0}') or startswith(givenName,'{0}') or startswith(surname,'{0}') or startswith(mail,'{0}') or startswith(userPrincipalName,'{0}')" -f ($n -replace "'","''")
+                Invoke-GraphRequest -Uri ($uri + $filter) @webParameters
             }
-    }
-    Write-Progress "Getting the List of users" -Completed
+        }
+        Write-Progress "Getting the List of users" -Completed
     }
 }
 
@@ -234,6 +251,9 @@ function Get-GraphUser         {
             }
         }
         [void]$PSBoundParameters.Remove('UserID')
+        if ($userid -is [string] -and $Userid -notmatch $GuidRegex) {
+            $userId = Get-GraphUserList -Name $UserID
+        }
         foreach ($id in $UserID) {
             #region set up the user part of the URI that we will call
             if ($id -is [MicrosoftGraphUser] -and -not  ($PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters})  )) {
@@ -380,14 +400,14 @@ function Get-GraphUser         {
            #elseif ($r.'@odata.type' -match 'device$')         { $r.pstypenames.Add('GraphDevice')        }
            #else
             if     ($r.'@odata.type' -match 'group$') {
-                    $r.remove('@odata.type')
-                    $r.remove('@odata.context')
-                    $r.remove('creationOptions')
+                    [void]$r.remove('@odata.type')
+                    [void]$r.remove('@odata.context')
+                    [void]$r.remove('creationOptions')
                     New-Object -Property $r -TypeName ([MicrosoftGraphGroup])
             }
             elseif ($r.'@odata.type' -match 'user$' -or $PSCmdlet.parameterSetName -eq 'None' -or $Select) {
-                    $r.Remove('@odata.type')
-                    $r.Remove('@odata.context')
+                    [void]$r.Remove('@odata.type')
+                    [void]$r.Remove('@odata.context')
                     New-Object -Property $r -TypeName ([MicrosoftGraphUser])
             }
             else    {$r}
@@ -1226,10 +1246,10 @@ function Get-GraphMailFolder   {
     if ($UserID)  {$uri = "$GraphUri/users/$userID/mailFolders" }
     else          {$uri = "$GraphUri/me/mailFolders" }
     $JoinChar = "?"  #Will the next parameter be joined onto the URI with a "?"" or with "&"  ?
-    if ($Select)  {$uri = $uri + '?$select=' + ($Select -join ',') ;                                 $JoinChar = "&"}
-    if ($Name)    {$uri = $uri + $JoinChar + ("`$filter=startswith(displayName,'{0}') " -f $Name ) ; $JoinChar = "&"}
-    if ($Filter)  {$uri = $uri + $JoinChar + '$Filter='  +$Filter                                  ; $JoinChar = "&"}
-    if ($OrderBy) {$uri = $uri + $JoinChar + '$orderby='  +$Filter                                 ; $JoinChar = "&"}
+    if ($Select)  {$uri = $uri + '?$select=' + ($Select -join ',') ;                                                     $JoinChar = "&"}
+    if ($Name)    {$uri = $uri + $JoinChar + ("`$filter=startswith(displayName,'{0}') " -f ($Name -replace "'","''" )) ; $JoinChar = "&"}
+    if ($Filter)  {$uri = $uri + $JoinChar + '$Filter='  + $Filter                                                     ; $JoinChar = "&"}
+    if ($OrderBy) {$uri = $uri + $JoinChar + '$orderby=' + $OrderBy                                                    ; $JoinChar = "&"}
     if ($Top)     {$uri = $uri + $JoinChar + '$top=' + $top }
     #endregion
 
@@ -1244,7 +1264,7 @@ function Get-GraphMailFolder   {
 
     foreach ($f in $folderList) {
         $size = $f.sizeInBytes
-        $f.remove('sizeInBytes')
+        [void]$f.remove('sizeInBytes')
         New-object -TypeName MicrosoftGraphMailFolder -Property $f |
             Add-Member -PassThru -NotePropertyName SizeInBytes -NotePropertyValue $size
         }
@@ -2077,7 +2097,7 @@ function Get-GraphEvent        {
 
         if ($Select)     { $uri  +=  '&$select=' + ($Select -join ',') }
 
-        if ($Subject)    { $uri  += ('&$filter=startswith(subject,''{0}'')' -f $subject ) }
+        if ($Subject)    { $uri  += ('&$filter=startswith(subject,''{0}'')' -f ($subject -replace "'","''") ) }
         elseif ($Filter) { $uri  +=  '&$Filter='  + $Filter }
 
         if ($OrderBy)    { $uri  +=  '&$orderby=' + $orderby }
@@ -2469,7 +2489,7 @@ Param(
     [switch]$Force
 )
     if ($Force -or $pscmdlet.ShouldProcess($Displayname,"Create new To-Do list")){
-        Microsoft.Graph.Users.private\New-MgUserTodoList_CreateExpanded -UserId $UserId -DisplayName $displayname -IsShared:$IsShared -Confirm:$false |
+        Microsoft.Graph.Users.private\New-MgUserTodoList_CreateExpanded1 -UserId $UserId -DisplayName $displayname -IsShared:$IsShared -Confirm:$false |
                 Add-Member -PassThru -NotePropertyName UserId -NotePropertyValue $UserId
     }
 }
@@ -2544,7 +2564,7 @@ function New-GraphToDoTask     {
     if ($DueDateTime)       {$Params['DueDateTime']       = (ConvertTo-GraphDateTimeTimeZone $DueDateTime)}
 
     if ($Force -or $PSCmdlet.ShouldProcess($title,"Add NewTask")) {
-        Microsoft.Graph.Users.private\New-MgUserTodoListTask_CreateExpanded @params |
+        Microsoft.Graph.Users.private\New-MgUserTodoListTask_CreateExpanded1 @params |
             Add-Member -PassThru -NotePropertyName UserId   -NotePropertyValue $userID |
             Add-Member -PassThru -NotePropertyName ListID   -NotePropertyValue $ToDoList
     }
@@ -2636,7 +2656,7 @@ function Update-GraphToDoTask  {
         if ($CompletedDateTime) {$Params['CompletedDateTime'] = (ConvertTo-GraphDateTimeTimeZone $CompletedDateTime)}
         if ($DueDateTime)       {$Params['DueDateTime']       = (ConvertTo-GraphDateTimeTimeZone $DueDateTime)}
         if ($force -or $pscmdlet.ShouldProcess("Task update")) {
-            Microsoft.Graph.Users.private\Update-MgUserTodoListTask_UpdateExpanded @params
+            Microsoft.Graph.Users.private\Update-MgUserTodoListTask_UpdateExpanded1 @params
         }
     }
 }
@@ -2687,7 +2707,7 @@ function Remove-GraphToDoTask  {
             TodoTaskListId  = $ToDoList
         }
         if ($force -or $pscmdlet.ShouldProcess($Title,'Task deletion')) {
-                Microsoft.Graph.Users.private\Remove-MgUserTodoListTask_Delete @Params
+                Microsoft.Graph.Users.private\Remove-MgUserTodoListTask_Delete1 @Params
         }
     }
 }
@@ -2724,7 +2744,7 @@ function Remove-GraphToDoList  {
             TodoTaskListId  = $ToDoList
         }
         if ($force -or $pscmdlet.ShouldProcess($Title,'Delete whole to-do list')) {
-                Microsoft.Graph.Users.private\Remove-MgUserTodoList_Delete @Params
+                Microsoft.Graph.Users.private\Remove-MgUserTodoList_Delete1 @Params
         }
     }
 }
