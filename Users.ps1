@@ -1,11 +1,12 @@
 ﻿using namespace Microsoft.Graph.PowerShell.Models
+$script:WellKnownMailFolderRegex = '^[/\\]?(archive|clutter|conflicts|conversationhistory|deleteditems|drafts|inbox|junkemail|localfailures|msgfolderroot|outbox|recoverableitemsdeletions|scheduled|searchfolders|sentitems|serverfailures|syncissues)[/\\]?$'
 
 function ConvertTo-GraphDateTimeTimeZone {
     <#
         .synopsis
             Converts a datetime object to dateTimeTimezone object with the current time zone.
     #>
-    param (
+    param   (
         [dateTime]$d
     )
     New-object MicrosoftGraphDateTimeZone -Property @{
@@ -14,7 +15,7 @@ function ConvertTo-GraphDateTimeTimeZone {
     }
 }
 
-function Get-GraphUserList     {
+function Get-GraphUserList        {
     <#
       .Synopsis
         Returns a list of Azure active directory users for the current tennant.
@@ -25,9 +26,9 @@ function Get-GraphUserList     {
     #>
     [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser])]
     [cmdletbinding(DefaultparameterSetName="None")]
-    param(
+    param   (
         #If specified searches for users whose first name, surname, displayname, mail address or UPN start with that name.
-        [parameter(Mandatory=$true, parameterSetName='FilterByName', Position=1,ValueFromPipeline=$true )]
+        [parameter(Mandatory=$true, parameterSetName='FilterByName', Position=0,ValueFromPipeline=$true )]
         [string[]]$Name,
 
         #Names of the fields to return for each user.
@@ -104,7 +105,7 @@ function Get-GraphUserList     {
     }
 }
 
-function Get-GraphUser         {
+function Get-GraphUser            {
     <#
       .Synopsis
         Gets information from the MS-Graph API about the a user (current user by default)
@@ -415,7 +416,7 @@ function Get-GraphUser         {
     }
 }
 
-function Set-GraphUser         {
+function Set-GraphUser            {
     <#
       .Synopsis
         Sets properties of  a user (the current user by default)
@@ -429,7 +430,7 @@ function Set-GraphUser         {
     [cmdletbinding(SupportsShouldprocess=$true)]
     param   (
         #ID for the user if not the current user
-        [parameter(Position=1,ValueFromPipeline=$true)]
+        [parameter(Position=0,ValueFromPipeline=$true)]
         $UserID = "me",
         #A freeform text entry field for the user to describe themselves.
         [String]$AboutMe,
@@ -555,30 +556,30 @@ function Set-GraphUser         {
                     Write-Warning "$photo doesn't look like the path to a .jpg file" ; return
                 }
                 else {$photoPath = (Resolve-Path $Photo).Path }
-                $BaseURI                    =  $webparams['uri']
+                $baseUri                    =  $webparams['uri']
                 $webparams['uri']           =  $webparams['uri'] + 'photo/$value'
                 $webparams['Method']        = 'Put'
                 $webparams['Contenttype']   = 'image/jpeg'
                 $webparams['InputFilePath'] =  $photoPath
                 Write-Debug "Uploading Photo: '$photoPath'"
                 if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {Invoke-GraphRequest  @webparams}
-                $webparams['uri'] = $BaseURI
+                $webparams['uri'] = $baseUri
             }
             if ($Manager) {
-                $BaseURI                    =  $webparams['uri']
+                $baseUri                    =  $webparams['uri']
                 $webparams['uri']           =  $webparams['uri'] + 'manager/$ref'
                 $webparams['Method']        = 'Put'
                 $webparams['Contenttype']   = 'application/json'
                 $json = ConvertTo-Json @{ '@odata.id' =  "$GraphUri/users/$manager" }
                 Write-Debug  $json
                 if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {Invoke-GraphRequest  @webparams -Body $json}
-                $webparams['uri'] = $BaseURI
+                $webparams['uri'] = $baseUri
             }
         }
     }
 }
 
-function New-GraphUser         {
+function New-GraphUser            {
     <#
         .synopsis
             Creates a new user in Azure Active directory
@@ -586,7 +587,7 @@ function New-GraphUser         {
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', '', Justification="False positive and need to support plain text here")]
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param (
+    param   (
         #User principal name for the new user. If not specified it can be built by specifying Mail nickname and domain name.
         [Parameter(ParameterSetName='DomainFromUPNLast',Mandatory=$true)]
         [Parameter(ParameterSetName='DomainFromUPNDisplay',Mandatory=$true)]
@@ -740,15 +741,15 @@ function New-GraphUser         {
     }
 }
 
-function Remove-GraphUser      {
+function Remove-GraphUser         {
     <#
       .Synopsis
         Deletes a user from Azure Active directory
     #>
     [cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
-    param (
+    param   (
         #ID for the user
-        [parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        [parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         $UserID,
         #If specified the user is deleted without a confirmation prompt.
         [Switch]$Force
@@ -779,7 +780,7 @@ function Remove-GraphUser      {
     }
 }
 
-function Find-GraphPeople      {
+function Find-GraphPeople         {
     <#
       .Synopsis
         Searches people in your inbox / contacts / directory
@@ -791,7 +792,7 @@ function Find-GraphPeople      {
     #>
     [cmdletbinding(DefaultparameterSetName='Default')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification="Person would be incorrect")]
-    param (
+    param   (
         #Text to use in a 'Topic' Search. Topics are not pre-defined, but inferred using machine learning based on your conversation history (!)
         [parameter(ValueFromPipeline=$true,Position=0,parameterSetName='Default',Mandatory=$true)]
         [ValidateNotNullOrEmpty()]
@@ -804,11 +805,9 @@ function Find-GraphPeople      {
         [ValidateRange(1,1000)]
         [int]$First = 10
     )
-    begin {
-    }
     process {
     #xxxx todo check scopes    Requires consent to use either the People.Read or the People.Read.All scope
-        if ($Topic) {
+        if     ($Topic) {
             $uri = $GraphURI +'/me/people?$search="topic:{0}"&$top={1}' -f $Topic, $First
         }
         elseif ($SearchTerm) {
@@ -823,7 +822,7 @@ function Find-GraphPeople      {
     }
 }
 
-Function Import-GraphUser      {
+function Import-GraphUser         {
 <#
     .synopsis
        Imports a list of users from a CSV file
@@ -836,7 +835,7 @@ Function Import-GraphUser      {
     [cmdletbinding(SupportsShouldProcess=$true)]
     param   (
         #One or more files to read for input.
-        [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
         #Disables any prompt for confirmation
         [switch]$Force,
@@ -928,15 +927,15 @@ Function Import-GraphUser      {
     }
 }
 
-Function Export-GraphUser      {
+function Export-GraphUser         {
 <#
     .synopsis
        Exports a list of users to a CSV file
 #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    param (
+    param   (
         #Destination for CSV output
-        [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
         #Filter clause for the query for example "department eq 'accounts'"
         $Filter,
@@ -958,12 +957,12 @@ Function Export-GraphUser      {
 }
 
 #MailBox commands: these only depend on the user module from the SDK so go in the same file as user commands
-function New-GraphMailAddress  {
+function New-GraphMailAddress     {
     <#
       .synopsis
         Helper function to create a email addresses
     #>
-    param (
+    param   (
         # The recipient's email address, e.g Alex@contoso.com
         [Parameter(Mandatory=$true,Position=0, ValueFromPipeline=$true)]
         [Alias('Mail')]
@@ -975,14 +974,14 @@ function New-GraphMailAddress  {
     @{name=$name;Address=$Address}
 }
 
-function New-GraphRecipient    {
+function New-GraphRecipient       {
     <#
       .Synopsis
         Creats a new meeting attendee, with a mail address and the type of attendance.
     #>
-    param(
+    param   (
         # The recipient's email address, e.g Alex@contoso.com
-        [Parameter(Mandatory=$true,Position=1, ValueFromPipeline=$true)]
+        [Parameter(Mandatory=$true,Position=0, ValueFromPipeline=$true)]
         $Mail,
         #The displayname for the recipient
         [Parameter(Position=2)]
@@ -991,7 +990,7 @@ function New-GraphRecipient    {
     @{ 'emailAddress' =  @{'address'=$mail; name=$DisplayName }}
 }
 
-function New-GraphAttendee     {
+function New-GraphAttendee        {
     <#
       .Synopsis
         Helper function to create a new meeting attendee, with a mail address and the type of attendance.
@@ -999,7 +998,7 @@ function New-GraphAttendee     {
     [cmdletbinding(DefaultParameterSetName='Default')]
     [outputType([system.collections.hashtable])]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
-    param(
+    param   (
         # The recipient's email address, e.g Alex@contoso.com
         [Parameter(Position=0, ValueFromPipelineByPropertyName=$true,ParameterSetName='Default',Mandatory=$true)]
         [Alias('Mail')]
@@ -1033,7 +1032,7 @@ function New-GraphPhysicalAddress {
     #>
     [cmdletbinding()]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
-    param (
+    param   (
         #Street address. This can contain carriage returns for a district, e.g. "101 London Road`r`nBotley"
         [String]$Street,
         #City, or town as people outside the US tend to call it
@@ -1052,14 +1051,14 @@ function New-GraphPhysicalAddress {
     $Address
 }
 
-function New-GraphRecurrence   {
+function New-GraphRecurrence      {
 <#
     .synopsis
         Helper function to create the patterned recurrence for a task or event
     .links
         https://docs.microsoft.com/en-us/graph/api/resources/patternedrecurrence?view=graph-rest-1.0
 #>
-    param(
+    param   (
         #The day of the month on which the event occurs. Required if type is absoluteMonthly or absoluteYearly.
         [ValidateRange(1,31)]
         [int]$DayOfMonth = 1,
@@ -1145,9 +1144,9 @@ function New-GraphRecurrence   {
     }
 }
 
-function Expand-GraphEvent     {
+function Expand-GraphEvent        {
     param   (
-        [Parameter(Position=1,ValueFromPipeline=$true)]
+        [Parameter(Position=0,ValueFromPipeline=$true)]
         $Event,
         $CalendarPath
 
@@ -1174,8 +1173,8 @@ function Expand-GraphEvent     {
     }
 }
 
-function Get-GraphCalendarPath {
-    param (
+function Get-GraphCalendarPath    {
+    param   (
         $Calendar,
         $Group,
         $User
@@ -1215,7 +1214,7 @@ function Get-GraphCalendarPath {
     }
 }
 
-function Get-GraphMailFolder   {
+function Get-GraphMailFolder      {
     <#
       .Synopsis
         Get the user's Mailbox folders
@@ -1223,55 +1222,86 @@ function Get-GraphMailFolder   {
         Get-GraphMailFolderList -Name inbox
         Gets the current users inbox folder
     #>
-    [cmdletbinding(DefaultParameterSetName="None")]
-    param(
+    [cmdletbinding(DefaultParameterSetName="FilterByName")]
+    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphMailFolder])]
+    param   (
+        #Filter the folders returned by a name
+        [Parameter(ParameterSetName='FilterByName',Position=0)]
+        [ArgumentCompleter([MailFolderCompleter])]
+        [string]$Name,
+        $ParentFolder,
         #UserID as a guid or User Principal name. If not specified defaults to "me"
-        [string]$UserID,
+        [string]$User,
         #Select the first n folders.
         [validaterange(1,1000)]
-        [int]$Top,
+        [int]$Top = 100,
         #fields to select in the query - will add a validate set later
         [string[]]$Select  ,
         #String with orderby clause e.g. "name", "lastmodifiedDate desc"
-        [string]$OrderBy,
-        #filter the folders returned by a name
-        [Parameter(Mandatory=$true, ParameterSetName='FilterByName')]
-        [string]$Name,
+        [Parameter(ParameterSetName='Sorted')]
+        [ValidateSet('childFolderCount', 'childFolderCount desc', 'displayName', 'displayName desc',
+                    'totalItemCount', 'totalItemCount desc', 'unreadItemCount', 'unreadItemCount desc')]
+        [string]$OrderBy = 'displayname',
         #A custom filter clause.
-        [Parameter(Mandatory=$true, ParameterSetName='FilterByString')]
-        [string]$Filter
+        [Parameter(ParameterSetName='FilterByString')]
+        [string]$Filter,
+        [switch]$ChildItems
     )
-
     #region set-up URI . If we got a user ID, use it other otherwise use the current user, add select, orderby, filter & top parameters as needed
-    if ($UserID)  {$uri = "$GraphUri/users/$userID/mailFolders" }
-    else          {$uri = "$GraphUri/me/mailFolders" }
-    $JoinChar = "?"  #Will the next parameter be joined onto the URI with a "?"" or with "&"  ?
-    if ($Select)  {$uri = $uri + '?$select=' + ($Select -join ',') ;                                                     $JoinChar = "&"}
-    if ($Name)    {$uri = $uri + $JoinChar + ("`$filter=startswith(displayName,'{0}') " -f ($Name -replace "'","''" )) ; $JoinChar = "&"}
-    if ($Filter)  {$uri = $uri + $JoinChar + '$Filter='  + $Filter                                                     ; $JoinChar = "&"}
-    if ($OrderBy) {$uri = $uri + $JoinChar + '$orderby=' + $OrderBy                                                    ; $JoinChar = "&"}
-    if ($Top)     {$uri = $uri + $JoinChar + '$top=' + $top }
+    if     ($User.UserPrincipalName)  {$baseUri = "$GraphUri/users/$($User.UserPrincipalName)/mailFolders" }
+    elseif ($User)                    {$baseUri = "$GraphUri/users/$User/mailFolders" }
+    else                              {$baseUri = "$GraphUri/me/mailFolders" }
+
+    if     ($Name -match $WellKnownMailFolderRegex -or $Name -match '\S{100}') {
+                                         $uri     = $baseUri + '/{1}?$top={0}' -f $top, ($Name -replace '[/\\]','') }
+    else {
+        if     ($Name -match  "^[/\\]?(\w.*)[/\\](\w.*?$)") {
+            $Name         = $Matches[2]
+            $ParentFolder = Get-GraphMailFolder -Name $Matches[1] -User $User
+            if (-not $ParentFolder -or $ParentFolder.count -gt 1) {
+                Write-Warning "$($parentfolder.count)Could not resolve $($matches[1]) as a folder path" ; return
+            }
+        }
+        if     ($ParentFolder.id) {      $Uri     = $baseUri + '/{1}/childfolders?$top={0}' -f $top, $parentfolder.id }
+        elseif ($ParentFolder)    {      $Uri     = $baseUri + '/{1}/childfolders?$top={0}' -f $top, $ParentFolder    }
+        else                      {      $Uri     = $baseUri + '?$top={0}'                  -f $top }
+        if     ($Name)            {      $filter  = "startswith(displayName,'{0}') "        -f ($Name -replace "'","''" ) }
+    }
+    if     ($Select)                     {$uri    = $uri + '&$select=' + ($Select -join ',') }
+    if     ($Filter)                     {$uri    = $uri + $JoinChar + '&$Filter='  + $Filter  }
+    #The API order by DOES NOT WORK :-( -always by display name.
+   #if     ($OrderBy)                    {$uri    = $uri + $JoinChar + '&$orderby=' + $OrderBy }
     #endregion
 
-    #region get the data, to keep the size attribute we will handle paging and converting to an object locally.
-    $folderList    = @()
-    $result       = Invoke-GraphRequest -Uri $uri
-    $folderList   += $result.value
-    while ($result.'@odata.nextLink') {
-        $result          = Invoke-GraphRequest -Uri  $result.'@odata.nextLink' ;
-        $folderList += $result.value
+    #region get the data, to keep the size attribute which is missing from SDK object, we will handle paging and converting to an object locally.
+    $folderList              = @()
+    $response                = Invoke-GraphRequest -Uri $uri
+    if ($response.Keys -notcontains 'value') { #Value may be empty.
+          [void]$response.remove('@odata.context')
+           $folderList      += $response
     }
-
-    foreach ($f in $folderList) {
+    else  {$folderList      += $response.value
+        while ($response.'@odata.nextLink' -and $folderList.count -lt $Top) {
+               $response     = Invoke-GraphRequest -Uri  $response.'@odata.nextLink' ;
+               $folderList  += $response.value
+        }
+    }
+    if ($ChildItems)   {$result = foreach ($f in $folderlist) {Get-GraphMailFolder -ParentFolder $f.id -User $User }}
+    else               {$result = foreach ($f in $folderList) {
         $size = $f.sizeInBytes
         [void]$f.remove('sizeInBytes')
         New-object -TypeName MicrosoftGraphMailFolder -Property $f |
-            Add-Member -PassThru -NotePropertyName SizeInBytes -NotePropertyValue $size
-        }
-    #endregion\\
+            Add-Member -PassThru -NotePropertyName SizeInBytes -NotePropertyValue  $size |
+            Add-Member -PassThru -NotePropertyName Path        -NotePropertyValue "$baseUri/$($f.id)"
+    }}
+    if (-not $OrderBy) {$result}
+    elseif  ($OrderBy -match 'Desc') {
+                        $result | Sort-Object -Property ($OrderBy -replace '\s*desc\s*$','') -Descending }
+    else               {$result | Sort-Object -Property  $OrderBy }
+    #endregion
 }
 
-function Get-GraphMailItem     {
+function Get-GraphMailItem        {
     <#
       .Synopsis
         Get items in a mail folder
@@ -1302,18 +1332,38 @@ function Get-GraphMailItem     {
         This shows a filter based on two conditions.
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    param(
-        #UserID as a guid or User Principal name. If not specified defaults to "me"
-        [string]$User ,
-        #The ID of a folder, or one of the well known folder names 'archive', 'clutter', 'conflicts', 'conversationhistory', 'deleteditems', 'drafts', 'inbox', 'junkemail', 'localfailures', 'msgfolderroot', 'outbox', 'recoverableitemsdeletions', 'scheduled', 'searchfolders', 'sentitems', 'serverfailures', 'syncissues'
-        [Parameter(ValueFromPipeline=$true)]
+    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphMessage])]
+    param   (
+        #A folder objet or the ID of a folder, or one of the well known folder names 'archive', 'clutter', 'conflicts', 'conversationhistory', 'deleteditems', 'drafts', 'inbox', 'junkemail', 'localfailures', 'msgfolderroot', 'outbox', 'recoverableitemsdeletions', 'scheduled', 'searchfolders', 'sentitems', 'serverfailures', 'syncissues'
+        [Parameter(ValueFromPipeline=$true,Position=0)]
+        [ArgumentCompleter([MailFolderCompleter])]
         $Mailfolder = "Inbox",
-        #if specified the command will return child folders instead of messages
-        [switch]$ChildFolders,
+        #UserID as a guid or User Principal name, if it can't be discovered from the mailfolder. If not specified defaults to "me"
+        [string]$User,
+        #Selects only unread mail (equivalent to isread:no in Outlook)
+        [switch]$Unread,
+        #Searches based on the subject field (equivalent to subject: in Outlook)
+        [string]$Subject,
+        #Searches based on the from field (equivalent to from: in Outlook)
+        [string]$From,
+        #Searches based on the to field (equivalent to to: in Outlook)
+        [string]$To,
+        #Selects only mail with attachments (equivalent to hasAttachments:yes in Outlook). Note this does not combine well with date based searches
+        [switch]$HasAttachments,
+        #Selects only mail marked as important (equivalent to importance:high in Outlook).
+        [switch]$Important,
+        #Selects only mail from today (equivalent to received:today in Outlook).
+        [switch]$Today,
+        #Selects only mail from today (equivalent to received:yesterday in Outlook).
+        [switch]$Yesterday,
+        #Selects only mail from before a given date
+        [datetime]$Before,
+        #Selects only mail from after a given date
+        [datetime]$After,
         #A term to do a free text search for in the mail box (see examples)
         [string]$Search,
-        #If specified returns the top X items
-        [int]$Top,
+        #If specified returns the top X items, defaults to 100
+        [int]$Top = 100 ,
         #Sorting option, defaults to sorting by SentDateTime with newest first. Searches are not sorted.
         [string]$OrderBy ='SentdateTime desc',
         #Select particular mail fields , ignored if -ChildFolders is specified; defaults to From, Subject, SentDateTime, BodyPreview, and Weblink
@@ -1321,43 +1371,169 @@ function Get-GraphMailItem     {
         'flag', 'from', 'hasAttachments', 'id', 'importance', 'inferenceClassification', 'internetMessageHeaders', 'internetMessageId',
         'isDeliveryReceiptRequested', 'isDraft', 'isRead', 'isReadReceiptRequested', 'lastModifiedDateTime', 'parentFolderId',
         'receivedDateTime', 'replyTo', 'sender', 'sentDateTime', 'subject', 'toRecipients', 'uniqueBody', 'webLink' )]
-        [string[]]$Select = @('From', 'Subject', 'SentDatetime', 'BodyPreview', 'weblink'),
+        [string[]]$Select = @('From', 'Subject', 'SentDatetime', 'hasAttachments', 'BodyPreview', 'weblink'),
         #A Custom filter string; for example "importance eq high" - the examples have more cases
         [Parameter(Mandatory=$true, ParameterSetName='FilterByString')]
         [string]$Filter
     )
     process {
-        if     ($Mailfolder.id) {$MailPath = 'mailfolders/' +  $Mailfolder.id}
-        elseif ($Mailfolder)    {$MailPath = 'mailfolders/' + ($Mailfolder -replace '^/','')}
-        else                    {$MailPath = ''}
+       # $wellKnownMailFolderRegex = '^[/\\]?(archive|clutter|conflicts|conversationhistory|deleteditems|drafts|inbox|junkemail|localfailures|msgfolderroot|outbox|recoverableitemsdeletions|scheduled|searchfolders|sentitems|serverfailures|syncissues)[/\\]?$'
 
-        if ($User.id) {$User  = $User.id}
-        if ($User)    {$uri   = "$GraphUri/users/$user/$MailPath" }
-        else          {$uri   = "$GraphUri/me/$MailPath" }
-
-        if ($ChildFolders -and '' -ne $MailPath)    {
-            Invoke-GraphRequest -Uri "$uri/childfolders" -ValueOnly -AsType ([MicrosoftGraphMailFolder])
+        #if mailfolder is a path (not a well known name or 120 chars of ID) get the folder.
+        if ($Mailfolder -is [string] -and $Mailfolder -notmatch $WellKnownMailFolderRegex -and $Mailfolder -Notmatch "\S{100}") {
+            $Mailfolder = Get-GraphMailFolder -User $User -Name $Mailfolder
         }
-        elseif ($ChildFolders) {
-            Write-Warning -Message 'You need to specify a folder when requesting child folders.'
+        #if mailfolder was a folder object with a path to start or we just got one,  know where to look.
+        if ($Mailfolder.path)   {$baseUri = $Mailfolder.path}
+        else {  #build a path for a string holding a well known name or ID  or use the ID if the folder was fetched without adding path.
+            if     ($Mailfolder.id)             { $MailPath = 'mailfolders/' +  $Mailfolder.id}
+            elseif ($Mailfolder -is [string] )  { $MailPath = 'mailfolders/' + ($Mailfolder -replace '^/','' -replace '/$','')}
+            else {Write-Warning 'Could not make sense of the the folder provided'}
+
+            if ($User.id) {$baseUri   = "$GraphUri/users/$($user.id)/$MailPath"}
+            if ($User)    {$baseUri   = "$GraphUri/users/$user/$MailPath" }
+            else          {$baseUri   = "$GraphUri/me/$MailPath" }
         }
-        else {
-            $uri =  $uri + '/messages?$select='  + ($Select -join ',')
-            if     ($Top)    {$uri = $uri + '&$top='     + $Top              }
-            if     ($Search) {$Uri = $uri + '&$search="' + $Search + '"'     }
-            elseif ($Filter) {$Uri = $uri + '&$filter='  + $Filter + ''      }
-            else             {$uri = $uri + '&$orderby=' + $OrderBy          }
+        #baseURI should be something like https://graph.microsoft.com/v1.0/users/{some-user-id}/mailfolders/inbox
+        #                              or https://graph.microsoft.com/v1.0/me/mailfolders/{somefolderID}
+        $webparams = @{
+            'Headers'        = @{'Prefer'          ='outlook.body-content-type="text"'
+                                    'ConsistencyLevel'='eventual'}
+            'ValueOnly'      = $true
+            'Uri'            = $baseUri + '/messages?$select='  + ($Select -join ',') +
+                                '&$expand=attachments($select=id,name,size,contenttype)&$top=' + $Top
+        }
+        #Get-GraphMailitem -Search "hasattachments:yes from:tom" -top 3
+        if ($HasAttachments)      {$Search = $search + ' hasattachments:yes'}
+        if ($Important)           {$Search = $search + ' importance:high'}
+        if ($Unread)              {$Search = $search + ' isread:no'}
+        if ($Subject)             {$Search = $search + " subject:$subject"}
+        if ($To)                  {$Search = $search + " to:$to"}
+        if ($From)                {$Search = $search + " from:$from"}
+        if ($Before -and $After)  {$Search = $search + ' received>={0:MM-dd-yyyy} AND received<={1:MM-dd-yyyy}' -f $After,$Before }
+        if              ($After)  {$Search = $search + ' received>={0:MM-dd-yyyy}' -f $After}
+        elseif         ($Before)  {$Search = $search + ' received<={0:MM-dd-yyyy}' -f $Before }
+        elseif          ($Today)  {$Search = $search + ' received:today'}
+        elseif      ($Yesterday)  {$Search = $search + ' received:yesterday'}
 
+        if     ($Search)     {$webparams.Uri +=  '&$search="' + $Search + '"' }
+        elseif ($Filter)     {$webparams.Uri +=  '&$filter='  + $Filter  }
+        else                 {$webparams.Uri +=  '&$orderby=' + $OrderBy }
+        Write-Debug $webparams.uri
 
-            Invoke-GraphRequest -Uri $uri -Headers @{'Prefer' ='outlook.body-content-type="text"'} -ValueOnly -AsType ([MicrosoftGraphMessage]) -ExcludeProperty '@odata.etag' |
-                Add-Member -PassThru -MemberType ScriptProperty -Name "fromName"    -Value {$this.from.emailAddress.name} |
-                Add-Member -PassThru -MemberType ScriptProperty -Name "fromAddress" -Value {$this.from.emailAddress.address} |
-                Add-Member -PassThru -MemberType ScriptProperty -Name "bodyText"    -Value {$this.body.content}
+        #we need to handle attachments here.
+        $results = Invoke-GraphRequest @webparams
+        foreach ($msg in $results) {
+            $msg.Remove('@odata.etag')
+            $msg.Remove("@odata.type")
+            $msgpath =  "$baseUri/messages/$($msg.id)"
+            #$msg won't convert unless we convert the attachments first.
+            foreach ($a in $msg.attachments) {
+                        $a.Remove("@odata.type")
+                        $a.Remove("@odata.mediacontenttype")
+                        $a = New-Object MicrosoftGraphAttachment -Property $a
+            }
+            $newMsg = New-object MicrosoftGraphMessage -Property $msg |
+                Add-Member -PassThru -NotePropertyName Path -NotePropertyValue $msgpath   |
+                Add-Member -PassThru -MemberType ScriptProperty -Name FromName    -Value {$this.from.emailAddress.name}    |
+                Add-Member -PassThru -MemberType ScriptProperty -Name FromAddress -Value {$this.from.emailAddress.address} |
+                Add-Member -PassThru -MemberType ScriptProperty -Name BodyText    -Value {$this.body.content}              |
+                Add-Member -PassThru -MemberType ScriptMethod   -Name Move        -Value {
+                    param($Destination)
+                    Move-GraphMailItem -Item $this @PSBoundParameters
+                }
+            #Converting a message to to an object will strip extra members off the attachments, so do attachments in 2 parts
+            foreach ($a in $newMsg.Attachments) {
+                Add-Member -InputObject $a -NotePropertyName Path -NotePropertyValue "$msgpath/attachments/$($a.id)"
+                Add-Member -InputObject $a -MemberType ScriptMethod -Name Download  -Value {
+                    param($Destination)
+                    Save-GraphMailAttachment -Attachment $this @PSBoundParameters
+                }
+            }
+            $newMsg
         }
     }
 }
 
-function Send-GraphMailMessage {
+function Move-GraphMailItem       {
+    param   (
+            #The mail item to move. If can be a message object or the ID of a message
+            [parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
+            $Item,
+            #The destination folder. It can be a folder object, a folder ID or a well known folder name like "DeletedItems" or "Inbox"
+            [parameter(Mandatory=$true,Position=2)]
+            [ArgumentCompleter([MailFolderCompleter])]
+            $Destination,
+            #Specifies the user if it cannot be discovered from the item and is not "me"
+            $User
+        )
+    begin   {
+        #if mailfolder is a path (not a well known name or 120 chars of ID) get the folder.
+        if     ($Destination -is [string] -and $Destination -notmatch $WellKnownMailFolderRegex -and $Mailfolder -Notmatch "\S{100}") {
+                $Destination = Get-GraphMailFolder -User $User -Name $Destination
+        }
+        if     ($Destination.Id)           {$body = @{'destinationId' = $Destination.Id}}
+        elseif ($Destination -is [string]) {$body = @{'destinationId' = $Destination}}
+        else {Write-Warning 'Could not get the destination.' ; break}
+        $webparms = @{
+            'ContentType'     = 'application/json'
+            'Body'            = (ConvertTo-Json $body)
+            'Method'          = 'Post'
+        }
+        Write-Debug $webparms.Body
+    }
+    process {
+        foreach ($i in $item){
+            if  ($i.path) {$Uri = $i.path +"/move"}
+            else {
+                if     ($i.id)             {$mailPath = "messages/$($i.id)/move"}
+                elseif ($i -is [string])   {$mailPath = "messages/$i/move"}
+                else {Write-warning "Could Not make sense of that item"}
+                if ($User.id) {$Uri   = "$GraphUri/users/$($user.id)/$MailPath"}
+                if ($User)    {$Uri   = "$GraphUri/users/$user/$MailPath" }
+                else          {$Uri   = "$GraphUri/me/$MailPath" }
+            }
+            Write-Debug $uri
+            $null = Invoke-GraphRequest @webparms -uri $uri
+        }
+    }
+}
+# only supporting move to deleted items however the DELETE method "really" deletes e.g  DELETE /users/{id | userPrincipalName}/messages/{id} DELETE /me/mailFolders/{id}/messages/{id}
+
+function Save-GraphMailAttachment {
+    param   (
+        [Parameter(ValueFromPipeline=$true,Position=0)]
+        $Attachment,
+        #if Destination is a folder the file saved will use the name of the attachment. A file name can be specified.
+        [Parameter(Position=2)]
+        $Destination = (Get-Location),
+        #if specfied the downloaded item(s) will be returned as a file
+        [Alias('PT')]
+        [switch]$PassThru
+    )
+    process {
+        foreach ($a in $Attachment) {
+            if        ($a -is [string] -and $a -match '/messages/.*/attachments/') {
+                $uri = $a -replace '/\$value$','' }
+            elseif    ($a.path) {
+                $uri = $a.path
+                if    ($a.Name) {$Filename = $a.Name}
+            }
+            else {Write-Warning 'Could not make sense of attachment provided'}
+            if (Test-Path $Destination -PathType Container) {
+                    if (-not $filename) {
+                            $filename = (Invoke-GraphRequest "$uri`?`$select=Name").name
+                    }
+                    $outfile = Join-Path $Destination $filename
+            }
+            else  { $outfile = $Destination}
+            Invoke-GraphRequest -OutputFilePath $outfile -Uri "$uri/`$value"
+            if ($PassThru) {Get-Item $outfile}
+        }
+    }
+}
+
+function Send-GraphMailMessage    {
     <#
       .Synopsis
         Sends Mail using the Graph API from the current user's mailbox.
@@ -1378,7 +1554,7 @@ function Send-GraphMailMessage {
         this time the mail is not sent but left in the user's drafts folder for review.
     #>
     [Cmdletbinding(DefaultParameterSetName='None')]
-    param (
+    param   (
         #Recipient(s) on the "to" line, each is either created with New-MailRecipient (a hash table), or a string holding an address.
         [parameter(Mandatory=$true,Position=0)]
         $To ,
@@ -1544,13 +1720,13 @@ function Send-GraphMailMessage {
     }
 }
 
-function Send-GraphMailReply   {
+function Send-GraphMailReply      {
     <#
       .synopsis
         Replies to a mail message.
     #>
     [Cmdletbinding(DefaultParameterSetName='None')]
-    param (
+    param   (
         #Either a message ID or a Message object with an ID.
         [parameter(Mandatory=$true,Position=0,ValueFromPipeline)]
         $Message,
@@ -1572,7 +1748,7 @@ function Send-GraphMailReply   {
     Invoke-GraphRequest -Method post -Uri $uri -ContentType 'application/json' -Body $json
 }
 
-function Send-GraphMailForward {
+function Send-GraphMailForward    {
     <#
       .synopsis
         Forwards a mail message.
@@ -1583,7 +1759,7 @@ function Send-GraphMailForward {
       Creates a recipient , and forwards the top mail in the users inbox to that recipent
     #>
     [Cmdletbinding(DefaultParameterSetName='None')]
-    param (
+    param   (
         #Either a message ID or a Message object with an ID.
         [parameter(Mandatory=$true,Position=0,ValueFromPipeline)]
         $Message,
@@ -1607,7 +1783,7 @@ function Send-GraphMailForward {
     Invoke-GraphRequest -Method post -Uri $uri -ContentType 'application/json' -Body $json
 }
 
-function Get-GraphContact      {
+function Get-GraphContact         {
     <#
       .Synopsis
         Get the user's contacts
@@ -1619,9 +1795,9 @@ function Get-GraphContact      {
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
     [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact])]
-    param(
+    param   (
         #UserID as a guid or User Principal name. If not specified defaults to "me"
-        [string]$UserID,
+        [string]$User,
         #If specified selects the first n contacts
         [int]$Top,
         #A custom set of contact properties to select
@@ -1644,8 +1820,8 @@ function Get-GraphContact      {
     )
 
     #region build the URI - if we got a user ID, use it, add select, filter, orderby and/or top as needed
-    if     ($UserID.id) {$uri = "$GraphUri/users/$($userID.id)/contacts"}
-    elseif ($UserID)    {$uri = "$GraphUri/users/$userID/contacts" }
+    if     ($User.id) {$uri = "$GraphUri/users/$($User.id)/contacts"}
+    elseif ($User)    {$uri = "$GraphUri/users/$User/contacts" }
     else                {$uri = "$GraphUri/me/contacts" }
 
     $JoinChar = "?" #will next parameter be added to the URI with a "?" or a "&" ?
@@ -1670,7 +1846,7 @@ function Get-GraphContact      {
     #endregion
 }
 
-function New-GraphContact      {
+function New-GraphContact         {
     <#
       .Synopsis
         Adds an entry to the current users Outlook contacts
@@ -1765,7 +1941,7 @@ function New-GraphContact      {
     }
 }
 
-function Set-GraphContact      {
+function Set-GraphContact         {
     <#
       .Synopsis
         Modifies or adds an entry in the current users Outlook contacts
@@ -1935,7 +2111,7 @@ function Set-GraphContact      {
     }
 }
 
-function Remove-GraphContact   {
+function Remove-GraphContact      {
     <#
       .synopsis
          Deletes a contact from the default user's contacts
@@ -1947,16 +2123,13 @@ function Remove-GraphContact   {
         are confident you have the right contact selected.
     #>
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
-    param (
+    param   (
         #The contact to remove, as an ID or as a contact object containing an ID
         [parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true )]
         $Contact,
         #If specified the contact will be removed without prompting for confirmation
         $Force
     )
-    begin {
-
-    }
     process {
         if ($force -or $pscmdlet.ShouldProcess($Contact.DisplayName, 'Delete contact')) {
             if ($Contact.id) {$Contact = $Contact.id}
@@ -1966,7 +2139,7 @@ function Remove-GraphContact   {
 }
 
 #Outlook calendar - also only needs items found in the user module, so we don't give it it's own PS1 file
-function Get-GraphEvent        {
+function Get-GraphEvent           {
     <#
       .Synopsis
         Get the  events in a calendar
@@ -2017,7 +2190,7 @@ function Get-GraphEvent        {
         format-table will pick up the default display properties (Subject, When, Where and ShowAs)
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    param (
+    param   (
         #UserID as a guid or User Principal name, whose calendar should be fetched.
         [Parameter( Mandatory=$true, ParameterSetName="User"          ,ValueFromPipelineByPropertyName=$true)]
         [Parameter( Mandatory=$true, ParameterSetName="UserAndSubject",ValueFromPipelineByPropertyName=$true)]
@@ -2075,7 +2248,7 @@ function Get-GraphEvent        {
         [string]$Filter
     )
 
-    begin {
+    begin   {
         $webParams = @{
             'AllValues'       = $true
             'ValueOnly'       = $true
@@ -2084,7 +2257,7 @@ function Get-GraphEvent        {
         }
         if ($TimeZone) {$webParams['Headers'] =@{"Prefer"="Outlook.timezone=""$TimeZone"""}}
     }
-    Process {
+    process {
         $CalendarPath = Get-GraphCalendarPath -Calendar $Calendar -Group $Group -User $User
         $uri          = "$GraphUri/$CalendarPath"
         #region apply the selection criteria. If -days is specified use calendar view, otherwise use events and add filter, orderby, select and top as needed
@@ -2110,7 +2283,7 @@ function Get-GraphEvent        {
     }
 }
 
-function Add-GraphEvent        {
+function Add-GraphEvent           {
     <#
       .Synopsis
         Adds an event to a calendar
@@ -2139,7 +2312,7 @@ function Add-GraphEvent        {
         Finally the meeting is created.
     #>
     [cmdletbinding()]
-    param (
+    param   (
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
         [Parameter( ParameterSetName="User",ValueFromPipelineByPropertyName=$true)]
         [string]$User,
@@ -2204,7 +2377,7 @@ function Add-GraphEvent        {
         # Attendees is one. link says this also sends the invite
 
     )
-    begin {
+    begin   {
         $webParams = @{
                     'Method'          = 'Post'
                     'ExcludeProperty' = 'icaluid','@odata.etag','@odata.context'
@@ -2248,7 +2421,7 @@ function Add-GraphEvent        {
     }
 }
 
-function Set-GraphEvent        {
+function Set-GraphEvent           {
     <#
       .Synopsis
         Modifies an event on a calendar
@@ -2258,7 +2431,7 @@ function Set-GraphEvent        {
         TBC
     #>
     [cmdletbinding(SupportsShouldProcess=$true,DefaultParameterSetName='None')]
-    param (
+    param   (
         #The event to be updateds either as an ID or as an event object containing an ID.
         [Parameter(ValueFromPipeline=$true,Position=0,Mandatory=$true)]
         $Event,
@@ -2371,7 +2544,7 @@ function Set-GraphEvent        {
      }
 }
 
-function Remove-GraphEvent     {
+function Remove-GraphEvent        {
     <#
       .Synopsis
         Deletes an item from the calendar
@@ -2416,7 +2589,7 @@ function Remove-GraphEvent     {
 #To-do-list functions are here because they are in the Users.private module, not a module of their own
 # they require the Tasks.ReadWrite  scope
 
-function Get-GraphToDoList     {
+function Get-GraphToDoList        {
     <#
       .Synopsis
         Gets information about lists used in the To Do app.
@@ -2468,14 +2641,14 @@ function Get-GraphToDoList     {
     }
 }
 
-function New-GraphToDoList     {
+function New-GraphToDoList        {
 <#
     .synopsis
         Creates a new list for the To-Do app
 #>
 [cmdletBinding(SupportsShouldProcess=$true)]
-Param(
-    [parameter(Mandatory=$true,Position=1)]
+param   (
+    [parameter(Mandatory=$true,Position=0)]
     #The name for the list
     [string]$Displayname    ,
 
@@ -2494,9 +2667,9 @@ Param(
     }
 }
 
-function New-GraphToDoTask     {
+function New-GraphToDoTask        {
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param (
+    param   (
 
         #A To-do list object or the ID of a To-do list
         [Parameter()]
@@ -2509,7 +2682,7 @@ function New-GraphToDoTask     {
         $UserId =  $global:GraphUser,
 
         # A brief description of the task.
-        [Parameter(mandatory=$true, position=1)]
+        [Parameter(mandatory=$true, position=0)]
         [string]$Title,
 
         #The text or HTML content of the task body
@@ -2570,9 +2743,9 @@ function New-GraphToDoTask     {
     }
 }
 
-function Update-GraphToDoTask  {
+function Update-GraphToDoTask     {
     [cmdletbinding(SupportsShouldProcess=$true)]
-    Param (
+    param   (
     #A Task object or the ID of a task.
     [Parameter(mandatory=$true,ValueFromPipelineByPropertyName =$true, ValueFromPipeline=$true)]
     [alias('ID')]
@@ -2588,7 +2761,7 @@ function Update-GraphToDoTask  {
     [string]$UserId =  $global:GraphUser,
 
     # A brief description of the task.
-    [Parameter(position=1)]
+    [Parameter(position=0)]
     [string]$Title,
 
     #The text or HTML content of the task body
@@ -2661,13 +2834,13 @@ function Update-GraphToDoTask  {
     }
 }
 
-function Remove-GraphToDoTask  {
+function Remove-GraphToDoTask     {
     <#
         .synopsis
             Removes a task from the To Do app
     #>
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
-    Param (
+    param   (
     #A Task object or the ID of a task.
     [Parameter(mandatory=$true,ValueFromPipelineByPropertyName =$true, ValueFromPipeline=$true)]
     [alias('ID')]
@@ -2712,13 +2885,13 @@ function Remove-GraphToDoTask  {
     }
 }
 
-function Remove-GraphToDoList  {
+function Remove-GraphToDoList     {
     <#
         .synopsis
             Removes a list from the To Do app, including any task in contains.
     #>
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
-    Param (
+    param   (
     #A To-do list object or the ID of a To-do list
     [Parameter(mandatory=$true,ValueFromPipelineByPropertyName =$true, ValueFromPipeline=$true)]
     [alias('TodoTaskListId','ListID')]

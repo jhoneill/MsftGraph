@@ -1,6 +1,5 @@
 using namespace Microsoft.Graph.PowerShell.Models
 #MicrosoftGraphMailTips object is isn Microsoft.Graph.Users.Actions.private.dll
-[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Scope='Function', Target='New*')]
 param()
 
 function Get-GraphMailTips       {
@@ -9,7 +8,7 @@ function Get-GraphMailTips       {
         Gets mail tips for one or more users (is their mailbox full, are auto-replies on etc)
     #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification="MailTip would be incorrect")]
-    param(
+    param   (
         #mail addresses
         [Parameter(Mandatory=$true)]
         [string[]]$Address

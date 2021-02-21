@@ -1,5 +1,5 @@
-﻿using namespace System.Management.Automation
-using namespace Microsoft.Graph.PowerShell.Models
+﻿using namespace Microsoft.Graph.PowerShell.Models
+using namespace System.Management.Automation
 
 function Get-GraphPlan           {
     <#
@@ -98,7 +98,7 @@ function Set-GraphPlanDetails    {
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification="Detail would be incorrect")]
-    Param(
+    param   (
         #The ID of the Plan or a Plan object with an ID property.
         [Parameter(Mandatory=$true, Position=0,ValueFromPipeline=$true)]
         $Plan,
@@ -166,15 +166,13 @@ function Remove-GraphPlan  {
         Removes a plan from a plan the
     #>
     [CmdletBinding(SupportsShouldProcess,ConfirmImpact='High')]
-    param (
+    param   (
         #The ID of the plan or a plan object with an ID property.
         [Parameter( ValueFromPipeline=$true,Position=0)]
         $Plan,
         #If specified the plan will be removed without prompting for confirmation; by default confirmation IS requested.
         [switch]$Force
     )
-    begin {
-    }
     process {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
         if (-not $Plan)         {$Plan = Invoke-GraphRequest -Uri "$GraphUri/me/planner/plans" -ValueOnly -AsType ([MicrosoftGraphPlannerPlan]) -ExcludeProperty '@odata.etag' | Select-Object -First 1 }

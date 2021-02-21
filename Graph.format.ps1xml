@@ -167,7 +167,10 @@
             </TableControl>
         </View>
         <View>
-            <Name>Domain</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphVerifiedDomain</TypeName></ViewSelectedBy>
+            <Name>Domain</Name><ViewSelectedBy>
+                <TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphVerifiedDomain</TypeName>
+                <TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDomain</TypeName>
+            </ViewSelectedBy>
             <TableControl>
                 <AutoSize />
                 <TableHeaders>
@@ -1723,19 +1726,26 @@
         <View>
             <Name>Graph MailMessage</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphMessage</TypeName></ViewSelectedBy>
             <TableControl>
-                <AutoSize />
                 <TableHeaders>
                     <TableColumnHeader>
                       <Label>From Name</Label>
                       <Alignment>left</Alignment>
+                        <Width>25</Width>
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>Subject</Label>
                         <Alignment>Left</Alignment>
+                        <Width>40</Width>
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>Sent</Label>
                         <Alignment>Left</Alignment>
+                        <Width>18</Width>
+                    </TableColumnHeader>
+                    <TableColumnHeader>
+                        <Label>+</Label>
+                        <Alignment>Left</Alignment>
+                        <Width>1</Width>
                     </TableColumnHeader>
                     <TableColumnHeader>
                         <Label>Preview</Label>
@@ -1758,6 +1768,11 @@
                                    <ScriptBlock>([datetime]$_.sentdatetime).tostring("g")</ScriptBlock>
                                 <Alignment>Left</Alignment>
                            </TableColumnItem>
+                           <TableColumnItem>
+                                   <ScriptBlock>if ($_.hasattachments) {"Y"} </ScriptBlock>
+                                <Alignment>Left</Alignment>
+                           </TableColumnItem>
+
                             <TableColumnItem>
                                 <PropertyName>bodypreview</PropertyName>
                                 <Alignment>Left</Alignment>

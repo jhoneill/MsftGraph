@@ -1,10 +1,4 @@
-using namespace System.Management.Automation
 using namespace Microsoft.Graph.PowerShell.Models
-using namespace System.Globalization
-
-$Script:GraphUri  = "https://graph.microsoft.com/v1.0"
-$Script:GUIDRegex = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
-
 
 function Get-GraphGroupList         {
     <#
@@ -24,9 +18,9 @@ function Get-GraphGroupList         {
     #>
     [Cmdletbinding(DefaultparameterSetName="None")]
     [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphGroup])]
-    param (
+    param   (
         #if specified limits the groups returned to those with names begining...
-        [Parameter(Mandatory=$true, parameterSetName='FilterByName', Position=1)]
+        [Parameter(Mandatory=$true, parameterSetName='FilterByName', Position=0)]
         [string]$Name,
         #Field(s) to select: ID and displayname are always included;
         #The following are only available when getting a single group:
@@ -129,7 +123,7 @@ function Get-GraphGroup             {
     param   (
         #The name of a team.
         #One more Team IDs or team objects containing and ID. If omitted the current user's teams will be used.
-        [Parameter(ValueFromPipeline=$true, Position=1)]
+        [Parameter(ValueFromPipeline=$true, Position=0)]
         [Alias("Team","Group")]
         [ArgumentCompleter([GroupCompleter])]
         $ID ,
@@ -393,9 +387,9 @@ function New-GraphGroup             {
     [Cmdletbinding(SupportsShouldprocess=$true,DefaultParameterSetName="None")]
     [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphGroup])]
     [Alias("New-GraphTeam")]
-    param(
+    param   (
         #The Name of the group / team
-        [Parameter(Mandatory=$true, Position=1)]
+        [Parameter(Mandatory=$true, Position=0)]
         [string]$Name,
 
         #Unless specified groups will be mail enabled "unfied" / Microsoft365 groups
@@ -591,7 +585,7 @@ function Set-GraphTeam              {
         Note the use of -SwitchName:$false.
     #>
     [Cmdletbinding(SupportsShouldProcess=$true)]
-    param (
+    param   (
         #The team to update either as an ID or a team object with and ID.
         [ArgumentCompleter([GroupCompleter])]
         [Parameter(ValueFromPipeline=$true,Position=0)]
@@ -702,7 +696,7 @@ function Remove-GraphGroup          {
     #>
     [Cmdletbinding(SupportsShouldprocess=$true,ConfirmImpact='High')]
     [Alias("Remove-GraphTeam")]
-    param(
+    param   (
         #The ID of the Group / team
         [Parameter(Mandatory=$true, Position=0,ValueFromPipeline=$true )]
         [ArgumentCompleter([GroupCompleter])]
@@ -724,11 +718,6 @@ function Remove-GraphGroup          {
             }
         }
     }
-<#
-    Groups in the recycle bin (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/directory/deletedItems/microsoft.graph.group").value
-   DELETE /directory/deletedItems/{id}                permanent delete
-   POST /directory/deletedItems/{id}/restore          restore item
-#>
 }
 
 function Add-GraphGroupMember       {
@@ -831,7 +820,7 @@ function Remove-GraphGroupMember    {
         #If specified the member will be removed without prompting for confirmation
         [switch]$Force
     )
-        begin   {
+    begin   {
         #ensure we have an ID for the group(s) we were passed. If we got a GUID in a string, we'll confirm it's a group and get the display name.
         $Group = foreach ($g in $Group) {
             if     ($g.ID) {$g}
@@ -884,8 +873,8 @@ function Export-GraphGroupMember    {
         If a file is specified it will be treated as CSV file for export,
         otherwise the objects are output
 #>
-    param  (
-        [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+    param   (
+        [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         #One or more group(s) to export
         [ArgumentCompleter([GroupCompleter])]
         $Group,
@@ -894,10 +883,10 @@ function Export-GraphGroupMember    {
         #If specified , output will be in Group name order (default is User name.)
         [switch]$OrderByGroup
     )
-    begin  {
+    begin   {
     $list = @()
     }
-    process{
+    process {
         foreach ($g in $group) {
             if ($g.DisplayName) {$groupName = $g.DisplayName}
             else                {$groupname = $g}
@@ -908,7 +897,7 @@ function Export-GraphGroupMember    {
                                             Displayname
         }
     }
-    end    {
+    end     {
         if ($OrderByGroup) {$list = $list | Sort-Object -Property Memberof, UserPrincipalName }
         else               {$list = $list | Sort-Object -Property UserPrincipalName, Memberof }
         if (-not $path) {return $list}
@@ -916,7 +905,7 @@ function Export-GraphGroupMember    {
     }
 }
 
-Function Import-GraphGroupMember    {
+function Import-GraphGroupMember    {
 <#
     .synopsis
        Imports a list of group memberships from a CSV file
@@ -932,7 +921,7 @@ Function Import-GraphGroupMember    {
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='high')]
     param   (
         #One or more files to read for input.
-        [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
         #Usually the command will prompt for confirmation -Force disables this primpt
         [switch]$Force,
@@ -973,7 +962,7 @@ Function Import-GraphGroupMember    {
     }
 }
 
-Function Import-GraphGroup          {
+function Import-GraphGroup          {
 <#
     .synopsis
        Imports a list of groups from a CSV file
@@ -994,7 +983,7 @@ Function Import-GraphGroup          {
     [cmdletbinding(SupportsShouldProcess=$true)]
     param   (
         #One or more files to read for input.
-        [Parameter(Position=1,ValueFromPipeline=$true,Mandatory=$true)]
+        [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
         #Disables any prompt for confirmation
         [switch]$Force,
@@ -1117,8 +1106,8 @@ function Get-GraphGroupConversation {
         [Parameter(ValueFromPipeline=$true, Mandatory=$true, Position=1, ParameterSetName='OneConversation')]
         $Conversation,
         #The group where the conversation is found,it is not part of can't be found from the conversation object
-        [Parameter(ParameterSetName='InTeam')]
-        [Parameter(ParameterSetName='OneConversation')]
+        [Parameter(ParameterSetName='InTeam',Position=0)]
+        [Parameter(ParameterSetName='OneConversation',Position=0)]
         [ArgumentCompleter([GroupCompleter])]
         [Alias("Team")]
         $Group,
@@ -1175,12 +1164,12 @@ function Get-GraphGroupThread       {
     [Alias("Get-GraphTeamThread")]
     param   (
         #The group thread, either as an ID or as a thread object (which may have the team/group as property)
-        [Parameter(ParameterSetName='SingleThread', Position=0, ValueFromPipeline=$true, Mandatory=$true)]
+        [Parameter(ParameterSetName='SingleThread', Position=1, ValueFromPipeline=$true, Mandatory=$true)]
         $Thread,
         #The group holding the thread (s), if thread is either not passed or is just the ID of a thread.
         [Alias("Team")]
-        [Parameter(ParameterSetName='GroupThreads')]
-        [Parameter(ParameterSetName='SingleThread', Position=1)]
+        [Parameter(ParameterSetName='GroupThreads', Position=0)]
+        [Parameter(ParameterSetName='SingleThread', Position=0)]
         [ArgumentCompleter([GroupCompleter])]
         $Group,
         #When selecting the threads for a group narrows the list by the name of the topic
@@ -1245,7 +1234,7 @@ function Add-GraphGroupThread       {
         Send-GraphGroupReply
     #>
     [Cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='Low')]
-    param (
+    param   (
         #The group where the thread will be added
         [Parameter(Mandatory=$true,Position=0)]
         [Alias("Team")]
@@ -1379,7 +1368,7 @@ function Send-GraphGroupReply       {
         Add-GraphGroupThread
     #>
     [Cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='Low')]
-    param (
+    param   (
         #The Post being replied to, either as an ID or a post object containing an ID which may identify the thread and group
         [Parameter(Mandatory=$true,Position=0,ValueFromPipeline=$true)]
         $Post,
@@ -1436,17 +1425,16 @@ function Send-GraphGroupReply       {
     }
 }
 
-Function Get-ChannelMessagesByURI   {
+function Get-ChannelMessagesByURI   {
     <#
       .synopsis
         Helper function to add get and expand messages or replies to messages
     #>
-    param (
+    param   (
         [parameter(Position=0,ValueFromPipeline=$true)]
         $URI,
         $Top = 20
     )
-
     process {
         $msglist = @()
         Write-progress -Activity 'Getting messages' -Status "Reading Messages"
@@ -1501,7 +1489,7 @@ function Get-GraphChannel           {
     #>
     [Cmdletbinding(DefaultparameterSetName="None")]
     [Alias("Get-GraphTeamChannel")]
-    param(
+    param   (
         #The channel either as a name, an ID or as a channel object (which may contain the team as a property)
         [Parameter(Mandatory=$true, ValueFromPipeline=$true, Position=1, parameterSetName="CHMsgs")]
         [Parameter(Mandatory=$true, ValueFromPipeline=$true, Position=1, parameterSetName="CHTabs")]
@@ -1509,6 +1497,7 @@ function Get-GraphChannel           {
         [Parameter(Mandatory=$true, ValueFromPipeline=$true, Position=1, parameterSetName="CHFiles")]
         $Channel,
         #The ID of the team if it is not in the channel object. If not specified the current users teams are tried
+        [Parameter(Position=0)]
         [ArgumentCompleter([TeamCompleter])]
         $Team,
         #If specified gets the channel's Tabs
@@ -1532,7 +1521,6 @@ function Get-GraphChannel           {
         [Parameter(parameterSetName="CHMsgs")]
         $Top
     )
-
     process {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
         if ($Channel -is [string] -and $Channel -notmatch '@thread') {
@@ -1608,7 +1596,7 @@ function New-GraphChannel           {
     #>
     [Cmdletbinding(SupportsShouldprocess=$true)]
     [Alias("Add-GraphTeamChannel")]
-    param(
+    param   (
         #The team where the channel will be added, either as an ID or a team object
         [Parameter( Mandatory=$true, Position=0)]
         [ArgumentCompleter([TeamCompleter])]
@@ -1620,7 +1608,7 @@ function New-GraphChannel           {
         #Description for the new channel
         [String]$Description
     )
-    begin  {
+    begin   {
         $webparams = @{Method = "POST"
                        ContentType = "application/json"
         }
@@ -1667,7 +1655,7 @@ function Remove-GraphChannel        {
         Finds a channel by name from a named team , and removes it.
     #>
     [Cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='High')]
-    param(
+    param   (
         #The channel to delete; either as an ID, or a channel object
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         $Channel,
@@ -1709,7 +1697,7 @@ function New-GraphChannelMessage    {
         This adds a message
     #>
     [Cmdletbinding(SupportsShouldprocess=$true, ConfirmImpact='Low')]
-    param(
+    param   (
         #The channel to post to either as an ID or a channel object.
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         $Channel,
@@ -1782,7 +1770,7 @@ function New-GraphChannelReply      {
         Posts a reply to a message in a Teams channel
     #>
     [Cmdletbinding(SupportsShouldProcess=$true)]
-    param (
+    param   (
         #The Message to reply to as an ID or a message object
         [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         $Message,
@@ -1869,7 +1857,7 @@ function Get-GraphChannelReply      {
 
     #>
     [Cmdletbinding()]
-    param (
+    param   (
         #The Message to reply to as an ID or a message object containing an ID (and possibly the team and channel ID)
         [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         $Message,
@@ -1918,7 +1906,7 @@ function Get-GraphChannelReply      {
     }
 }
 
-function Add-GraphWikiTab {
+function Add-GraphWikiTab           {
     <#
       .Synopsis
         Adds a wiki tab to a channel in teams
@@ -1929,7 +1917,7 @@ function Add-GraphWikiTab {
         when the tab is first opened
     #>
     [CmdletBinding(SupportsShouldprocess=$true)]
-    param(
+    param   (
         #An ID or Channel object which may contain the team ID
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         $Channel,
@@ -1980,7 +1968,7 @@ function Add-GraphWikiTab {
 # Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
 # https://products.office.com/en-us/microsoft-teams/appDefinitions.xml
 
-function Add-GraphPlannerTab     {
+function Add-GraphPlannerTab        {
     <#
       .Synopsis
         Adds a planner tab to a team-channel for a pre-existing plan
@@ -1997,7 +1985,7 @@ function Add-GraphPlannerTab     {
         and the third creates a tab labelled 'Planner' in the channel for that plan.
     #>
     [CmdletBinding(SupportsShouldProcess=$true)]
-    param(
+    param   (
         #An ID or Plan object for a plan within the team
         [Parameter(Mandatory=$true,Position=0)]
         $Plan,
@@ -2067,7 +2055,7 @@ function Add-GraphPlannerTab     {
     }
 }
 
-function Add-GraphOneNoteTab     {
+function Add-GraphOneNoteTab        {
     <#
       .Synopsis
         Adds a tab in a Teams channel for a OneNote section or Notebook
@@ -2090,7 +2078,7 @@ function Add-GraphOneNoteTab     {
         at its 'FY-19 Year End' section.
     #>
     [CmdletBinding(SupportsShouldProcess)]
-    param(
+    param   (
         #The Notebook or Section to associate with the tab
         [Parameter(Mandatory=$true,Position=0)]
         [Alias('Section')]

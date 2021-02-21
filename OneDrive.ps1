@@ -89,7 +89,6 @@ function Get-GraphDrive {
         #If specified does not display a message when a folder is empty
         [switch]$Quiet
     )
-
     process {
         #region Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
@@ -219,7 +218,7 @@ function New-GraphFolder {
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Drive cache is intended to be accessible outside the module.')]
-    param(
+    param   (
         #The name for the new folder
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
         [Alias('FolderPath')]
@@ -229,7 +228,7 @@ function New-GraphFolder {
         [Parameter()]
         $Drive = 'me/Drive'
     )
-    begin {
+    begin   {
         #  Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
         if     ($Drive.id)               {$drive = "drives/$($drive.id)"}
@@ -295,9 +294,9 @@ function Show-GraphFolder {
         documents folder in the default browser
     #>
     [CmdletBinding(DefaultParameterSetName='FolderName')]
-    param(
+    param   (
         #If Specified gets the  folder by folder ID
-        [Parameter(Mandatory=$true, ParameterSetName='FolderName',Position=1)]
+        [Parameter(Mandatory=$true, ParameterSetName='FolderName',Position=0)]
         [Alias("FolderPath")]
         [ArgumentCompleter([OneDriveFolderCompleter])]
         [String]$Path,
@@ -334,7 +333,7 @@ function Copy-ToGraphFolder {
         on the team's drive.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    param(
+    param   (
         #location of file on the local machine
         [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
         $Path,
@@ -418,7 +417,7 @@ function Copy-ToGraphFolder {
                     $folderURI  = $uri -replace "/[^/]*?$",""   #the last slash and everything after it (lazy regex)
                     Write-Verbose -Message "COPY-TOGRAPHFOLDER: $uri was not found,  checking for $folderURI"
                     try {
-                        $x = Invoke-RestMethod -Method get -Headers $Script:DefaultHeader -Uri $folderuri
+                        $x = Invoke-GraphRequest -Uri $folderuri
                         if ($x.folder) {
                                 $settings['item'].name = $uri -replace '^.*/','' #get rid of everything up to the last slash (greedy regex)
                                 Write-Verbose -Message "COPY-TOGRAPHFOLDER: $folderURI is a valid folder; will upload as a new file."
@@ -480,9 +479,9 @@ function Copy-FromGraphFolder {
         Gets all the files in a folder on a teams drive and copies them to C:\Temp.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    param(
+    param   (
         #The path to the file on one drive
-        [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=1)]
+        [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
         [ArgumentCompleter([OneDrivePathCompleter])]
         $Path,
         #The drive, by default the current user's OneDrive.
@@ -497,7 +496,7 @@ function Copy-FromGraphFolder {
         [Alias('PT')]
         [Switch]$Passthru
     )
-    process  {
+    process {
         <#
         We can download from
         /drives/{drive-id}/items/{parent-id}:/{filename}

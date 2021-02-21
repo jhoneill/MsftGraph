@@ -21,7 +21,7 @@ function Get-GraphOneNoteBook    {
         Finds a PowerShell secion in any of the users workbooks. Again the search is casse insensitive
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    param   (
+    param    (
         #A graph URI pointing to the notebook, or a notebook object where the .self property is a graph URI...
         [Parameter(ValueFromPipeline=$true)]
         $Notebook ,
@@ -96,7 +96,7 @@ function Get-GraphOneNoteSection {
         [Parameter(ParameterSetName='Notebook')]
         $Notebook ,
         #If Specified returns the pages in the section.
-        [Parameter(ParameterSetName='Sections',Position=1)]
+        [Parameter(ParameterSetName='Sections')]
         [switch]$Pages,
         #If specified filters pages or Sections to those with names beginning ...
         [string]$Name
@@ -178,7 +178,7 @@ function New-GraphOneNoteSection {
         elseif ($notebook -notmatch "/sections$") {$webparams['uri'] = $Notebook + "/sections"}
         else                                      {$webparams['uri'] = $Notebook }
     }
-    process  {
+    process {
         $webparams['body']  = ConvertTo-Json @{"displayName" = $sectionName}
         Write-Debug $webparams['body']
         if ($Force -or $PSCmdlet.ShouldProcess($SectionName,"Add section to Notebook $($Notebook.displayname)")) {
@@ -212,8 +212,7 @@ function Get-GraphOneNotePage    {
         #If specified returs the contents with guids for each section where content can be inserted.
         [switch]$ContentWithIDs
     )
-
-    process  {
+    process {
         if     ($Page.self)        {$uri=$Page.self}
         elseif ($page-is [string]) {$uri=$Page}
         else   {Write-Warning -Message 'Could not process the page parameter' ; return}
@@ -252,7 +251,7 @@ function Add-GraphOneNotePage    {
         With $Section already defined this adds a simple page, with a title and a short body.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    param (
+    param   (
         #The section either as a URL or or as section object, which contrains a self URL or a pages URL
         [Parameter(Mandatory=$true)]
         $Section ,
@@ -334,7 +333,7 @@ function Add-FileToGraphOneNote  {
         #If specified the command will not pause for conformation, this is the default unless $ConfirmPreference is modified,
         [switch]$Force
     )
-    process  {
+    process {
         #region set the URI - based on $Section - and other parameters used to send the page
         $webParams = @{ 'Method'          = 'Post'
                         'ContentType'     = 'multipart/form-data; boundary=MyAppPartBoundary'
@@ -436,7 +435,7 @@ function Update-GraphOneNotePage {
         #If specified, the page is updated without prompting.
         [switch]$Force
     )
-    process  {
+    process {
          #If the content contains binary data, the request must be sent using the multipart/form-data content type with a "Commands" part.
         if     ($Page.self)          {$uri = $Page.self}
         elseif ($Page -is [String])  {$uri = $Page}
@@ -493,7 +492,7 @@ function Remove-GraphOneNotePage {
         #If specified, the page is deleted without prompting.
         [switch]$Force
     )
-    process  {
+    process {
         if     ($Page.self)         {$uri = $Page.self}
         elseif ($Page -is [string]) {$uri = $Page}
         else   {Write-Warning -Message 'Could not process the Page parameter' ; return}
@@ -534,7 +533,7 @@ function Out-GraphOneNote        {
         [parameter(ValueFromPipeline=$true)]
         [psobject]$InputObject,
         #Includes the specified properties of the objects in the output
-        [Parameter(Position=1)]
+        [Parameter(Position=0)]
         [String[]]$Property = @('*'),
         #The section to the content to this can be set in an environment variable DefaultOneNoteSection.
         $Section = $env:DefaultOneNoteSection,
@@ -565,7 +564,6 @@ function Out-GraphOneNote        {
     begin   { $stuff = @() }
     process { $Stuff = $Stuff + $InputObject}
     end     {
-
         #region gather the parameters for the API call - built URI from $section
          #if we got a section object use its pages URL, otherwise if we got a string without pages on the end, add pages, otherwise use section as is
         if     (-not $section )                  {throw [ParameterBindingException]::new('Section parameter is required')}

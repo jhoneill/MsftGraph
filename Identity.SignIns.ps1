@@ -6,11 +6,11 @@ function New-GraphInvitation   {
             Invites an external user to become a guest in Azure AD
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
-    param(
+    param   (
         #The email address of the user being invited.
         #The characters  #~ ! $ %  ^  & * ( [ { < > } ] ) +  = \ /  | ; : " " ? , are not permitted
         #A  . or - is permitted except at the beginning or end of the name. A _  is permitted anywhere.
-        [Parameter(Position=1,ValueFromPipeline=$true)]
+        [Parameter(Position=0,ValueFromPipeline=$true)]
         [string]$EmailAddress,
         #The display name of the user being invited.
         [string]$DisplayName,

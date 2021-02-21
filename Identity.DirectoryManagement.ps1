@@ -3,7 +3,7 @@ using namespace Microsoft.Graph.PowerShell.Models
 #Uses functions from  and MicrosoftGraphSubscribedSku type from  Microsoft.Graph.Identity.DirectoryManagement.private.dll
 
 #xxxx todo: check context is a workorschool account and that it has the right scopes and warn / error / throw if not.
-function Get-GraphDomain          {
+function Get-GraphDomain            {
     <#
       .synopsis
         Gets domains in the current tenant
@@ -13,10 +13,11 @@ function Get-GraphDomain          {
     [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphDomain])]
     [cmdletbinding(DefaultParameterSetName='None')]
     param (
-        [parameter(Position=1, ValueFromPipeline=$true, ParameterSetName='Domain',    Mandatory=$true)]
-        [parameter(Position=1, ValueFromPipeline=$true, ParameterSetName='VDRecords', Mandatory=$true)]
-        [parameter(Position=1, ValueFromPipeline=$true, ParameterSetName='SCRecords', Mandatory=$true)]
-        [parameter(Position=1, ValueFromPipeline=$true, ParameterSetName='NameRef',   Mandatory=$true)]
+        [parameter(Position=0, ValueFromPipeline=$true, ParameterSetName='Domain',    Mandatory=$true)]
+        [parameter(Position=0, ValueFromPipeline=$true, ParameterSetName='VDRecords', Mandatory=$true)]
+        [parameter(Position=0, ValueFromPipeline=$true, ParameterSetName='SCRecords', Mandatory=$true)]
+        [parameter(Position=0, ValueFromPipeline=$true, ParameterSetName='NameRef',   Mandatory=$true)]
+        [ArgumentCompleter([DomainCompleter])]
         $Domain,
 
         [parameter(ParameterSetName='VDRecords',Mandatory=$true)]
@@ -39,26 +40,26 @@ function Get-GraphDomain          {
             if     ($d.id)              {$d = $d.id}
             elseif ($d.name)            {$d = $d.name}
             elseif ($d -isnot [String]) {Write-Warning -Message 'Could not find the Domain ID from the parameter'}
-            if ($VerificationDNSRecords) {
+            if     ($VerificationDNSRecords)      {
                 $null = $PSBoundParameters.Remove("VerificationDNSRecords")
                 Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgDomainVerificationDnsRecord_List1 -DomainId $d @PSBoundParameters
             }
-            elseif ($ServiceConfigurationRecords)  {
+            elseif ($ServiceConfigurationRecords) {
                 $null = $PSBoundParameters.Remove("ServiceConfigurationRecords")
                 Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgDomainServiceConfigurationRecord_List1 -DomainId $d @PSBoundParameters
             }
-            elseif ($NameReferenceList)  {
+            elseif ($NameReferenceList)           {
                 $null = $PSBoundParameters.Remove("NameReferenceList")
                 Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgDomainNameerenceByRef_List1 -DomainId $d @PSBoundParameters
             }
-            else {
+            else   {
                 Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgDomain_Get1 -DomainId $d @PSBoundParameters
             }
         }
     }
 }
 
-function Get-GraphOrganization    {
+function Get-GraphOrganization      {
     <#
       .Synopsis
         Gets a summary of organization information from MSGraph
@@ -71,7 +72,7 @@ function Get-GraphOrganization    {
     #>
     [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization])]
     [cmdletbinding(DefaultParameterSetName="None")]
-    Param(
+    param (
         $Organization,
         [Parameter(DontShow)]
         [System.Uri]
@@ -93,7 +94,7 @@ function Get-GraphOrganization    {
     Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgOrganization_List1 @PSBoundParameters
 }
 
-function Get-GraphSKU             {
+function Get-GraphSKU               {
     <#
       .Synopsis
         Gets details of SKUs organization an organization has subscribed to
@@ -105,7 +106,7 @@ function Get-GraphSKU             {
     [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphSubscribedSku])]
     param   (
         #The SKU to get either as an ID or a SKU object containing an ID
-        [parameter(Position = 1, ValueFromPipeline=$true)]
+        [parameter(Position = 0, ValueFromPipeline=$true)]
         [ArgumentCompleter([SkuCompleter])]
         $SKU = '*',
         #If specified just returns the Service plans for the SKU, otherwise returns the SKU with a service plans property
@@ -153,20 +154,20 @@ function Get-GraphSKU             {
     }
 }
 
-function Grant-GraphUserLicense   {
+function Grant-GraphUserLicense     {
     <#
       .Synopsis
         Grants the licence to use a particular stock-keeping-unit (SKU) to a user
     #>
     [cmdletbinding(SupportsShouldprocess=$true)]
-    param (
+    param   (
         #The SKU to get either as an ID or a SKU object containing an ID
-        [parameter(Position=1, Mandatory=$true)]
+        [parameter(Position=0, Mandatory=$true)]
         [ArgumentCompleter([SkuCompleter])]
         $SKUID ,
 
         #ID for the user (required. "me" will select the current user)
-        [parameter(Position=2, ValueFromPipeline=$true, Mandatory = $true)]
+        [parameter(Position=1, ValueFromPipeline=$true, Mandatory = $true)]
         $UserID ,
 
         #Disables individual parts of the the SKU
@@ -176,7 +177,7 @@ function Grant-GraphUserLicense   {
         #Runs the command without a confirmation dialog
         [Switch]$Force
     )
-    begin {
+    begin   {
         $request        = @{'addLicenses' = @() ; 'removeLicenses' = @()}
 
         foreach  ($s in $SKUID) {
@@ -228,7 +229,7 @@ function Grant-GraphUserLicense   {
             #region Add the user to web parameters: allow for mulitple users - potentially with an ID or a UPN
             if ($u -eq "me") {
                     $webparams['uri']   = "$GraphUri/me/assignLicense"
-                    $userDisplayName    =  $Script:GraphUser.DisplayName
+                    $userDisplayName    =  $global:GraphUser
             }
             elseif ($u.id)  {
                     $webparams['uri']   = "$GraphUri/users/$($u.id)/assignLicense"
@@ -262,20 +263,20 @@ function Grant-GraphUserLicense   {
     }
 }
 
-function Revoke-GraphUserLicense  {
+function Revoke-GraphUserLicense    {
     <#
       .Synopsis
         Revokes a user's licence to use a particular stock-keeping-unit (SKU)
     #>
     [cmdletbinding(SupportsShouldprocess=$true)]
-    param (
+    param   (
         #The SKU to revoke either as an ID or a SKU object containing an ID
-        [parameter(Position=1, Mandatory=$true)]
+        [parameter(Position=0, Mandatory=$true)]
         [ArgumentCompleter([SkuCompleter])]
         $SKUID ,
 
         #ID for the user (required. "me" will select the current user)
-        [parameter(Position=2, ValueFromPipeline=$true, Mandatory = $true)]
+        [parameter(Position=1, ValueFromPipeline=$true, Mandatory = $true)]
         $UserID ,
 
         #Runs the command without a confirmation dialog
@@ -297,7 +298,7 @@ function Revoke-GraphUserLicense  {
         # Use the default credentials for the proxy
         $ProxyUseDefaultCredentials
     )
-    begin {
+    begin   {
         $request        = @{'addLicenses' = @() ; 'removeLicenses' = @()}
         foreach ($s in $SKUID) {
             if  ($s.skuid) {$s = ($s.skuid) }
@@ -327,7 +328,7 @@ function Revoke-GraphUserLicense  {
             #region Add the user to web parameters: allow for mulitple users - potentially with an ID or a UPN
             if ($u -eq "me") {
                     $webparams['uri']   = "$GraphUri/me/assignLicense"
-                    $userDisplayName    =  $Script:GraphUser.DisplayName
+                    $userDisplayName    =  $global:GraphUser
             }
             elseif ($u.id)  {
                     $webparams['uri']   = "$GraphUri/users/$($u.id)/assignLicense"
@@ -350,14 +351,14 @@ function Revoke-GraphUserLicense  {
     }
 }
 
-function Get-GraphSkuLicensedUser {
+function Get-GraphSkuLicensedUser   {
     <#
       .Synopsis
         Get0 stock-keeping-unit (SKU)
     #>
     param   (
         #The SKU to get either as an ID or a SKU object containing an ID
-        [parameter(Position=1, ValueFromPipeline=$true, Mandatory=$true)]
+        [parameter(Position=0, ValueFromPipeline=$true, Mandatory=$true)]
         [ArgumentCompleter([SkuCompleter])]
         $SKUID ,
 
@@ -381,7 +382,7 @@ function Get-GraphSkuLicensedUser {
             elseif  ($s -notmatch $GuidRegex) {
                 Write-Warning "$s doesn't look like a valid SKU" ; continue
             }
-            $uri     = '$GraphUri/users?$Select=id,displayName,userPrincipalName,assignedLicenses&$filter=assignedLicenses/any(x:x/skuId eq {0})' -f  $s
+            $uri     = $GraphUri + '/users?$Select=id,displayName,userPrincipalName,assignedLicenses&$filter=assignedLicenses/any(x:x/skuId eq {0})' -f  $s
             if ($expand) {
                 $result +=  Invoke-GraphRequest -Uri $uri -ValueOnly
             }
@@ -402,7 +403,7 @@ function Get-GraphSkuLicensedUser {
     }
 }
 
-function Get-GraphDirectoryRole   {
+function Get-GraphDirectoryRole     {
 <#
     .synopsis
         Gets a directory role or its members
@@ -412,9 +413,10 @@ function Get-GraphDirectoryRole   {
         The command adds the role name to the user object making it possible
         to show the roles and names in the output.
 #>
-    Param (
+    param   (
         #The role to get, either as a display name (wildcards allowed), an ID, or a Role object containing an ID
-        [parameter(ValueFromPipeline=$true,Position=1)]
+        [parameter(ValueFromPipeline=$true,Position=0)]
+        [ArgumentCompleter([RoleCompleter])]
         $Role = '*',
         #If specified returns the members of the role as user objects
         [switch]$Members
@@ -453,19 +455,18 @@ function Get-GraphDirectoryRole   {
     }
 }
 
-function Grant-GraphDirectoryRole {
+function Grant-GraphDirectoryRole   {
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
-    param (
-        #The member to add , can be a user name, or a user or group object
+    param   (
+        #The role(s) to revoke, either as role names or a role objects.
+        [Parameter(Position=0,Mandatory=$true)]
+        [ArgumentCompleter([RoleCompleter])]
+        $Role ,        #The member to add , can be a user name, or a user or group object
         [Parameter(ValueFromPipeline=$true,Position=1,Mandatory=$true)]
         $Member ,
-        #The role(s) to revoke, either as role names or a role objects.
-        [Parameter(Position=2,Mandatory=$true)]
-        [ArgumentCompleter([RoleCompleter])]
-        $Role ,
         [switch]$Force
     )
-    begin {
+    begin   {
         $Role = $Role | Get-GraphDirectoryRole
     }
     process {
@@ -484,19 +485,19 @@ function Grant-GraphDirectoryRole {
     }
 }
 
-function Revoke-GraphDirectoryRole {
+function Revoke-GraphDirectoryRole  {
     [cmdletbinding(SupportsShouldProcess=$True,ConfirmImpact='High')]
-    param (
-        [Parameter(ValueFromPipeline=$true,Position=1)]
-        #The member to add , can be a user name, or a user or group object
-        $Member ,
-        [Parameter(Position=2,Mandatory=$true)]
+    param   (
+        [Parameter(Position=0,Mandatory=$true)]
         #The role(s) to revoke, either as role names or a role objects.
         [ArgumentCompleter([RoleCompleter])]
         $Role ,
+        [Parameter(ValueFromPipeline=$true,Position=1)]
+        #The member to add , can be a user name, or a user or group object
+        $Member ,
         [switch]$Force
     )
-    begin {
+    begin   {
         $Role = $Role | Get-GraphDirectoryRole
     }
     process {
@@ -513,7 +514,7 @@ function Revoke-GraphDirectoryRole {
     }
 }
 
-function Get-GraphDeletedObject {
+function Get-GraphDeletedObject     {
     param (
         $Name,
         [switch]$Group
@@ -526,8 +527,8 @@ function Get-GraphDeletedObject {
 
 function Restore-GraphDeletedObject {
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
-    param (
-        [Parameter(ValueFromPipeline=$true,position=1)]
+    param   (
+        [Parameter(ValueFromPipeline=$true,position=0)]
         $ID,
         [switch]$Group,
         [switch]$Force
@@ -540,7 +541,7 @@ function Restore-GraphDeletedObject {
         }
     }
 }
-
+#  DELETE /directory/deletedItems/{id}                permanent delete
 
 #see applications.
 #(Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/microsoft.graph.servicePrincipal" -all)

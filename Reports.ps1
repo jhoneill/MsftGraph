@@ -1,6 +1,6 @@
 using namespace Microsoft.Graph.PowerShell.Models
 
-Function Get-GraphReport       {
+function Get-GraphReport       {
     <#
         .Synopsis
             Gets reports from MS Graph
@@ -10,7 +10,7 @@ Function Get-GraphReport       {
             fields have 'friendly' names which need to be wrapped in quotes
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    param(
+    param   (
         #The report to Fetch
         [ValidateSet(
                 'EmailActivityCounts', 'EmailActivityUserCounts', 'EmailActivityUserDetail',
@@ -47,7 +47,7 @@ Function Get-GraphReport       {
         #If specified the data will be written in CSV format to the path provided, otherwise it will be output to the pipeline
         $Path
     )
-    if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+    if (-not $script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
     if     ($Date)    {
         if ($report -match 'Counts$|Pages$|Storage$') {Write-Warning -Message 'Reports ending with Counts, Pages or Storage do not support date filtering' ; return }
         if ($report -match '^Office365Activation')    {Write-Warning -Message 'Office365Activation Reports do not support any filtering.'  ; return }
@@ -70,7 +70,7 @@ Function Get-GraphReport       {
     else       { Invoke-GraphRequest -Method GET -uri $uri | ConvertFrom-Csv }
 }
 
-Function Get-GraphSignInLog    {
+function Get-GraphSignInLog    {
     <#
       .synopsis
         Gets the audit log -requires a priviledged account
@@ -87,7 +87,7 @@ Function Get-GraphSignInLog    {
     #>
     [cmdletbinding()]
     [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphSignIn])]
-    param (
+    param   (
             $top = 200
     )
     $i = 1
@@ -127,7 +127,7 @@ Function Get-GraphSignInLog    {
 
 }
 
-Function Get-GraphDirectoryLog {
+function Get-GraphDirectoryLog {
     <#
       .synopsis
         Gets the Directory audit log -requires a priviledged account
@@ -138,7 +138,7 @@ Function Get-GraphDirectoryLog {
     #>
     [cmdletbinding()]
     [outputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryAudit])]
-    param (
+    param   (
     [switch]$all,
     $Top = 100
     )
@@ -153,7 +153,7 @@ Function Get-GraphDirectoryLog {
     while ($result.'@odata.nextLink' -and  $records.Count -lt $top) {
         $i ++
         Write-Progress -Activity 'Getting Directory Audits log' -CurrentOperation "Page $i"
-        $result   = Invoke-GraphRequest  -Method get -Uri $result.'@odata.nextLink'  -headers $Script:DefaultHeader
+        $result   = Invoke-GraphRequest  -Method get -Uri $result.'@odata.nextLink'
         $records += $result.value
     }
     foreach ($r in $records) {

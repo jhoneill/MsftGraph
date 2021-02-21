@@ -42,26 +42,24 @@ function Get-GraphSite                {
     )
     begin {
         Connect-MSGraph
-        $webParams = @{Method = 'Get'
-                    Headers = $Script:DefaultHeader
-        }
+        $webParams = @{Method = 'Get'  }
     }
     process {
-        if (-not $Script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
+        if (-not $script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
         foreach ($s in $site) {
 
             if ($s.id)     {$siteID    = $s.id}     else {$siteid = $s}
             if ($s.weburl) {$ParentURL = $s.weburl} else {
-                $ParentURL = (Invoke-RestMethod @webParams -Uri "https://graph.microsoft.com/v1.0/sites/$siteID").webUrl
+                $ParentURL = (Invoke-GraphRequest @webParams -Uri "$GraphUri/sites/$siteID").webUrl
             }
-            if     ($ListID)     { (Invoke-RestMethod @webParams -Uri  "https://graph.microsoft.com/v1.0/sites/$SiteID/lists/$ListID/items?expand=fields").value }
+            if     ($ListID)     { (Invoke-GraphRequest @webParams -Uri  "$GraphUri/sites/$SiteID/lists/$ListID/items?expand=fields").value }
             elseif ($Lists)      {
 
-                              $webParams['uri'] =  "https://graph.microsoft.com/v1.0/sites/$SiteID/lists?expand=columns,contenttypes,drive"
+                              $webParams['uri'] =  "$GraphUri/sites/$SiteID/lists?expand=columns,contenttypes,drive"
                               if ($Hidden) {
                                 $webParams['uri'] += '&$select=system,createdDateTime,description,eTag,id,lastModifiedDateTime,name,webUrl,displayName,createdBy,lastModifiedBy,list'
                               }
-                              $l = (Invoke-RestMethod @webParams).value
+                              $l = (Invoke-GraphRequest @webParams).value
                               foreach ($list in $l) {
                                 $list.pstypeNames.add('GraphList')
                                 if ($list.drive) {$list.drive.pstypeNames.add('GraphDrive')}
@@ -73,12 +71,12 @@ function Get-GraphSite                {
                               return $l
             }
             elseif ($Drives)     {
-                              $d = (Invoke-RestMethod @webParams -Uri  "https://graph.microsoft.com/v1.0/sites/$SiteID/drives").value
+                              $d = (Invoke-GraphRequest @webParams -Uri  "$GraphUri/sites/$SiteID/drives").value
                               foreach ($drive in $d) {$drive.pstypeNames.add("GraphDrive")}
                               return $d
             }
             elseif ($SubSites)   {
-                              $SubSitelist = (Invoke-RestMethod @webParams -Uri  "https://graph.microsoft.com/v1.0/sites/$SiteID/sites" ).value
+                              $SubSitelist = (Invoke-GraphRequest @webParams -Uri  "$GraphUri/sites/$SiteID/sites" ).value
                               foreach ($subsite in $SubSitelist) {
                                 $subsite.pstypeNames.add("GraphSite")
                                 Add-Member -InputObject $subsite -MemberType NoteProperty -Name siteID -Value $siteID
@@ -90,16 +88,16 @@ function Get-GraphSite                {
             }
             elseif ($Notebooks)  {
                 if ($siteID -eq "root") {
-                    $siteID  =     (Invoke-RestMethod @webParams -Uri  "https://graph.microsoft.com/v1.0/sites/root").id
+                    $siteID  =     (Invoke-GraphRequest @webParams -Uri  "$GraphUri/sites/root").id
                 }
-                $books = (Invoke-RestMethod @webParams -uri   "https://graph.microsoft.com/v1.0/sites/$siteID/onenote/notebooks?`$expand=sections").value
+                $books = (Invoke-GraphRequest @webParams -uri   "$GraphUri/sites/$siteID/onenote/notebooks?`$expand=sections").value
                 foreach ($b in $books) {
                     foreach ($s in $b.sections) {$s.pstypeNames.add("GraphOneNoteSection")}
                     $b.pstypeNames.add("GraphOneNoteBook")
                 }
                 return $books
             }
-            else            {   $site = Invoke-RestMethod @webParams -Uri ("https://graph.microsoft.com/v1.0/sites/$siteID" + '?expand=drives,lists,sites')
+            else            {   $site = Invoke-GraphRequest @webParams -Uri ("$GraphUri/sites/$siteID" + '?expand=drives,lists,sites')
                                 $site.lists  | Add-Member -MemberType NoteProperty   -Name SiteID   -Value  $site.id
                                 $site.lists  | Add-Member -MemberType ScriptProperty -Name Template -Value {$this.list.template}
                                 $site.lists  | ForEach-Object {$_.pstypeNames.add("GraphList")}
@@ -215,14 +213,12 @@ function Get-GraphList                {
     }
 
     Connect-MSGraph
-    $webParams = @{Method = "Get"
-                  Headers = $Script:DefaultHeader
-    }
+    $webParams = @{Method = "Get"    }
     if     ($Items) {
-        $uri = "https://graph.microsoft.com/v1.0/sites/$siteID/lists/$listid/items?expand=fields"
+        $uri = "$GraphUri/sites/$siteID/lists/$listid/items?expand=fields"
         if ($List.drive) { $uri += ',driveItem' } #trying to expand driveItem in drive-less lists causes an error.
         Write-Progress -Activity 'Getting list items'
-        $listitems = (Invoke-RestMethod @webParams -uri $uri).value
+        $listitems = (Invoke-GraphRequest @webParams -uri $uri).value
         Write-Progress -Activity 'Getting list items' -Completed
         if ($Property) {
             $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$Property)
@@ -247,16 +243,16 @@ function Get-GraphList                {
     #If we were asked for listItems we will have returned in the previous if. From here on we return objects for one or more list(s)
     elseif ($List)  {
         Write-Progress -Activity 'Getting list details'
-        $result =  Invoke-RestMethod @webParams -uri "https://graph.microsoft.com/v1.0/sites/$siteID/lists/$listid`?expand=columns,contenttypes,drive,items(expand=fields)"
+        $result =  Invoke-GraphRequest @webParams -uri "$GraphUri/sites/$siteID/lists/$listid`?expand=columns,contenttypes,drive,items(expand=fields)"
         Write-Progress -Activity 'Getting list details' -Completed
     }
     else   {
         Write-Progress -Activity 'Getting Site Lists'
-        $webParams['uri'] =  "https://graph.microsoft.com/v1.0/sites/$siteID/lists?expand=columns,contenttypes,drive"
+        $webParams['uri'] =  "$GraphUri/sites/$siteID/lists?expand=columns,contenttypes,drive"
         if ($Hidden) {
           $webParams['uri'] += '&$select=system,createdDateTime,description,eTag,id,lastModifiedDateTime,name,webUrl,displayName,createdBy,lastModifiedBy,list'
         }
-        $result = (Invoke-RestMethod @webParams).Value
+        $result = (Invoke-GraphRequest @webParams).Value
         Write-Progress -Activity 'Getting Site Lists' -Completed
     }
     if     ($ColumnList) {
@@ -353,7 +349,7 @@ function New-GraphList                {
     elseif ($site -is [string]) {$siteID = $site }
     else   {Write-Warning -Message 'Could not determine the site ID'; Return}
     Connect-MSGraph
-    $WebParams = @{ 'URI'         = "https://graph.microsoft.com/v1.0/sites/$siteID/lists"
+    $WebParams = @{ 'URI'         = "$GraphUri/sites/$siteID/lists"
                     'Method'      = 'Post'
                     'Headers'     =  $DefaultHeader
                     'ContentType' = 'application/json'
@@ -383,7 +379,7 @@ function New-GraphList                {
     $json = ConvertTo-Json $settings  -Depth 10
     Write-Debug $Json
     if ($Force -or $PSCmdlet.ShouldProcess($DisplayName,"Add list to site $($site.name)")) {
-        $result = Invoke-RestMethod @WebParams -body $json
+        $result = Invoke-GraphRequest @WebParams -body $json
         Add-Member -InputObject $result -MemberType NoteProperty -Name SiteID -Value $siteID
         $result.pstypeNames.add('GraphList')
         return $result
@@ -436,15 +432,14 @@ function Add-GraphListItem            {
     Connect-MSGraph
     $webParams = @{
             'Method'      =  'Post'
-            'Headers'     =   $Script:DefaultHeader
-            'URI'         =  "https://graph.microsoft.com/v1.0/sites/$siteID/lists/$listID/items"
+            'URI'         =  "$GraphUri/sites/$siteID/lists/$listID/items"
             'ContentType' = 'application/json'
     }
     $Settings = @{'fields'=$Fields}
     $json = ConvertTo-Json $settings
     Write-Debug $Json
     if ($Force -or $PSCmdlet.ShouldProcess($List.name,'Add item')) {
-        $result = Invoke-RestMethod @webParams -Body $json
+        $result = Invoke-GraphRequest @webParams -Body $json
         if ($Passthru) {
             $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$Fields.Keys)
             $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
@@ -501,15 +496,14 @@ function Set-GraphListItem            {
     Connect-MSGraph
     $webParams = @{
             'Method'      =  'Patch'
-            'Headers'     =   $Script:DefaultHeader
-            'URI'         =  "https://graph.microsoft.com/v1.0/sites/$siteID/lists/$listID/items/$Item/fields"
+            'URI'         =  "$GraphUri/sites/$siteID/lists/$listID/items/$Item/fields"
             'ContentType' = 'application/json'
     }
 
     $json = ConvertTo-Json $Fields
     Write-Debug $Json
     if ($Force -or $PSCmdlet.ShouldProcess($List.name,'Update item')) {
-        $result = Invoke-RestMethod @webParams -Body $json
+        $result = Invoke-GraphRequest @webParams -Body $json
         if ($Passthru) { return $result}
     }
 }
@@ -554,11 +548,10 @@ function Remove-GraphListItem         {
     Connect-MSGraph
     $webParams = @{
             'Method'      =  'DELETE'
-            'Headers'     =   $Script:DefaultHeader
-            'URI'         =  "https://graph.microsoft.com/v1.0/sites/$siteID/lists/$listID/items/$Item"
+            'URI'         =  "$GraphUri/sites/$siteID/lists/$listID/items/$Item"
             'ContentType' = 'application/json'
     }
-    if ($force -or $PSCmdlet.ShouldProcess($item,'Delete List Item') ){ Invoke-RestMethod @webParams }
+    if ($force -or $PSCmdlet.ShouldProcess($item,'Delete List Item') ){ Invoke-GraphRequest @webParams }
 }
 
 function New-GraphColumn              {
@@ -947,7 +940,7 @@ function Get-GraphSiteColumn   {
         Connect-MSGraph
         if (-not $script:RootSiteColumns) {
             Write-Progress -Activity "Getting list of columns for the root site"
-            $script:RootSiteColumns = (Invoke-RestMethod -Method Get -Uri "https://graph.microsoft.com/v1.0/sites/root/columns" -Headers $DefaultHeader).value
+            $script:RootSiteColumns = (Invoke-GraphRequest -Method Get -Uri "$GraphUri/sites/root/columns" -Headers $DefaultHeader).value
             Write-Progress -Activity "Getting list of columns for the root site" -Completed
         }
     }

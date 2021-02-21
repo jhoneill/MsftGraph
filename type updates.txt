@@ -4,17 +4,17 @@
 #        Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization        # GraphOrganization
 #        Microsoft.Graph.PowerShell.Models.MicrosoftGraphDomain
 
-  Other sign ins
+
   Justins bits
-  directory         Undelete objcts     # Invoke-GraphRequest -Uri "$GraphUri/directory/deleteditems/microsoft.graph.user" -ValueOnly | foreach {Invoke-GraphRequest " https://graph.microsoft.com/beta/directory/deleteditems/$($_.id)/restore" -method post -body " "}
-  directory         roletemplates       # Invoke-GraphRequest  -Uri "$GraphUri/directoryroletemplates" -all
+  directory         roletemplates?      # Invoke-GraphRequest  -Uri "$GraphUri/directoryroletemplates" -all
   directory         settings            # Invoke-GraphRequest  -Uri "https://graph.microsoft.com/beta/settings" -ValueOnly
-  mail              delete              # DELETE /me/messages/{id}  DELETE /users/{id | userPrincipalName}/messages/{id} DELETE /me/mailFolders/{id}/messages/{id} DELETE /users/{id | userPrincipalName}/mailFolders/{id}/messag
-  mail              move                # POST /me/messages/{id}/move
   onenote page      preview,
   onenote page      copy to section
   onenote-section   copy to notebook
-  ToDoLists and task check the use of *1 cmdlets and type returned.
+  /security/alerts:  <- scope ?
+   /servicePrincipals:
+   /search
+  ToDoLists and task check the use of *1 cmdlets and type returned. Support user objects
   User              find meeting times ,
   User              export personal data,
   User              get transitive member-of
@@ -22,8 +22,6 @@
   user              inbox rules        # Invoke-GraphRequest  -Uri  "$GraphUri/me/mailFolders/inbox/messagerules"
   user              outlook Categories # Invoke-GraphRequest  -Uri  "$GraphUri/me/outlook/mastercategories" -ValueOnly
     https://graph.microsoft.com/v1.0/me/messages('AAMkADA1M-zAAA=')/attachments('AAMkADA1M-CJKtzmnlcqVgqI=')/?$expand=microsoft.graph.itemattachment/item
-
-
 
   Group             get transitive member-of
   Group             get transitive members,
@@ -46,16 +44,14 @@
 <#
  Others to explore
 
- (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices").value | ft approximateLastSignInDateTime,displayName,operatingsystem,operatingsystemversion
- (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/registeredOwners").value
- (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/memberof").value
- (irm -Method Get -headers $Script:DefaultHeader -Uri "https://graph.microsoft.com/v1.0/me/owneddevices").value | ft displayname,operatingsystemversion,trusttype
+ https://graph.microsoft.com/v1.0/devices -value | ft approximateLastSignInDateTime,displayName,operatingsystem,operatingsystemversion
+ https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/registeredOwners  -value
+ https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/memberof -value
+ https://graph.microsoft.com/v1.0/me/owneddevices").value | ft displayname,operatingsystemversion,trusttype
+ https://graph.microsoft.com/beta/me/findRooms
+ https://graph.microsoft.com/v1.0/security/alerts *scopes*
 
-  GET https://graph.microsoft.com/beta/me/findRooms                 #
-  #>
 
-
-<#
 POST https://graph.microsoft.com/beta/me/messages/AAMkAGE1M88AADUv0uFAAA=/attachments
 Content-type: application/json
 Content-length: 319

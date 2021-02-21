@@ -1,6 +1,10 @@
 using namespace System.Management.Automation
 using namespace Microsoft.Graph.PowerShell.Models
 
+$global:GraphUri                  = "https://graph.microsoft.com/v1.0"   #May want this outside the module
+$script:GUIDRegex                 = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
+$script:WellKnownMailFolderRegex  = '^[/\\]?(archive|clutter|conflicts|conversationhistory|deleteditems|drafts|inbox|junkemail|localfailures|msgfolderroot|outbox|recoverableitemsdeletions|scheduled|searchfolders|sentitems|serverfailures|syncissues)[/\\]?$'
+
 #region completer, transformer, and validator attributes for parameters
 class UpperCaseTransformAttribute : ArgumentTransformationAttribute  {
     [object] Transform([System.Management.Automation.EngineIntrinsics]$EngineIntrinsics, [object] $InputData) {
@@ -19,7 +23,7 @@ class ValidateCountryAttribute    : ValidateArgumentsAttribute {
     }
 }
 
-class DomainCompleter         : IArgumentCompleter {
+class DomainCompleter             : IArgumentCompleter {
     [array]$Domains = @()
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
@@ -36,7 +40,7 @@ class DomainCompleter         : IArgumentCompleter {
     }
 }
 
-class GroupCompleter          : IArgumentCompleter {
+class GroupCompleter              : IArgumentCompleter {
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
         [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
@@ -46,8 +50,8 @@ class GroupCompleter          : IArgumentCompleter {
         #strip quotes from word to complete - replace " or ' with nothing
         $wordToComplete = $wordToComplete -replace '"|''', ''
 
-        if ($wordToComplete) {$uri =  $script:GraphUri +  ("/Groups/?`$filter=startswith(displayName,'{0}') or startswith(mail,'{0}')" -f $wordToComplete)}
-        else                 {$uri = "$script:GraphUri/Groups/?`$Top=20"}
+        if ($wordToComplete) {$uri =  $global:GraphUri +  ("/Groups/?`$filter=startswith(displayName,'{0}') or startswith(mail,'{0}')" -f $wordToComplete)}
+        else                 {$uri = "$global:GraphUri/Groups/?`$Top=20"}
 
         Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
                 $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
@@ -57,7 +61,7 @@ class GroupCompleter          : IArgumentCompleter {
     }
 }
 
-class RoleCompleter           : IArgumentCompleter {
+class RoleCompleter               : IArgumentCompleter {
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
         [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
@@ -67,7 +71,7 @@ class RoleCompleter           : IArgumentCompleter {
         #strip quotes from word to complete - replace " or ' with nothing
         if (-not $wordToComplete) {$wordToComplete = '*'}
         else {$wordToComplete = "$wordToComplete*" -replace '"|''', '' }
-        Invoke-GraphRequest  -Uri "$Script:GraphUri/directoryroles?`$select=displayname" -ValueOnly |
+        Invoke-GraphRequest  -Uri "$global:GraphUri/directoryroles?`$select=displayname" -ValueOnly |
             Where-Object displayname -like $wordToComplete | Sort-Object -Property displayname | ForEach-Object {
                 $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$($_.displayname)'", $_.displayname, ([CompletionResultType]::ParameterValue) , $_.displayname) )
         }
@@ -75,7 +79,7 @@ class RoleCompleter           : IArgumentCompleter {
     }
 }
 
-class TeamCompleter           : IArgumentCompleter {
+class TeamCompleter               : IArgumentCompleter {
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
         [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
@@ -86,8 +90,8 @@ class TeamCompleter           : IArgumentCompleter {
         $wordToComplete = $wordToComplete -replace '"|''', ''
 
 
-        if ($wordToComplete) {$uri =  $script:GraphUri +  ("/groups?`$filter=startswith(displayname,'{0}')')" -f $wordToComplete)}
-        else                 {$uri = "$script:GraphUri/Groups/?`$Top=20"}
+        if ($wordToComplete) {$uri =  $global:GraphUri +  ("/groups?`$filter=startswith(displayname,'{0}')')" -f $wordToComplete)}
+        else                 {$uri = "$global:GraphUri/Groups/?`$Top=20"}
         #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams so this is just completing groups for now
         Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
                 $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
@@ -97,7 +101,7 @@ class TeamCompleter           : IArgumentCompleter {
     }
 }
 
-class OneDrivePathCompleter   : IArgumentCompleter {
+class OneDrivePathCompleter       : IArgumentCompleter {
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
         [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
@@ -124,7 +128,7 @@ class OneDrivePathCompleter   : IArgumentCompleter {
     }
 }
 
-class OneDriveFolderCompleter : IArgumentCompleter {
+class OneDriveFolderCompleter     : IArgumentCompleter {
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
         [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
@@ -151,7 +155,35 @@ class OneDriveFolderCompleter : IArgumentCompleter {
     }
 }
 
-class SkuCompleter            : IArgumentCompleter {
+class MailFolderCompleter         : IArgumentCompleter {
+     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+         [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+     ) {
+         $result = [System.Collections.Generic.List[CompletionResult]]::new()
+
+         #strip quotes from word to complete - replace " or ' with nothing.
+         $wordToComplete = $wordToComplete -replace '"|''', ''
+         #Where interested in what's before the final / or \
+         $params = @{'Select' = 'displayname'}
+         $path = ''
+         if ($wordToComplete -match '^[/\\]?(\w.*)[/\\].*?$') {
+             $params['Name'] = $Matches[1];
+             $params['ChildItems'] =$true
+             $path   = $Matches[1] + '/'
+         }
+         if ($FakeBoundParameters['User']) {  $params['User'] = $FakeBoundParameters['User']}
+         Get-GraphMailFolder @params | ForEach-Object {
+             $p = $path+$_.displayname
+             if ($p -like "$wordToComplete*") {
+                 $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
+             }
+         }
+         return $result
+     }
+}
+
+class SkuCompleter                : IArgumentCompleter {
     [array]$skus = @()
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
@@ -167,7 +199,7 @@ class SkuCompleter            : IArgumentCompleter {
     }
 }
 
-class SkuPlanCompleter        : IArgumentCompleter {
+class SkuPlanCompleter            : IArgumentCompleter {
     [array]$skus = @()
     [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
@@ -190,16 +222,8 @@ class SkuPlanCompleter        : IArgumentCompleter {
 }
 #endregion
 
-
-#Sometimes when we want to convert an opaque drive ID (e.g. on a file or folder) to a name; save extra calls to the server by caching the id-->name
-$global:DriveCache  = @{}
-
-$Script:GraphUri    = "https://graph.microsoft.com/v1.0"
-$Script:GUIDRegex   = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
-
-
 . "$PSScriptRoot\Authentication.ps1"
- $ImportCmds = [ordered]@{
+$ImportCmds = [ordered]@{
   'Users'                        = @('Get-MgUser_List1' , 'New-MgUserTodoList_CreateExpanded1',
                                      'New-MgUserTodoListTask_CreateExpanded1', 'Remove-MgUserTodoList_Delete1',
                                      'Remove-MgUserTodoListTask_Delete1', 'Update-MgUserTodoListTask_UpdateExpanded1')
@@ -234,4 +258,4 @@ foreach ($subModule in $ImportCmds.keys) {
 . "$PSScriptRoot\OneDrive.ps1"
 . "$PSScriptRoot\Planner.ps1"
 
-Connect-Graph | Out-Host
+Write-Host  "Ready fo Connect-Graph."
