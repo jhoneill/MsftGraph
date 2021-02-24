@@ -78,8 +78,10 @@ function Invoke-GraphRequest {
         [switch]$AllValues,
 
         #If specified removes properties found in the JSON before converting to a type or returning the object
-        [string[]]$ExcludeProperty,
+        [string[]]$ExcludeProperty =@(),
 
+        #A regular expression for keys to be removed, for example to catch many odata properties
+        [string]$PropertyNotMatch,
         #If specified converts the JSON object to properties of the a new object of the requested type. Any properties which are expected in the JSON but not defined in the type should be excluded.
         [string]$AsType
     )
@@ -88,6 +90,7 @@ function Invoke-GraphRequest {
         [void]$PSBoundParameters.Remove('AllValues')
         [void]$PSBoundParameters.Remove('AsType')
         [void]$PSBoundParameters.Remove('ExcludeProperty')
+        [void]$PSBoundParameters.Remove('PropertyNotMatch')
         [void]$PSBoundParameters.Remove('ValueOnly')
         if ([GraphSession]::Instance.AuthContext.TokenExpires -is [datetime] -and [GraphSession]::Instance.AuthContext.TokenExpires -lt [DateTime]::Now) {
             if ($script:RefreshParams) {
@@ -122,6 +125,10 @@ function Invoke-GraphRequest {
         if ($StatusCodeVariable) {Set-variable $StatusCodeVariable -Scope 1 -Value (Get-Variable $StatusCodeVariable -ValueOnly) }
         foreach ($r in $result) {
             foreach ($p in $ExcludeProperty) {[void]$r.remove($p)}
+            if ($PropertyNotMatch) {
+                $keystoRemove = $r.keys -match $PropertyNotMatch
+                foreach ($p in $keystoRemove) {[void]$r.remove($p)}
+            }
             if ($AsType) {New-Object -TypeName $AsType -Property $r}
             else         {$r}
         }

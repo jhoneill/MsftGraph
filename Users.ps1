@@ -237,7 +237,7 @@ function Get-GraphUser            {
 
         #if we got a user object use its ID, if we got an array and it contains names (not guid or UPN or "me") and also contains Guids we can't unravel that.
         if ($UserID -is [array] -and $UserID -notmatch "$GuidRegex|\w@\w|me" -and
-                                         $UserID -match     $GuidRegex ) {
+                                     $UserID -match     $GuidRegex ) {
             Write-Warning   -Message 'If you pass an array of values they cannot be names. You can pipe names or pass and array of IDs/UPNs' ; return
         }
         #if it is a string and not a guid or UPN - or an array where at least some members are not GUIDs/UPN/me try to resolve it
@@ -247,14 +247,12 @@ function Get-GraphUser            {
         #endregion
         #if select is in use ensure we get ID, UPN and Display-name.
         if ($Select) {
-            foreach ($s in @('ID','userPrincipalName','displayName')) {
-                 if ($s -notin $select) {$select += $s }
+            foreach ($s in @('ID', 'userPrincipalName', 'displayName')){
+                 if ($s -notin $Select) {$Select += $s }
             }
         }
         [void]$PSBoundParameters.Remove('UserID')
-        if ($userid -is [string] -and $Userid -notmatch $GuidRegex) {
-            $userId = Get-GraphUserList -Name $UserID
-        }
+
         foreach ($id in $UserID) {
             #region set up the user part of the URI that we will call
             if ($id -is [MicrosoftGraphUser] -and -not  ($PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters})  )) {

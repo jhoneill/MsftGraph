@@ -1,4 +1,5 @@
-﻿[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Scope='Function', Target='New*')]
+﻿using namespace Microsoft.Graph.PowerShell.Models
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Scope='Function', Target='New*')]
 param()
 function Get-GraphSite                {
     <#
@@ -17,7 +18,7 @@ function Get-GraphSite                {
         from the site(s) including hidden ones.
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
-    param(
+    param   (
         #Specifies a site, if omitted "root" will be assumed - the root site of the user's tennant.
         [Parameter( ValueFromPipeline=$true,Position=0)]
         $Site = "root",
@@ -26,10 +27,11 @@ function Get-GraphSite                {
         [Switch]$Lists,
         #If specified returns the system lists which are hidden by default
         [Parameter(ParameterSetName="Lists")]
-        [Switch]$Hidden,
+        [Parameter(Mandatory=$true, ParameterSetName="HiddenLists")]
+        [Switch]$HIDdenLists,
         #if Specified returns the details of one list
         [Parameter(Mandatory=$true, ParameterSetName="SingleList")]
-        [String]$listID,
+        [String]$ListID,
         #If Specified returns notebooks in the s
         [Parameter(Mandatory=$true, ParameterSetName="Notebooks")]
         [Switch]$Notebooks,
@@ -40,71 +42,50 @@ function Get-GraphSite                {
         [Parameter(Mandatory=$true, ParameterSetName="SubSites")]
         [Switch]$SubSites # Needs higher permissions
     )
-    begin {
-        Connect-MSGraph
-        $webParams = @{Method = 'Get'  }
-    }
     process {
-        if (-not $script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
-        foreach ($s in $site) {
-
-            if ($s.id)     {$siteID    = $s.id}     else {$siteid = $s}
-            if ($s.weburl) {$ParentURL = $s.weburl} else {
-                $ParentURL = (Invoke-GraphRequest @webParams -Uri "$GraphUri/sites/$siteID").webUrl
+        contexthas -WorkOrSchoolAccount -BreakIfNot
+        foreach ($s in $site)    {
+            if  ($s.id)          {$siteID    = $s.id}     else {$siteID = $s}
+            if  ($s.weburl)      {$ParentURL = $s.weburl} else {
+                $ParentURL = (Invoke-GraphRequest "$GraphUri/sites/$siteID").webUrl
             }
-            if     ($ListID)     { (Invoke-GraphRequest @webParams -Uri  "$GraphUri/sites/$SiteID/lists/$ListID/items?expand=fields").value }
-            elseif ($Lists)      {
-
-                              $webParams['uri'] =  "$GraphUri/sites/$SiteID/lists?expand=columns,contenttypes,drive"
-                              if ($Hidden) {
-                                $webParams['uri'] += '&$select=system,createdDateTime,description,eTag,id,lastModifiedDateTime,name,webUrl,displayName,createdBy,lastModifiedBy,list'
-                              }
-                              $l = (Invoke-GraphRequest @webParams).value
-                              foreach ($list in $l) {
-                                $list.pstypeNames.add('GraphList')
-                                if ($list.drive) {$list.drive.pstypeNames.add('GraphDrive')}
-                                Add-Member -InputObject $list -MemberType NoteProperty -Name siteID -Value $siteID
-                                if ($ParentURL) {
-                                    Add-Member -InputObject $list -MemberType NoteProperty -Name ParentUrl -Value $ParentURL
-                                }
-                              }
-                              return $l
+            if     ($ListID)     {
+                Invoke-GraphRequest  "$GraphUri/sites/$SiteID/lists/$ListID/items?expand=fields" -valueOnly
+            }
+            elseif ($Lists -or $HIDdenLists)      {
+                $Uri      =  "$GraphUri/sites/$SiteID/lists?expand=columns,contenttypes,drive"
+                if ($HIDdenLists) {
+                    $Uri += '&$select=system,createdDateTime,description,eTag,id,lastModifiedDateTime,name,webUrl,displayName,createdBy,lastModifiedBy,list'
+                }
+                $l = Invoke-GraphRequest $uri -valueOnly -PropertyNotMatch '@odata' -AsType ([MicrosoftGraphList])  |
+                            Add-Member -PassThru -NotePropertyName siteID    -NotePropertyValue $siteID
+                if ($ParentURL) {
+                      $l |  Add-Member -PassThru -NotePropertyName ParentUrl -NotePropertyValue $ParentURL
+                }
+                else {$l}
             }
             elseif ($Drives)     {
-                              $d = (Invoke-GraphRequest @webParams -Uri  "$GraphUri/sites/$SiteID/drives").value
-                              foreach ($drive in $d) {$drive.pstypeNames.add("GraphDrive")}
-                              return $d
+                Invoke-GraphRequest -Uri  "$GraphUri/sites/$SiteID/drives" -valueOnly -AsType ([MicrosoftGraphDrive])
             }
             elseif ($SubSites)   {
-                              $SubSitelist = (Invoke-GraphRequest @webParams -Uri  "$GraphUri/sites/$SiteID/sites" ).value
-                              foreach ($subsite in $SubSitelist) {
-                                $subsite.pstypeNames.add("GraphSite")
-                                Add-Member -InputObject $subsite -MemberType NoteProperty -Name siteID -Value $siteID
-                                if ($ParentURL) {
-                                    Add-Member -InputObject $subsite -MemberType NoteProperty -Name ParentUrl -Value $ParentURL
-                                }
-                              }
-                              return $SubSitelist
+                $SubSitelist = Invoke-GraphRequest  -Uri  "$GraphUri/sites/$SiteID/sites"  -valueOnly -AsType ([MicrosoftGraphSite]) |
+                                      Add-Member -PassThru -NotePropertyName siteID -NotePropertyValue $siteID
+                if ($ParentURL) {
+                      $SubSitelist |  Add-Member -PassThru -NotePropertyName ParentUrl -NotePropertyValue $ParentURL
+                }
+                else {$SubSitelist}
+
             }
             elseif ($Notebooks)  {
-                if ($siteID -eq "root") {
-                    $siteID  =     (Invoke-GraphRequest @webParams -Uri  "$GraphUri/sites/root").id
-                }
-                $books = (Invoke-GraphRequest @webParams -uri   "$GraphUri/sites/$siteID/onenote/notebooks?`$expand=sections").value
-                foreach ($b in $books) {
-                    foreach ($s in $b.sections) {$s.pstypeNames.add("GraphOneNoteSection")}
-                    $b.pstypeNames.add("GraphOneNoteBook")
-                }
-                return $books
-            }
-            else            {   $site = Invoke-GraphRequest @webParams -Uri ("$GraphUri/sites/$siteID" + '?expand=drives,lists,sites')
-                                $site.lists  | Add-Member -MemberType NoteProperty   -Name SiteID   -Value  $site.id
-                                $site.lists  | Add-Member -MemberType ScriptProperty -Name Template -Value {$this.list.template}
-                                $site.lists  | ForEach-Object {$_.pstypeNames.add("GraphList")}
-                                $site.drives | ForEach-Object {$_.pstypeNames.add("GraphDrive")}
-                                $site.sites  | ForEach-Object {$_.pstypeNames.add("GraphSite")}
-                                $site.pstypeNames.add("GraphSite")
-                                return $site
+                if ($siteID -eq "root") {$siteID  = (Invoke-GraphRequest  "$GraphUri/sites/root").id }
+                $uri = "$GraphUri/sites/$siteID/onenote/notebooks?`$expand=sections"
+                Invoke-GraphRequest -uri  $Uri -valueOnly -PropertyNotMatch '@odata' -AsType ([MicrosoftGraphNotebook]) }
+            else                 {
+                $uri = "$GraphUri/sites/$siteID`?expand=drives,lists,sites"
+                $siteobj = Invoke-GraphRequest -Uri $uri -PropertyNotMatch '@odata' -AsType ([MicrosoftGraphSite])
+                $siteobj.lists  | Add-Member -MemberType NoteProperty   -Name SiteID   -Value  $site.id
+                $siteobj.lists  | Add-Member -MemberType ScriptProperty -Name Template -Value {$this.list.template}
+                $siteobj
             }
         }
     }
@@ -127,7 +108,7 @@ function Get-GraphList                {
         >$myTeamSite = Get-GraphTeam -Site | select -first 1
         >$problemsList = $myteamsite.lists | where name -like problem*
         >
-        > Get-GraphList -site $myTeamSite.id -list $problemslist.id -ColumnList
+        > Get-GraphList  -list $problemslist -ColumnList
 
         The first command gets the current users group(s) and returns their site(s).
         For this example we select the first site. The sites returned by Get-GraphGroup /
@@ -177,20 +158,20 @@ function Get-GraphList                {
         items returned by Get-GraphList -items will have a .DriveItem property.
         Driveitems can be piped into  Copy-FromGraphFolder .
     #>
-    [cmdletbinding(DefaultParameterSetName="None")]
-    param(
+    [cmdletbinding(DefaultParameterSetName="ListID")]
+    param   (
         #The list either as an ID or as a list object (which may contain the site.)
-        [parameter(ValueFromPipeline=$true, ParameterSetName="ListID",Position=0)]
-        [parameter(ValueFromPipeline=$true, ParameterSetName="ListItems",Position=0)]
-        [parameter(ValueFromPipeline=$true, ParameterSetName="ListIDColumns",Position=0)]
+        [parameter(ValueFromPipeline=$true, ParameterSetName="ListID",       Position=0)]
+        [parameter(ValueFromPipeline=$true, ParameterSetName="ListItems"    ,Position=0, Mandatory=$true)]
+        [parameter(ValueFromPipeline=$true, ParameterSetName="ListIDColumns",Position=0, Mandatory=$true)]
         $List ,
         #Specifies a site, if omitted "root" will be assumed - the root site of the user's tennant.
         $Site = "root",
         #If specified returns hidden lists (like 'Users')
         [Parameter(ParameterSetName="ListofLists",Mandatory=$true)]
-        [Switch]$Hidden,
+        [Switch]$HIDden,
         #If specified returns the list's items
-        [Parameter(ParameterSetName="ListItems",Mandatory=$true)]
+        [Parameter(ParameterSetName="ListItems")]
         [Switch]$Items,
         #If specified returns the columns in the list
         [parameter(ParameterSetName="ListIDColumns", Mandatory=$true)]
@@ -199,78 +180,85 @@ function Get-GraphList                {
         [Parameter(ParameterSetName="ListItems")]
         [Alias('Fields')]
         [String[]]$Property
-
     )
-
-    if     ($Site.id)     {$siteID = $Site.ID}
-    elseif ($List.siteID) {$siteID = $List.siteID}
-    else                  {$siteID = $Site}  #Site has a default, so won't be empty
-    if     ($List.id)     {$listid = $List.ID}
-    elseif ($List)        {$listid = $List    #Don't set listID if List is empty (it has no default)
-                           if (-not $PSBoundParameters.ContainsKey('Site')) { #If we got a list ID and no site it's probably not the root!
-                               Write-Warning -Message 'Assuming root site. If a 404 "not found" error occurs specify the site explicitly.'
-                           }
-    }
-
-    Connect-MSGraph
-    $webParams = @{Method = "Get"    }
-    if     ($Items) {
-        $uri = "$GraphUri/sites/$siteID/lists/$listid/items?expand=fields"
-        if ($List.drive) { $uri += ',driveItem' } #trying to expand driveItem in drive-less lists causes an error.
-        Write-Progress -Activity 'Getting list items'
-        $listitems = (Invoke-GraphRequest @webParams -uri $uri).value
-        Write-Progress -Activity 'Getting list items' -Completed
-        if ($Property) {
-            $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$Property)
-            $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
-            foreach ($i in $listitems) {
-                Add-Member  -InputObject $i.fields -MemberType MemberSet    -Name PSStandardMembers -Value $PSStandardMembers -PassThru |
-                Add-Member  -MemberType NoteProperty -Name SiteID -Value $siteID -PassThru |
-                Add-Member  -MemberType NoteProperty -Name Listid -Value $listid -PassThru |
-                Add-Member  -MemberType NoteProperty -Name Itemid -Value $i.id   -PassThru
+    process {
+        if     ($List.siteID) {$siteID = $List.siteID}
+        elseif ($Site.id)     {$siteID = $Site.ID}
+        else                  {$siteID = $Site}  #Site has a default, so won't be empty
+        #Don't set listID if List is empty (it has no default)
+        if     ($List.id)     {$listID = $List.ID}
+        elseif ($List -is [string] -and  $list -match $GUIDRegex)   {
+            $listID = $List
+            if (-not $PSBoundParameters.ContainsKey('Site')) { #If we got a list ID and no site it's probably not the root!
+                Write-Warning -Message 'Assuming root site. If a 404 "not found" error occurs specify the site explicitly.'
             }
-            return
         }
-        else {
-            foreach ($i in $listitems) {
-                if ($i.driveItem) {$i.driveitem.pstypeNames.add('GraphDriveItem')}
-                Add-Member  -InputObject $i -MemberType NoteProperty -Name siteID -Value $siteID
-                Add-Member  -InputObject $i -MemberType NoteProperty -Name ListID -Value $listid
+        elseif ($List -is [string]) {
+            $listID = (Invoke-GraphRequest "$GraphUri/sites/$SiteID/lists?`$Select=ID,Displayname").value.where({$_.displayName -like $List}).id
+            if (-not $listID -or $ListID.Count -gt 1) {
+                Write-Warning "Could not resolve $List to a single list with the site information provided. "
             }
-            return $listitems
         }
-    }
-    #If we were asked for listItems we will have returned in the previous if. From here on we return objects for one or more list(s)
-    elseif ($List)  {
-        Write-Progress -Activity 'Getting list details'
-        $result =  Invoke-GraphRequest @webParams -uri "$GraphUri/sites/$siteID/lists/$listid`?expand=columns,contenttypes,drive,items(expand=fields)"
-        Write-Progress -Activity 'Getting list details' -Completed
-    }
-    else   {
-        Write-Progress -Activity 'Getting Site Lists'
-        $webParams['uri'] =  "$GraphUri/sites/$siteID/lists?expand=columns,contenttypes,drive"
-        if ($Hidden) {
-          $webParams['uri'] += '&$select=system,createdDateTime,description,eTag,id,lastModifiedDateTime,name,webUrl,displayName,createdBy,lastModifiedBy,list'
+
+        if     ($Items -or $Property) {
+            $uri = "$GraphUri/sites/$siteID/lists/$listID/items?expand=fields"
+            if ($List.drive.id) { $uri += ',driveItem' } #trying to expand driveItem in drive-less lists causes an error.
+            Write-Progress -Activity 'Getting list items'
+            $listitems = Invoke-GraphRequest -uri $uri -valueOnly -PropertyNotMatch '@odata'
+            Write-Progress -Activity 'Getting list items' -Completed
+            if ($Property) {
+                $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$Property)
+                $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
+                foreach ($i in $listitems) {
+                    [pscustomobject]$i.fields |
+                    Add-Member  -PassThru    -MemberType MemberSet    -Name PSStandardMembers -Value $PSStandardMembers  |
+                    Add-Member  -PassThru -NotePropertyName SiteID -NotePropertyValue $siteID  |
+                    Add-Member  -PassThru -NotePropertyName ListID -NotePropertyValue $listID  |
+                    Add-Member  -PassThru -NotePropertyName ItemID -NotePropertyValue $i.id
+                }
+                return
+            }
+            else {
+                foreach ($i in $listitems) {
+                    New-Object MicrosoftGraphListItem -Property $i |
+                        Add-Member -PassThru -NotePropertyName SiteID -NotePropertyValue $siteID |
+                        Add-Member -PassThru -NotePropertyName ListID -NotePropertyValue $listID
+                }
+                return
+            }
         }
-        $result = (Invoke-GraphRequest @webParams).Value
-        Write-Progress -Activity 'Getting Site Lists' -Completed
-    }
-    if     ($ColumnList) {
-        $result = $result | Select-Object -ExpandProperty Columns
-        foreach ($r in $result) {
-            $r.pstypeNames.add('GraphColumn')
-            Add-Member -InputObject $r -MemberType NoteProperty -Name SiteID -Value $Siteid
-            Add-Member -InputObject $r -MemberType NoteProperty -Name ListID -Value $listid
+        #If we were asked for listItems we will have returned in the previous if. From here on we return objects for one or more list(s)
+        elseif ($List)  {
+            Write-Progress -Activity 'Getting list details'
+            $uri = "$GraphUri/sites/$siteID/lists/$listID`?expand=columns,contenttypes,drive,items(expand=fields)"
+            $result =  Invoke-GraphRequest -uri $uri -PropertyNotMatch '@odata'
+            Write-Progress -Activity 'Getting list details' -Completed
         }
-        return $result
-    }
-    else   {
-        ForEach ($r in $result) {
-            $r.pstypeNames.add('GraphList')
-            if ($r.drive) {$r.drive.pstypeNames.add('GraphDrive')}
-            Add-Member -InputObject $r  -MemberType NoteProperty -Name SiteID -Value $siteID
+        else   {
+            Write-Progress -Activity 'Getting Site Lists'
+            $uri =  "$GraphUri/sites/$siteID/lists?expand=columns,contenttypes,drive"
+            if ($HIDden) {$uri += '&$select=createdDateTime,description,eTag,id,lastModifiedDateTime,name,webUrl,displayName,createdBy,lastModifiedBy,list' }
+            $result = Invoke-GraphRequest $uri -valueOnly -PropertyNotMatch '@odata'
+            Write-Progress -Activity 'Getting Site Lists' -Completed
         }
-        return $result
+        if     ($ColumnList) {
+            foreach ($r in $result) {
+                $listID   = $r.id
+                $listName = $r.displayName
+                foreach ($c in $r.columns) {
+                    New-object MicrosoftGraphColumnDefinition -Property $c |
+                        Add-Member -PassThru -NotePropertyName SiteID   -NotePropertyValue $siteID  |
+                        Add-Member -PassThru -NotePropertyName ListID   -NotePropertyValue $listID  |
+                        Add-Member -PassThru -NotePropertyName ListName -NotePropertyValue $listName
+                }
+            }
+        }
+        else   {
+            foreach ($r in $result) {
+             New-Object MicrosoftGraphList -Property $r |
+                Add-Member -PassThru -NotePropertyName SiteID -NotePropertyValue $siteID
+            }
+        }
     }
 }
 
@@ -305,7 +293,7 @@ function New-GraphList                {
 
         This builds the example at https://docs.microsoft.com/en-us/graph/api/list-create?view=graph-rest-1.0
         The first line gets the sharepoint site for a team the current user is a member of named 'consultants'
-        The second creates the column settings for a text column and the thrid builds a named column
+        The second creates the column settings for a text column and the third builds a named column
         definition with that specification. Lines 4 and 5 define a Number column
         And line 6 creates a new generic list on the site found in line 1; the list is named 'books'
         and has columns title (as all generic list items do), Author and Page count (the latter two being
@@ -347,18 +335,18 @@ function New-GraphList                {
     )
     if     ($Site.ID)           {$siteID = $Site.id}
     elseif ($site -is [string]) {$siteID = $site }
-    else   {Write-Warning -Message 'Could not determine the site ID'; Return}
-    Connect-MSGraph
-    $WebParams = @{ 'URI'         = "$GraphUri/sites/$siteID/lists"
-                    'Method'      = 'Post'
-                    'Headers'     =  $DefaultHeader
-                    'ContentType' = 'application/json'
+    else   {Write-Warning -Message 'Could not determine the site ID'; return}
+    $WebParams = @{ 'URI'              = "$GraphUri/sites/$siteID/lists"
+                    'Method'           = 'Post'
+                    'ContentType'      = 'application/json'
+                    'PropertyNotMatch' = '@odata'
+                    'AsType'           = ([MicrosoftGraphList])
     }
     $settings  = @{
         'displayName'             = $DisplayName;
         'list'   = @{
             'contentTypesEnabled' = [bool]$ContentTypes;
-            'hidden'              = [bool]$Hidden
+            'hidden'              = [bool]$HIDden
             'template'            = $Template
         }
     }
@@ -376,13 +364,11 @@ function New-GraphList                {
             $settings['contentTypes'] += $ct
          }
     }
-    $json = ConvertTo-Json $settings  -Depth 10
-    Write-Debug $Json
+    $WebParams['body'] = ConvertTo-Json $settings  -Depth 10
+    Write-Debug $WebParams.body
     if ($Force -or $PSCmdlet.ShouldProcess($DisplayName,"Add list to site $($site.name)")) {
-        $result = Invoke-GraphRequest @WebParams -body $json
-        Add-Member -InputObject $result -MemberType NoteProperty -Name SiteID -Value $siteID
-        $result.pstypeNames.add('GraphList')
-        return $result
+        Invoke-GraphRequest @WebParams |
+            Add-Member -PassThru -NotePropertyName SiteID -NotePropertyValue $siteID
     }
 }
 
@@ -424,26 +410,29 @@ function Add-GraphListItem            {
         #If specified the item will be added without prompting for confirmation (this is the default unless confirm preference is changed)
         [switch]$Force
     )
-    if     ($Site.ID)     {$siteid = $Site.ID}
-    elseif ($Site)        {$siteid = $Site}
-    elseif ($List.siteid) {$siteid = $List.siteid}
+    if     ($List.siteid) {$siteID = $List.siteid}
+    elseif ($Site.ID)     {$siteID = $Site.ID}
+    elseif ($Site)        {$siteID = $Site}
+
     else   {throw 'The site could not be determined from the list; please specify the site explicitly.' ; return}
-    if     ($List.id)     {$listid = $List.ID}  else {$listID = $List}
-    Connect-MSGraph
+    if     ($List.id)     {$listID = $List.ID}
+    else                  {$listID = $List}
     $webParams = @{
             'Method'      =  'Post'
             'URI'         =  "$GraphUri/sites/$siteID/lists/$listID/items"
             'ContentType' = 'application/json'
+            'Body'        = (ConvertTo-Json @{'fields'=$Fields})
     }
-    $Settings = @{'fields'=$Fields}
-    $json = ConvertTo-Json $settings
-    Write-Debug $Json
+    Write-Debug $webParams.Body
     if ($Force -or $PSCmdlet.ShouldProcess($List.name,'Add item')) {
-        $result = Invoke-GraphRequest @webParams -Body $json
+        $result = Invoke-GraphRequest @webParams
         if ($Passthru) {
             $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$Fields.Keys)
             $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
-            Add-Member -InputObject $result.fields -MemberType MemberSet -Name PSStandardMembers -Value $PSStandardMembers -PassThru
+            [pscustomobject]$result.fields |  Add-Member -MemberType MemberSet -Name PSStandardMembers -Value $PSStandardMembers -PassThru
+                    Add-Member  -PassThru -NotePropertyName SiteID -NotePropertyValue $siteID  |
+                    Add-Member  -PassThru -NotePropertyName ListID -NotePropertyValue $listID  |
+                    Add-Member  -PassThru -NotePropertyName ItemID -NotePropertyValue $result.id
         }
     }
 }
@@ -477,34 +466,34 @@ function Set-GraphListItem            {
         $List,
         #If there is no site id in the item or list parameter allows the site to specified as an ID or object
         $Site,
-        #If specified, passes through the server's confirmation of the update
-        [Alias('PT')]
-        [switch]$Passthru,
         #If specified the item will be updated without prompting for confirmation
         [switch]$Force
     )
-    if     ($item.SiteId) {$siteid = $item.SiteID}
-    elseif ($List.siteid) {$siteid = $List.siteid}
-    elseif ($Site.id)     {$siteid = $Site.id}
-    elseif ($Site)        {$siteid = $Site}
-    else   {throw 'The site could not be determined; please specify the site explicitly.' ; return}
-    if     ($item.Listid) {$listid = $Item.ListID}
-    elseif ($List.id)     {$listid = $List.ID}
-    elseif ($listid)      {$listID = $List}
-    else   {throw 'The List could not be determined; please specify the list explicity' ; return}
-    if     ($Item.id)     {$item   = $Item.id}
-    Connect-MSGraph
-    $webParams = @{
-            'Method'      =  'Patch'
-            'URI'         =  "$GraphUri/sites/$siteID/lists/$listID/items/$Item/fields"
-            'ContentType' = 'application/json'
-    }
+    process {
+        foreach ($i in $i) {
+            if     ($i.SiteId)    {$siteID = $i.SiteID}
+            elseif ($List.siteid) {$siteID = $List.siteid}
+            elseif ($Site.id)     {$siteID = $Site.id}
+            elseif ($Site)        {$siteID = $Site}
+            else   {throw 'The site could not be determined; please specify the site explicitly.' ; return}
 
-    $json = ConvertTo-Json $Fields
-    Write-Debug $Json
-    if ($Force -or $PSCmdlet.ShouldProcess($List.name,'Update item')) {
-        $result = Invoke-GraphRequest @webParams -Body $json
-        if ($Passthru) { return $result}
+            if     ($i.Listid)    {$listID = $i.ListID}
+            elseif ($List.id)     {$listID = $List.ID}
+            elseif ($listID)      {$listID = $List}
+            else   {throw 'The List could not be determined; please specify the list explicity' ; return}
+            if     ($i.Itemid)    {$i   = $i.ItemID}
+            elseif ($i.id)        {$i   = $i.id}
+            $webParams = @{
+                    'Method'      = 'Patch'
+                    'URI'         = "$GraphUri/sites/$siteID/lists/$listID/Items/$i/fields"
+                    'ContentType' = 'application/json'
+                    'Body'        =  ConvertTo-Json $Fields
+            }
+            Write-Debug $webParams.Body
+            if ($Force -or $PSCmdlet.ShouldProcess($List.name,'Update item')) {
+                $null = Invoke-GraphRequest @webParams
+            }
+        }
     }
 }
 
@@ -535,23 +524,29 @@ function Remove-GraphListItem         {
         #If specified the item will be deleted without prompting for confirmation (prompting is the default)
         [switch]$Force
     )
-    if     ($item.SiteId) {$siteid = $item.SiteID}
-    elseif ($List.siteid) {$siteid = $List.siteid}
-    elseif ($Site.id)     {$siteid = $Site.id}
-    elseif ($Site)        {$siteid = $Site}
-    else   {throw 'The site could not be determined; please specify the site explicitly.' ; return}
-    if     ($item.Listid) {$listid = $Item.ListID}
-    elseif ($List.id)     {$listid = $List.ID}
-    elseif ($listid)      {$listID = $List}
-    else   {throw 'The List could not be determined; please specify the list explicity' ; return}
-    if     ($Item.id)     {$item   = $Item.id}
-    Connect-MSGraph
-    $webParams = @{
-            'Method'      =  'DELETE'
-            'URI'         =  "$GraphUri/sites/$siteID/lists/$listID/items/$Item"
-            'ContentType' = 'application/json'
+    Process {
+        foreach ($i in $Item) {
+            if     ($i.SiteID)    {$siteID = $i.SiteID}
+            elseif ($List.SiteID) {$siteID = $List.siteid}
+            elseif ($Site.id)     {$siteID = $Site.id}
+            elseif ($Site)        {$siteID = $Site}
+            else   {throw 'The site could not be determined; please specify the site explicitly.' ; return}
+
+            if     ($i.ListID)    {$listID = $i.ListID}
+            elseif ($List.id)     {$listID = $List.ID}
+            elseif ($List)        {$listID = $List}
+            else   {throw 'The List could not be determined; please specify the list explicity' ; return}
+
+            if     ($i.ItemID)     {$i   = $i.ItemID}
+            elseif ($i.id)         {$i   = $i.id}
+            $webParams = @{
+                    'Method'      =  'DELETE'
+                    'URI'         =  "$GraphUri/sites/$siteID/lists/$listID/items/$i"
+                    'ContentType' = 'application/json'
+            }
+            if ($force -or $PSCmdlet.ShouldProcess($i,'Delete List Item') ){ Invoke-GraphRequest @webParams }
+        }
     }
-    if ($force -or $PSCmdlet.ShouldProcess($item,'Delete List Item') ){ Invoke-GraphRequest @webParams }
 }
 
 function New-GraphColumn              {
@@ -603,7 +598,7 @@ function New-GraphColumn              {
         #If true, no two list items may have the same value for this column.
         [bool]$EnforceUniqueValues,
         # Specifies whether the column is displayed in the user interface.
-        [boolean]$Hidden
+        [boolean]$HIDden
     )
     $Settings = $ColumnDefinition + @{
                            'name'                = $Name ;
@@ -611,7 +606,7 @@ function New-GraphColumn              {
                            'readOnly'            = [bool]$ReadOnly
                            'required'            = [bool]$Required
                            'enforceUniqueValues' = [bool]$EnforceUniqueValues
-                           'hidden'              = [bool]$Hidden
+                           'hidden'              = [bool]$HIDden
     }
 
     if ($ColumnGroup) { $settings['columnGroup'] = $ColumnGroup }
@@ -667,7 +662,7 @@ function New-GraphCalculatedColumn    {
     )
     $columnSettings = @{
         'formula'                        = $Formula
-        'OutputType'                      = $OutputType
+        'OutputType'                     = $OutputType
     }
     if ($OutputType -eq 'dateTime') {
         $columnSettings['format']        = $Format
@@ -762,12 +757,12 @@ function New-GraphLookupColumn        {
     param (
         #The unique identifier of the lookup source list.
         [Parameter(Mandatory=$true,Position=0)]
-        [string]$ListId,
+        [string]$ListID,
         #The name of the lookup source column.
         [Parameter(Mandatory=$true,Position=0)]
         [string]$ColumnName,
         #If specified, this column is a secondary lookup, pulling an additional field from the list item looked up by the primary lookup. Use the list item looked up by the primary as the source for the column named here
-        [string]$PrimaryLookupColumnId,
+        [string]$PrimaryLookupColumnID,
         #If Specified allows multiple/values to be specified
         [switch]$MultipleSelection,
         #Specified to indicates that values in the column should be able to exceed the standard limit of 255 characters.
@@ -777,10 +772,10 @@ function New-GraphLookupColumn        {
         'allowMultipleValues'            = [bool]$MultipleSelection
         'allowUnlimitedLength'           = $AllowUnlimitedLength
         'columnName'                     = $ColumnName
-        'listId'                         = $ListId
+        'listId'                         = $ListID
     }
     if ($IncludeGroups) {
-          $columnSettings['primaryLookupColumnId'] = $PrimaryLookupColumnId
+          $columnSettings['primaryLookupColumnId'] = $PrimaryLookupColumnID
     }
     return @{'lookup' = $columnSettings}
 }
@@ -890,7 +885,7 @@ function New-GraphTextColumn          {
 }
 #endregion
 
-function New-GraphContentType  {
+function New-GraphContentType         {
     [cmdletbinding()]
     [OutputType([System.Collections.Hashtable])]
     param (
@@ -912,7 +907,7 @@ function New-GraphContentType  {
     }
 }
 
-function Get-GraphSiteColumn   {
+function Get-GraphSiteColumn          {
     <#
       .synopsis
         Gets a column which is defined for the whole site.
@@ -921,7 +916,7 @@ function Get-GraphSiteColumn   {
     param (
     #Selects column(s) by name (and possibly group)
     [Parameter(ParameterSetName='Terms',Position=0, ValueFromPipeline=$true)]
-    [String]$Name,
+    [String]$Name = '*',
     #Selects column(s) by group (and possibly by name)
     [Parameter(ParameterSetName='Terms',Position=1)]
     [String]$ColumnGroup,
@@ -937,10 +932,9 @@ function Get-GraphSiteColumn   {
     [switch]$AllowMultiple
     )
     begin {
-        Connect-MSGraph
         if (-not $script:RootSiteColumns) {
             Write-Progress -Activity "Getting list of columns for the root site"
-            $script:RootSiteColumns = (Invoke-GraphRequest -Method Get -Uri "$GraphUri/sites/root/columns" -Headers $DefaultHeader).value
+            $script:RootSiteColumns = Invoke-GraphRequest -Method Get -Uri "$GraphUri/sites/root/columns" -valueOnly -astype ([MicrosoftGraphColumnDefinition])
             Write-Progress -Activity "Getting list of columns for the root site" -Completed
         }
     }
@@ -959,7 +953,7 @@ function Get-GraphSiteColumn   {
     }
 }
 
-function Get-GraphSiteUserList {
+function Get-GraphSiteUserList        {
     <#
       .Synopsis
         Gets the Users list for a [team] site
@@ -969,12 +963,10 @@ function Get-GraphSiteUserList {
         #The [team] Site whose user-list will be fetched
         [parameter(ValueFromPipeline=$true,Position=0,Mandatory=$True)]
         $Site
-    )
-    Connect-MSGraph
-    #If we get a list where it should be a site, but it has a site ID ... use that.
+    )    #If we get a list where it should be a site, but it has a site ID ... use that.
     if ($site.siteid) {$site=$site.Siteid}
     Write-Progress -Activity 'Getting Site Users' -CurrentOperation 'Finding list'
-    $list = Get-GraphList -Site $Site -Hidden  | Where-Object name -eq 'users'
+    $list = Get-GraphSite -HiddenLists -Site $Site   | Where-Object name -eq 'users'
     Write-Progress -Activity 'Getting Site Users' -CurrentOperation 'Getting users'
     $usersAndGroups = Get-Graphlist -List $list -Items -Property id,contenttype,title,name
     Write-Progress -Activity 'Getting Site Users' -Completed

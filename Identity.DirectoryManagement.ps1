@@ -354,7 +354,7 @@ function Revoke-GraphUserLicense    {
 function Get-GraphSkuLicensedUser   {
     <#
       .Synopsis
-        Get0 stock-keeping-unit (SKU)
+        Get stock-keeping-unit (SKU)
     #>
     param   (
         #The SKU to get either as an ID or a SKU object containing an ID

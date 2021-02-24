@@ -160,7 +160,7 @@ function Set-GraphPlanDetails    {
     }
 }
 
-function Remove-GraphPlan  {
+function Remove-GraphPlan        {
     <#
       .synopsis
         Removes a plan from a plan the
@@ -192,7 +192,6 @@ function Remove-GraphPlan  {
         }
     }
 }
-
 
 function Add-GraphPlanBucket     {
     <#

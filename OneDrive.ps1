@@ -1,6 +1,6 @@
 ﻿using namespace Microsoft.Graph.PowerShell.Models
 
-function Get-GraphDrive {
+function Get-GraphDrive       {
     <#
       .Synopsis
         Gets information about a OneDrive volume
@@ -194,7 +194,7 @@ function Get-GraphDrive {
     }
 }
 
-function New-GraphFolder {
+function New-GraphFolder      {
     <#
       .synopsis
         Creates a new folder on OneDrive.
@@ -277,7 +277,7 @@ function New-GraphFolder {
     }
 }
 
-function Show-GraphFolder {
+function Show-GraphFolder     {
     <#
       .synopsis
         Opens a OneDrive folder in a browser
@@ -320,7 +320,7 @@ function Show-GraphFolder {
    }
 }
 
-function Copy-ToGraphFolder {
+function Copy-ToGraphFolder   {
     <#
       .synopsis
         Copies filse from the local computer to one drive
