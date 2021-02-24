@@ -610,7 +610,6 @@ function New-GraphUser            {
         [string]$Domain,
 
         #The name displayed in the address book for the user. This is usually the combination of the user''s first name, middle initial and last name. This property is required when a user is created and it cannot be cleared during updates.
-        [Parameter(ParameterSetName='UPNFromDomainLast')]
         [Parameter(ParameterSetName='DomainFromUPNLast')]
         [Parameter(ParameterSetName='UPNFromDomainDisplay',Mandatory=$true)]
         [Parameter(ParameterSetName='DomainFromUPNDisplay',Mandatory=$true)]

@@ -470,16 +470,18 @@ function Grant-GraphDirectoryRole   {
         $Role = $Role | Get-GraphDirectoryRole
     }
     process {
-        if (-not $member.id) {$member = Get-GraphUserList -Name $Member}
-        if ($member.count -ne 1 -or -not $member.Id) {
-            Write-Warning "Could not process the role member."
-        }
-        foreach ($r in $role) {
-            $body = ConvertTo-Json @{ '@odata.id' = "$graphUri/directoryObjects/$($Member.Id)" }
-            Write-Debug $body
-            if ($Force -or $pscmdlet.ShouldProcess($Member.displayname,"Grant access to role '$($r.displayname)'")) {
-                try   { Invoke-GraphRequest -Uri "$graphuri/directoryroles/$($role.id)/members/`$ref" -Method post -Body $body -ContentType 'application/json'}
-                catch { Write-Warning "The request failed. This may be because the member has already been added to the role" }
+        foreach ($m in $Member) {
+            if (-not $m.id) {$m = Get-GraphUserList -Name $m}
+            if (-not $m -or $m.count -gt 1 -or -not $m.Id) {
+                Write-Warning "Could not process the role member." ; return
+            }
+            foreach ($r in $role) {
+                $body = ConvertTo-Json @{ '@odata.id' = "$graphUri/directoryObjects/$($m.Id)" }
+                Write-Debug $body
+                if ($Force -or $pscmdlet.ShouldProcess($m.displayname,"Grant access to role '$($r.displayname)'")) {
+                    try   { Invoke-GraphRequest -Uri "$graphuri/directoryroles/$($role.id)/members/`$ref" -Method post -Body $body -ContentType 'application/json'}
+                    catch { Write-Warning "The request failed. This may be because the member has already been added to the role" }
+                }
             }
         }
     }

@@ -1,68 +1,65 @@
-#Ntew types to add
-
+#New types to add
 #        Microsoft.Graph.PowerShell.Models.MicrosoftGraphProfilePhoto        ??GraphPhoto  ??
 #        Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization        # GraphOrganization
-#        Microsoft.Graph.PowerShell.Models.MicrosoftGraphDomain
 
+* ToDoLists and task check the use of *1 cmdlets and type returned. Support user objects
 
-  Justins bits
-  directory         roletemplates?      # Invoke-GraphRequest  -Uri "$GraphUri/directoryroletemplates" -all
-  directory         settings            # Invoke-GraphRequest  -Uri "https://graph.microsoft.com/beta/settings" -ValueOnly
-  onenote page      preview,
-  onenote page      copy to section
-  onenote-section   copy to notebook
-  /security/alerts:  <- scope ?
-   /servicePrincipals:
-   /search
-  ToDoLists and task check the use of *1 cmdlets and type returned. Support user objects
+* Justins bits
+
+* directory
+            roletemplates?      # Invoke-GraphRequest  -Uri "$GraphUri/directoryroletemplates" -all
+            settings            # Invoke-GraphRequest  -Uri "https://graph.microsoft.com/beta/settings" -ValueOnly
+
+* onenote
+            page -preview,
+            page -copy to section
+            section  -copy to notebook
+
+* Security/alerts
+            https://graph.microsoft.com/v1.0/security/alerts *scopes SecurityEvents.Read.All, SecurityEvents.ReadWrite.All*
+            https://docs.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0
+
+* ServicePrincipals
+            https://docs.microsoft.com/en-us/graph/api/resources/serviceprincipal?view=graph-rest-1.0
+* Search
+            https://docs.microsoft.com/en-us/graph/api/resources/search-api-overview?view=graph-rest-1.0
+
   User              find meeting times ,
   User              export personal data,
   User              get transitive member-of
   user              change password     #   /users/{user-id}/microsoft.graph.changePassword':
   user              inbox rules        # Invoke-GraphRequest  -Uri  "$GraphUri/me/mailFolders/inbox/messagerules"
   user              outlook Categories # Invoke-GraphRequest  -Uri  "$GraphUri/me/outlook/mastercategories" -ValueOnly
-    https://graph.microsoft.com/v1.0/me/messages('AAMkADA1M-zAAA=')/attachments('AAMkADA1M-CJKtzmnlcqVgqI=')/?$expand=microsoft.graph.itemattachment/item
 
   Group             get transitive member-of
   Group             get transitive members,
   Group             assign licence,
   group             setting templates   Invoke-GraphRequest  -Uri "https://graph.microsoft.com/v1.0/groupsettingTemplates" -all
   group             dynamic membership
-  device            get                  invoke-GraphRequest  -Uri  "https://graph.microsoft.com/v1.0/devices" -ValueOnly | % {
-                                                $_.remove('createdDatetime'),$_.remove('mdmappid'),$_.remove('sourceType'),$_.remove('externalSourceName')
-                                                foreach ($k in $_.alternativeSecurityIds) {$k.key = [byte[]][char[]]$k.key }
-                                                new-object -type Microsoft.Graph.PowerShell.Models.MicrosoftGraphDevice -Property $_
-                                            }
+
+
+
+
     4 Excel.ps1
-    9 ActionCard.ps1
-   21 Sharepoint.ps1
+    9 ActionCard.ps1 <-- bring back or dump ?
 
 
-#https://docs.microsoft.com/en-us/graph/api/resources/call?view=graph-rest-beta  calls in teams
-#https://docs.microsoft.com/en-us/graph/api/resources/onlinemeeting?view=graph-rest-beta  on line meetings in teams
 
 <#
  Others to explore
+ https://docs.microsoft.com/en-us/graph/api/resources/call?view=graph-rest-beta  calls in teams for bot type applications
+ https://docs.microsoft.com/en-us/graph/api/resources/onlinemeeting?view=graph-rest-beta  on line meetings in teams
 
  https://graph.microsoft.com/v1.0/devices -value | ft approximateLastSignInDateTime,displayName,operatingsystem,operatingsystemversion
  https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/registeredOwners  -value
  https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/memberof -value
  https://graph.microsoft.com/v1.0/me/owneddevices").value | ft displayname,operatingsystemversion,trusttype
  https://graph.microsoft.com/beta/me/findRooms
- https://graph.microsoft.com/v1.0/security/alerts *scopes*
 
-
-POST https://graph.microsoft.com/beta/me/messages/AAMkAGE1M88AADUv0uFAAA=/attachments
-Content-type: application/json
-Content-length: 319
-
-{
-    "@odata.type": "#microsoft.graph.referenceAttachment",
-    "name": "Personal pictures",
-    "sourceUrl": "https://contoso.com/personal/mario_contoso_net/Documents/Pics",
-    "providerType": "oneDriveConsumer",
-    "permission": "Edit",
-    "isFolder": "True"
+# Get devices
+invoke-GraphRequest  -Uri  "https://graph.microsoft.com/v1.0/devices" -ValueOnly | % {
+     $_.remove('createdDatetime'),$_.remove('mdmappid'),$_.remove('sourceType'),$_.remove('externalSourceName')
+     foreach ($k in $_.alternativeSecurityIds) {$k.key = [byte[]][char[]]$k.key }
+     new-object -type Microsoft.Graph.PowerShell.Models.MicrosoftGraphDevice -Property $_
 }
 #>
-

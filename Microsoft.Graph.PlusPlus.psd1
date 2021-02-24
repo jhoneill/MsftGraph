@@ -16,9 +16,9 @@
 
   GUID              =   'f564c0f9-7d96-4452-a715-679dc47c20cc'
   ModuleVersion     =   '2.0'
-  rootModule        =   '.\PlusPlus.psm1'
+  rootModule        =   '.\Microsoft.Graph.PlusPlus.psm1'
   RequiredModules   = @(@{ModuleName = 'Microsoft.Graph.Authentication'; ModuleVersion = '1.2.0'; })
-  FormatsToProcess  =   'Graph.format.ps1xml'
+  FormatsToProcess  =   'Microsoft.Graph.PlusPlus.format.ps1xml'
   FunctionsToExport = @('Add-FileToGraphOneNote',
                         'Add-GraphEvent',
                         'Add-GraphGroupMember',

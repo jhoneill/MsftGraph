@@ -16,7 +16,7 @@ class UpperCaseTransformAttribute : ArgumentTransformationAttribute  {
 class ValidateCountryAttribute    : ValidateArgumentsAttribute {
     [void]Validate([object]$Argument, [EngineIntrinsics]$EngineIntrinsics)  {
         if ($Argument -notin [cultureInfo]::GetCultures("SpecificCultures").foreach({
-                                New-Object -TypeName RegionInfo -ArgumentList $_.name
+                                New-Object -TypeName System.Globalization.RegionInfo -ArgumentList $_.name
                              }).TwoLetterIsoRegionName) {
             Throw [ParameterBindingException]::new("'$Argument' is not an ISO 3166 country Code")
         }
@@ -234,6 +234,7 @@ $ImportCmds = [ordered]@{
   'Users.Actions'                = @()
   'Identity.SignIns'             = @()
   'Reports'                      = @()
+  'Applications'                 = @('Get-MgServicePrincipal_Get2','Get-MgServicePrincipal_List1')
 }
 #These need the class and/or private functions from the SDK module.
 foreach ($subModule in $ImportCmds.keys) {

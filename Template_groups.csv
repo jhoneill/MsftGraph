@@ -1,0 +1,9 @@
+Action,DisplayName,Description,Type,Visibility
+Add,AdminAgents,,Security,
+ ,All Devices,All device targets,Security,
+Add,Test99,Test99,,Public
+Remove,Test110,Test110,,
+Remove,Test111,Test101,Security,
+Remove,Test1000,Test101,Team,
+Remove,Test1001,Test101,,
+Add,Test222,Testing,Team,
