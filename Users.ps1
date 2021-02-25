@@ -42,8 +42,8 @@ function Get-GraphUserList        {
                     'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
                     'preferredLanguage', 'provisionedPlans', 'proxyAddresses', 'state', 'streetAddress',
                     'surname', 'usageLocation', 'userPrincipalName', 'userType')]
-        [Alias('Select')]
-        [string[]]$Property,
+        [Alias('Property')]
+        [string[]]$Select,
 
         #number of users to get
         $Top=100,
@@ -88,12 +88,15 @@ function Get-GraphUserList        {
         if ($search -or $Filter -or $orderby -or $name) {
             $webParameters['Headers'] = @{'ConsistencyLevel'='eventual'}
         }
-        $uri = "$graphUri/users?`$top=$top"
-        if ($Select)  {$uri = $uri + '&$select='  + ($Select -join ',') }
+        $uri = "$GraphUri/users?`$top=$top"
+        if ($Select) {
+                     foreach ($s in @('ID', 'userPrincipalName', 'displayName')){if ($s -notin $Select) {$Select += $s }}
+                     $uri = $uri + '&$select='  + ($Select -join ',')
+        }
         if ($Filter)  {$uri = $uri + '&$Filter='  + $Filter }
         if ($OrderBy) {$uri = $uri + '&$orderby=' + $orderby}
         if (-not $Name) {
-            Invoke-GraphRequest -Uri $uri @webParameters
+                Invoke-GraphRequest -Uri $uri @webParameters
         }
         else {
             foreach ($n in $Name) {
@@ -215,10 +218,8 @@ function Get-GraphUser            {
         [switch]$Current
 
     )
-    begin   {
-        $result       = @()
-    }
     process {
+        $result       = @()
         if ((ContextHas -Not -WorkOrSchoolAccount) -and ($MailboxSettings -or $Manager -or $Photo -or $DirectReports -or $LicenseDetails -or $MemberOf -or $Teams -or $PlannerTasks -or $Devices ))  {
             Write-Warning   -Message "Only the -Drive, -Calendars and -Notebooks options work when you are logged in with this kind of account." ; return
             #to do check scopes.
@@ -241,8 +242,9 @@ function Get-GraphUser            {
             Write-Warning   -Message 'If you pass an array of values they cannot be names. You can pipe names or pass and array of IDs/UPNs' ; return
         }
         #if it is a string and not a guid or UPN - or an array where at least some members are not GUIDs/UPN/me try to resolve it
-        elseif ($UserID -notmatch "$GuidRegex|\w@\w|me" ) {
-                $UserID = Get-GraphUserList -Name $UserID
+        elseif (($UserID -is [string] -or $UserID -is [array]) -and
+                 $UserID -notmatch "$GuidRegex|\w@\w|me" ) {
+                 $UserID = Get-GraphUserList -Name $UserID
         }
         #endregion
         #if select is in use ensure we get ID, UPN and Display-name.
@@ -332,10 +334,10 @@ function Get-GraphUser            {
                         }
                 }
                 elseif ($Notebooks         ) {
-                    $result += Invoke-GraphRequest -Uri ($uri +
+                    $response = Invoke-GraphRequest -Uri ($uri +
                                           '/onenote/notebooks?$expand=sections' ) -All  -Exclude 'sections@odata.context'               -As ([MicrosoftGraphNotebook])
                     #Section fetched this way won't have parentNotebook, so make sure it is available when needed
-                    foreach ($bookobj in $result) {
+                    foreach ($bookobj in $response) {
                         foreach ($s in $b.Sections) {
                                 $s.parentNotebook.id          = $b.id
                                 $s.parentNotebook.displayname = $b.displayname
@@ -390,14 +392,9 @@ function Get-GraphUser            {
                 }
             }
              #endregion
+
         }
-    }
-    end     {
-        Write-Progress -Activity 'Getting user information' -Completed
         foreach ($r in $result) {
-           #if     ($r.'@odata.type' -match 'directoryRole$')  { $r.pstypenames.Add('GraphDirectoryRole') }
-           #elseif ($r.'@odata.type' -match 'device$')         { $r.pstypenames.Add('GraphDevice')        }
-           #else
             if     ($r.'@odata.type' -match 'group$') {
                     [void]$r.remove('@odata.type')
                     [void]$r.remove('@odata.context')
@@ -412,6 +409,9 @@ function Get-GraphUser            {
             else    {$r}
         }
     }
+    end     {
+        Write-Progress -Activity 'Getting user information' -Completed
+    }
 }
 
 function Set-GraphUser            {
@@ -425,6 +425,7 @@ function Set-GraphUser            {
         Needs consent to use the User.ReadWrite, User.ReadWrite.All, Directory.ReadWrite.All,
         or Directory.AccessAsUser.All scope.
     #>
+    [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser])]
     [cmdletbinding(SupportsShouldprocess=$true)]
     param   (
         #ID for the user if not the current user
@@ -500,33 +501,33 @@ function Set-GraphUser            {
         [String[]]$Skills,
         #Set to disable the user account, to re-enable an account use $AccountDisabled:$false
         [switch]$AccountDisabled,
+        #If specified the modified user will be returned
+        [switch]$PassThru,
+        #Supresses any confirmation prompt
         [Switch]$Force
     )
     begin   {
         #things we don't want to put in the JSON body when we send the changes.
-        $excludedParams = [Cmdlet]::CommonParameters +  @('Photo','UserID','AccountDisabled', 'UsageLocation', 'Manager')
+        $excludedParams = [Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters + @('Force', 'PassThru', 'UserID', 'AccountDisabled', 'Photo', 'Manager')
     }
     process {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
         #xxxx todo check scopes  User.ReadWrite, User.ReadWrite.All, Directory.ReadWrite.All,        or Directory.AccessAsUser.All scope.
 
         #allow an array of users to be passed.
-        foreach ($u in $UserID ) {
+        foreach ($id in $UserID ) {
             #region configure the web parameters for changing the user. Allow for user objects with an ID or a UP
             $webparams = @{
                     'Method'            = 'PATCH'
                     'Contenttype'       = 'application/json'
             }
-            if ($U -eq "me") {
-                    $webparams['uri']   = "$Graphuri/me/"
-            }
-            elseif ($U.id)  {
-                    $webparams['uri']   = "$Graphuri/users/$($U.id)/"
-            }
-            elseif ($U.UserPrincipalName) {
-                    $webparams['uri']   = "$Graphuri/users/$($U.UserPrincipalName)/"
-            }
-            else {  $webparams['uri']   = "$Graphuri/users/$U/" }
+            if     ($id -is [string] -and
+                    $id -match "\w@\w|$GUIDRegex" )
+                                          {$webparams['uri'] = "$GraphUri/users/$id/" }
+            elseif ($id -eq "me")          {$webparams['uri'] = "$GraphUri/me/"            }
+            elseif ($id.id)                {$webparams['uri'] = "$GraphUri/users/$($id.id)/"}
+            elseif ($id.UserPrincipalName) {$webparams['uri'] = "$GraphUri/users/$($id.UserPrincipalName)/"}
+            else  {Write-Warning "$id does not look like a valid user"; continue}
             #endregion
             #region Convert Settings other than manager and Photo into a block of JSON and send it as a request body
             $settings = @{}
@@ -539,14 +540,14 @@ function Set-GraphUser            {
                 $settings[$key] = $value
             }
             if ($PSBoundparameters['AccountDisabled']) {$settings['accountEnabled'] = -not $AccountDisabled} #allows -accountDisabled:$false
-         # if ($PSBoundparameters['UsageLocation'])   {$settings['usageLocation']  = $UsageLocation.ToUpper() } #Case matters now do this with a transformer attribute.
-            if ($settings.count -eq 0 -and -not $Photo -and -not $Manager) {
+            if     ($settings.count -eq 0 -and -not $Photo -and -not $Manager) {
                 Write-Warning -Message "Nothing to set" ; continue
             }
             elseif ($settings.count -gt 0)  {
+                #Don't put the body into webparams it will be used later (ConvertTo-Json $settings) -replace '""' , 'null'
                 $json = (ConvertTo-Json $settings) -replace '""' , 'null'
                 Write-Debug  $json
-                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {Invoke-GraphRequest  @webparams -Body $json }
+                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {$null = Invoke-GraphRequest  @webparams -Body $json }
             }
             #endregion
             if ($Photo)   {
@@ -558,9 +559,8 @@ function Set-GraphUser            {
                 $webparams['uri']           =  $webparams['uri'] + 'photo/$value'
                 $webparams['Method']        = 'Put'
                 $webparams['Contenttype']   = 'image/jpeg'
-                $webparams['InputFilePath'] =  $photoPath
                 Write-Debug "Uploading Photo: '$photoPath'"
-                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {Invoke-GraphRequest  @webparams}
+                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {$null = Invoke-GraphRequest  @webparams -InputFilePath $photoPath }
                 $webparams['uri'] = $baseUri
             }
             if ($Manager) {
@@ -570,8 +570,14 @@ function Set-GraphUser            {
                 $webparams['Contenttype']   = 'application/json'
                 $json = ConvertTo-Json @{ '@odata.id' =  "$GraphUri/users/$manager" }
                 Write-Debug  $json
-                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {Invoke-GraphRequest  @webparams -Body $json}
+                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {$null = Invoke-GraphRequest  @webparams -Body $json}
                 $webparams['uri'] = $baseUri
+            }
+            if ($PassThru)  {
+                if($id -is [MicrosoftGraphUser]) {
+                      Get-GraphUser -UserID $id.id -Select $settings.keys
+                }
+                else {Get-GraphUser -UserID $id    -Select $settings.keys}
             }
         }
     }
@@ -805,10 +811,10 @@ function Find-GraphPeople         {
     process {
     #xxxx todo check scopes    Requires consent to use either the People.Read or the People.Read.All scope
         if     ($Topic) {
-            $uri = $GraphURI +'/me/people?$search="topic:{0}"&$top={1}' -f $Topic, $First
+            $uri = $GraphUri +'/me/people?$search="topic:{0}"&$top={1}' -f $Topic, $First
         }
         elseif ($SearchTerm) {
-            $uri = $GraphURI + '/me/people?$search="{0}"&$top={1}' -f $SearchTerm, $First
+            $uri = $GraphUri + '/me/people?$search="{0}"&$top={1}' -f $SearchTerm, $First
         }
 
         Invoke-GraphRequest $uri -ValueOnly -As ([MicrosoftGraphPerson]) |

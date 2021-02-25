@@ -63,6 +63,7 @@
                         'Get-GraphPlanTask',
                         'Get-GraphReminderView',
                         'Get-GraphReport',
+                        'Get-GraphServicePrincipal',
                         'Get-GraphSignInLog',
                         'Get-GraphSite',
                         'Get-GraphSiteColumn',

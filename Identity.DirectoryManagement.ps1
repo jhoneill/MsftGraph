@@ -174,12 +174,18 @@ function Grant-GraphUserLicense     {
         [ArgumentCompleter([SkuPlanCompleter])]
         [string[]]$DisabledPlans,
 
+        #A two letter country code (ISO standard 3166). Examples include: 'US', 'JP', and 'GB' Can be set/reset here
+        [ValidateNotNullOrEmpty()]
+        [UpperCaseTransformAttribute()]
+        [ValidateCountryAttribute()]
+        [string]$UsageLocation,
+
         #Runs the command without a confirmation dialog
         [Switch]$Force
     )
     begin   {
         $request        = @{'addLicenses' = @() ; 'removeLicenses' = @()}
-
+        $SkuPartNumbers = @()
         foreach  ($s in $SKUID) {
             if   ($s.skuid) {$s = ($s.skuid) }
             if   ($s -match $GuidRegex) {
@@ -208,8 +214,9 @@ function Grant-GraphUserLicense     {
                 elseif ($skuplans.Containskey($d))   {$thisReq.disabledPlans += $skuplans[$d] }
             }
             $request.addLicenses += $thisReq
-            $licensePartNos = @($licensePartNos , $sku.SkuPartNumber) -join ", "
+            $SkuPartNumbers += $sku.SkuPartNumber
         }
+        $licensePartNos = $SkuPartNumbers -join ", "
         $webparams      =  @{
             Contenttype =  "application/json"
             Body        =  (ConvertTo-Json $request -Depth 10)
@@ -222,42 +229,47 @@ function Grant-GraphUserLicense     {
             Write-Warning "No Valid SKUs were passed"
             return
         }
-        if ($UserID -is [string] -and $userid -notmatch "me|$GUIDRegex" ) {
+        if ($UserID -is [string] -and $userid -notmatch "me|\w@\w|$GUIDRegex" ) {
             $userId = Get-GraphUser $UserID
         }
         foreach ($u in $UserID ) {
             #region Add the user to web parameters: allow for mulitple users - potentially with an ID or a UPN
             if ($u -eq "me") {
-                    $webparams['uri']   = "$GraphUri/me/assignLicense"
+                    $baseUri  = "$GraphUri/me/"
                     $userDisplayName    =  $global:GraphUser
             }
             elseif ($u.id)  {
-                    $webparams['uri']   = "$GraphUri/users/$($u.id)/assignLicense"
+                    $baseUri  = "$GraphUri/users/$($u.id)/"
                     $userDisplayName    = $u.Id  #hope to change this if we have a display name
             }
             elseif ($u.UserPrincipalName) {
-                    $webparams['uri']   = "$GraphUri/users/$($u.UserPrincipalName)/assignLicense"
+                    $baseUri  = "$GraphUri/users/$($u.UserPrincipalName)/"
                     $userDisplayName    = $u.UserPrincipalName  #hope to change this if we have a display name
             }
-            elseif ($u -is [string] -and $u -match $GUIDRegex) {
-                    $webparams['uri']   = "$GraphUri/users/$u/assignLicense"
+            elseif ($u -is [string] -and $u -match "\w@\w|$GUIDRegex") {
+                    $baseUri  = "$GraphUri/users/$u/"
                     $userDisplayName    = $u
             }
             elseif ($u -is [string]) {
                 $u = Get-GraphUser $u
                 if ($u.count -eq 1) {
-                    $webparams['uri']   = "$GraphUri/users/$($u.id)/assignLicense"
+                    $baseUri  = "$GraphUri/users/$($u.id)/"
                 }
                 else {
                     Write-Warning "Could not resolve $u to a single user. Ignoring"
                     continue
                 }
             }
+            $webparams['uri']  = $baseUri + "assignLicense"
             if ($u.DisplayName) {$userDisplayName = $u.DisplayName }
 
-            if ($Force -or $Pscmdlet.Shouldprocess($userdisplayname,"Grant licence for $licensePartNos")) {
-                $u = Invoke-GraphRequest  @webparams
-                Write-Verbose "GRANT-GRAPHUSERLICENSE: $licensePartNos  Grantedto $($u.userPrincipalName)"
+            if ($UsageLocation -and ($Force -or $Pscmdlet.Shouldprocess($userdisplayname,"Set usage location to '$UsageLocation'."))) {
+                $null = Invoke-GraphRequest -Method PATCH -Uri $baseUri -ContentType 'application/json' -body ('{{"usageLocation": "{0}"}}' -f $UsageLocation)
+            }
+            if ($Force -or $Pscmdlet.Shouldprocess($userdisplayname,"License $licensePartNos to user")) {
+                $u = Invoke-GraphRequest  @webparams -SkipHttpErrorCheck
+                if ($u.error) {Write-Warning "Licensing $licensePartNos to user '$userDisplayName' caused error '$($u.error.message)'."  }
+                else          {Write-Verbose "GRANT-GRAPHUSERLICENSE: $licensePartNos  Granted to $($u.userPrincipalName)"            }
             }
         }
     }

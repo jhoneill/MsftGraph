@@ -234,7 +234,7 @@ $ImportCmds = [ordered]@{
   'Users.Actions'                = @()
   'Identity.SignIns'             = @()
   'Reports'                      = @()
-  'Applications'                 = @('Get-MgServicePrincipal_Get2','Get-MgServicePrincipal_List1')
+  'Applications'                 =('Get-MgServicePrincipal_Get2','Get-MgServicePrincipal_List1')
 }
 #These need the class and/or private functions from the SDK module.
 foreach ($subModule in $ImportCmds.keys) {
@@ -259,4 +259,5 @@ foreach ($subModule in $ImportCmds.keys) {
 . "$PSScriptRoot\OneDrive.ps1"
 . "$PSScriptRoot\Planner.ps1"
 
-Write-Host  "Ready fo Connect-Graph."
+if ($null -eq [Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
+else {Write-Host ("Already logged on as '$([Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext.Account)'." )}

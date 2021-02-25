@@ -337,7 +337,7 @@ function Connect-Graph       {
                 Add-Member -force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $true
             }
             if ($authcontext.Account) {
-                $result           = 'Welcome To Microsoft Graph, {0}.' -f $authcontext.Account
+                $result           = 'Welcome To Microsoft Graph++, {0}.' -f $authcontext.Account
                 $user             =   Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/me/"
                 $global:GraphUser =  $user.userPrincipalName
                 Add-Member -Force -InputObject $authcontext -NotePropertyName UserDisplayName     -NotePropertyValue $user.displayName
