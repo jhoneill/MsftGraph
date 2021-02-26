@@ -237,13 +237,13 @@ function Get-GraphUser            {
         }
 
         #if we got a user object use its ID, if we got an array and it contains names (not guid or UPN or "me") and also contains Guids we can't unravel that.
-        if ($UserID -is [array] -and $UserID -notmatch "$GuidRegex|\w@\w|me" -and
+        if ($UserID -is [array] -and $UserID -notmatch "$GuidRegex|\w@\w|^me`$" -and
                                      $UserID -match     $GuidRegex ) {
             Write-Warning   -Message 'If you pass an array of values they cannot be names. You can pipe names or pass and array of IDs/UPNs' ; return
         }
         #if it is a string and not a guid or UPN - or an array where at least some members are not GUIDs/UPN/me try to resolve it
         elseif (($UserID -is [string] -or $UserID -is [array]) -and
-                 $UserID -notmatch "$GuidRegex|\w@\w|me" ) {
+                 $UserID -notmatch "$GuidRegex|\w@\w|^me`$" ) {
                  $UserID = Get-GraphUserList -Name $UserID
         }
         #endregion
@@ -741,6 +741,53 @@ function New-GraphUser            {
         # xxxx Todo figure out what errors need to be handled (illegal name, duplicate user)
         $_
         }
+    }
+}
+
+function Reset-GraphUserPassword  {
+    <#
+        .synopsis
+            Administrative reset to a given our auto-generated password, defaulting to 'reset at next logon'
+
+    #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword', '', Justification="False positive and need to support plain text here")]
+    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
+    param   (
+        #User principal name for the user.
+        [Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true)]
+        [ValidateNotNullOrEmpty()]
+        [alias("UPN")]
+        [string]$UserPrincipalName,
+
+        #The replacement password for the user. If none is specified one will be generated and output by the command
+        [string]$Initialpassword,
+
+        #If specified the user will not have to change their password at their next logon
+        [switch]$NoPasswordChange,
+
+        #If Specified prevents any confirmation dialog from appearing
+        [switch]$Force
+    )
+
+    if ($UserPrincipalName -notmatch "$Guidregex|\w@\w")  {
+        Write-Warning "$UserPrincipalName does not look like an ID or UPN." ; return
+    }
+    if (-not $Initialpassword)    {
+             $Initialpassword   = ([datetime]"1/1/1800").AddDays((Get-Random 146000)).tostring("ddMMMyyyy")
+             Write-Output "$UserPrincipalName, $Initialpassword"
+    }
+    $webparams = @{
+        'Method'            = 'PATCH'
+        'Uri'               = "$GraphUri/users/$UserPrincipalName/"
+        'Contenttype'       = 'application/json'
+        'Body'              = (ConvertTo-Json @{'passwordProfile' =  @{
+                                        'password'                      =      $Initialpassword
+                                        'forceChangePasswordNextSignIn' = -not $NoPasswordChange}})
+    }
+
+    Write-Debug $webparams.Body
+    if ($force -or $pscmdlet.ShouldProcess($UserPrincipalName, 'Reset password for user')){
+        Invoke-GraphRequest @webparams
     }
 }
 

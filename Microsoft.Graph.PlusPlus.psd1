@@ -118,8 +118,9 @@
                         'Remove-GraphPlanTask',
                         'Remove-GraphToDoList',
                         'Remove-GraphToDoTask',
-                        'Remove-GraphUser'
-                        'Rename-GraphPlanBucket'
+                        'Remove-GraphUser',
+                        'Rename-GraphPlanBucket',
+                        'Reset-GraphUserPassword',
                         'Restore-GraphDeletedObject',
                         'Revoke-GraphDirectoryRole',
                         'Revoke-GraphUserLicense',

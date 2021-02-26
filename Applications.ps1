@@ -18,10 +18,10 @@ function Get-GraphServicePrincipal {
             That has orderby which doesn't work - the it's in the Docs but the API errors if you try
             It doesn't have search my name, or select managedIDs or Applications.
     #>
-    [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphAppRole],ParameterSetName='AllRoles')]
-    [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphAppRole],ParameterSetName='FilteredRoles')]
-    [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphServicePrincipal])]
     [CmdletBinding(DefaultParameterSetName='List1')]
+    [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphAppRole],ParameterSetName=('AllRoles','FilteredRoles'))]
+    [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphPermissionScope],ParameterSetName=('AllScopes','FilteredScopes'))]
+    [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphServicePrincipal],ParameterSetName=('Get2','List1','List2','List3','List4'))]
     param   (
         [Parameter(ParameterSetName='AllRoles',       Mandatory=$true, Position=0)]
         [Parameter(ParameterSetName='FilteredRoles',  Mandatory=$true, Position=0)]
