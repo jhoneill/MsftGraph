@@ -1011,6 +1011,36 @@
                 </TableRowEntry></TableRowEntries>
             </TableControl>
         </View>
+      <View><Name>MicrosoftGraphOrganization</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization</TypeName></ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>DisplayName</Label></TableColumnHeader>
+          <TableColumnHeader><Label>Id</Label></TableColumnHeader>
+          <TableColumnHeader><Label>Country</Label></TableColumnHeader>
+          <TableColumnHeader><Label>CreatedDateTime</Label></TableColumnHeader>
+          <TableColumnHeader><Label>DeletedDateTime</Label></TableColumnHeader>
+          <TableColumnHeader><Label>OnPremisesLastSyncDateTime</Label></TableColumnHeader>
+          <TableColumnHeader><Label>OnPremisesSyncEnabled</Label></TableColumnHeader>
+          <TableColumnHeader><Label>PreferredLanguage</Label></TableColumnHeader>
+          <TableColumnHeader><Label>TenantType</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>DisplayName</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Id</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>Country</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>CreatedDateTime</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>DeletedDateTime</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>OnPremisesLastSyncDateTime</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>OnPremisesSyncEnabled</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>PreferredLanguage</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>TenantType</PropertyName></TableColumnItem>
+            </TableColumnItems>
+        </TableRowEntry></TableRowEntries>
+      </TableControl>
+    </View>
+
     </ViewDefinitions>
 </Configuration>
 

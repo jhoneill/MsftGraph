@@ -1,36 +1,19 @@
-#New types to add
-#        Microsoft.Graph.PowerShell.Models.MicrosoftGraphProfilePhoto        ??GraphPhoto  ??
-#        Microsoft.Graph.PowerShell.Models.MicrosoftGraphOrganization        # GraphOrganization
+* New types to add
+    Microsoft.Graph.PowerShell.Models.MicrosoftGraphProfilePhoto        ??GraphPhoto  ??
 
 * ToDoLists and task check the use of *1 cmdlets and type returned. Support user objects
 
+* Security/alerts   https://graph.microsoft.com/v1.0/security/alerts *scopes SecurityEvents.Read.All, SecurityEvents.ReadWrite.All*
+                    https://docs.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0
 
+* Search            https://docs.microsoft.com/en-us/graph/api/resources/search-api-overview?view=graph-rest-1.0
 
-* onenote
-            page -preview,   >             (Invoke-GraphRequest  https://graph.microsoft.com/v1.0/groups/8c4e1893-63bc-463b-b31e-abe0243c54fa/onenote/pages/1-cd8b18035d2644129e316eb9104a7196!6-44eb0c5c-d833-428f-add4-87ee3ba65f6e/preview).previewtext
-            page -copy to section           https://docs.microsoft.com/en-us/graph/api/page-copytosection?view=graph-rest-1.0&tabs=http
-            section  -copy to notebook      https://docs.microsoft.com/en-us/graph/api/section-copytonotebook?view=graph-rest-1.0&tabs=http
-
-* Security/alerts
-            https://graph.microsoft.com/v1.0/security/alerts *scopes SecurityEvents.Read.All, SecurityEvents.ReadWrite.All*
-            https://docs.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0
-
-* Search
-            https://docs.microsoft.com/en-us/graph/api/resources/search-api-overview?view=graph-rest-1.0
-
-  User              find meeting times , below
+* User              find meeting times , below ,  https://graph.microsoft.com/beta/me/findRooms
   User              export personal data, to a shared access signature (SAS) URL for an Azure Storage account,  https://docs.microsoft.com/en-us/graph/api/user-exportpersonaldata?view=graph-rest-1.0&tabs=http
-  User              get transitive member-of Invoke-GraphRequest  https://graph.microsoft.com/v1.0/me/transitivememberof -ValueOnly
   user              inbox rules        # Invoke-GraphRequest  -Uri  "$GraphUri/me/mailFolders/inbox/messagerules"
   user              outlook Categories # Invoke-GraphRequest  -Uri  "$GraphUri/me/outlook/mastercategories" -ValueOnly
 
-  Group             get transitive member-of
-  Group             get transitive members,
-  (Invoke-GraphRequest  https://graph.microsoft.com/v1.0/groups/8c4e1893-63bc-463b-b31e-abe0243c54fa)
-(Invoke-GraphRequest  https://graph.microsoft.com/v1.0/groups/8c4e1893-63bc-463b-b31e-abe0243c54fa/memberof)
-(Invoke-GraphRequest  https://graph.microsoft.com/v1.0/groups/8c4e1893-63bc-463b-b31e-abe0243c54fa/transitivememberof)
-(Invoke-GraphRequest  https://graph.microsoft.com/v1.0/groups/8c4e1893-63bc-463b-b31e-abe0243c54fa/transitivemembers)
-  Group             assign licence,   ** requires at least Azure AD P1 licensing   https://docs.microsoft.com/en-us/graph/api/group-assignlicense?view=graph-rest-1.0&tabs=http
+* Group             assign licence,   ** requires at least Azure AD P1 licensing   https://docs.microsoft.com/en-us/graph/api/group-assignlicense?view=graph-rest-1.0&tabs=http
   group             setting templates   Invoke-GraphRequest  -Uri "https://graph.microsoft.com/v1.0/groupsettingTemplates" -all
   group             dynamic membership
 
@@ -42,21 +25,22 @@ app    4 Excel.ps1
  https://docs.microsoft.com/en-us/graph/api/resources/call?view=graph-rest-beta  calls in teams for bot type applications
  https://docs.microsoft.com/en-us/graph/api/resources/onlinemeeting?view=graph-rest-beta  on line meetings in teams
 
-directory roletemplates   Invoke-GraphRequest  -Uri "$GraphUri/directoryroletemplates" -all
+directory roletemplates
 
- https://graph.microsoft.com/v1.0/devices -value | ft approximateLastSignInDateTime,displayName,operatingsystem,operatingsystemversion
- https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/registeredOwners  -value
- https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/memberof -value
- https://graph.microsoft.com/v1.0/me/owneddevices").value | ft displayname,operatingsystemversion,trusttype
- https://graph.microsoft.com/beta/me/findRooms
-
-# Get devices
 invoke-GraphRequest  -Uri  "https://graph.microsoft.com/v1.0/devices" -ValueOnly | % {
      $_.remove('createdDatetime'),$_.remove('mdmappid'),$_.remove('sourceType'),$_.remove('externalSourceName')
      foreach ($k in $_.alternativeSecurityIds) {$k.key = [byte[]][char[]]$k.key }
      new-object -type Microsoft.Graph.PowerShell.Models.MicrosoftGraphDevice -Property $_
 }
-#>
+ https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/registeredOwners  -value
+ https://graph.microsoft.com/v1.0/devices/c2221377-d362-42e7-8e16-e7d6abf80e61/memberof -value
+ https://graph.microsoft.com/v1.0/me/owneddevices").value | ft displayname,operatingsystemversion,trusttype
+
+Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/microsoft.graph.group" -all
+    microsoft.graph.administrativeUnit:
+    microsoft.graph.contract:
+    microsoft.graph.directoryRoleTemplate
+    microsoft.graph.orgContact:             Invoke-GraphRequest  -Uri "$GraphUri/directoryroletemplates" -all
 
 
     microsoft.graph.groupSetting:
@@ -84,7 +68,6 @@ invoke-GraphRequest  -Uri  "https://graph.microsoft.com/v1.0/devices" -ValueOnly
         description:            type: string           description: Description of the setting.              nullable: true
         name:                   type: string           description: Name of the setting.                     nullable: true
         type:                   type: string           description: Type of the setting.                     nullable: true
-
 
 findMeetingTimes
     application/json:

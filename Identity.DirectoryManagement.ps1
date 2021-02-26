@@ -557,22 +557,3 @@ function Restore-GraphDeletedObject {
 }
 #  DELETE /directory/deletedItems/{id}                permanent delete
 
-#see applications.
-#(Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/microsoft.graph.servicePrincipal" -all)
-#Get-MgServicePrincipal -filter "servicePrincipalType  eq 'Application'" | sort DisplayName -Descending
-#Get-MgServicePrincipal -filter "servicePrincipalType  eq 'managedIdentity'" | sort DisplayName -Descending
-#Get-MgServicePrincipal  | sort DisplayName -Descending
-# https://graph.microsoft.com/v1.0/servicePrincipals/3506bbf0-27e1-4450-be44-a7855c3dac29
-<#
-(Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/microsoft.graph.group" -all)
-    microsoft.graph.administrativeUnit:
-  microsoft.graph.contract:
-  microsoft.graph.device:
-
-  microsoft.graph.directoryRole:
-  microsoft.graph.directoryRoleTemplate
-
-      microsoft.graph.orgContact:
-microsoft.graph.organization:
-
-#>

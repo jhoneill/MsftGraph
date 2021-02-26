@@ -171,6 +171,9 @@ function Get-GraphUser            {
         #Get the Directory-Roles and Groups the user belongs to; -Groups or -Teams only return one type of object.
         [parameter(Mandatory=$true, parameterSetName="MemberOf")]
         [switch]$MemberOf,
+        #Get the Directory-Roles and Groups the user belongs to; -Groups or -Teams only return one type of object.
+        [parameter(Mandatory=$true, parameterSetName="TransitiveMemberOf")]
+        [switch]$TransitiveMemberOf,
         #Get the user's Notebook(s)
         [parameter(Mandatory=$true, parameterSetName="Notebooks")]
         [switch]$Notebooks,
@@ -291,7 +294,6 @@ function Get-GraphUser            {
                 scopedRoleMemberOf,
                 (content discovery) settings,
                 teamwork (apps),
-                transitiveMemberOf
             "https://graph.microsoft.com/v1.0/me/getmemberobjects"  -body '{"securityEnabledOnly": false}'  ).value
             #>
             try   {
@@ -367,12 +369,14 @@ function Get-GraphUser            {
                         $result     += Invoke-GraphRequest  -Uri "$GraphUri/directoryObjects/$r"
                     }
                 }
-                elseif ($DirectReports            ) {
-                    $result += Invoke-GraphRequest -Uri ($uri + '/directReports')  -All       }
                 elseif ($Manager                  ) {
                     $result += Invoke-GraphRequest -Uri ($uri + '/Manager') }
+                elseif ($DirectReports            ) {
+                    $result += Invoke-GraphRequest -Uri ($uri + '/directReports')       -All}
                 elseif ($MemberOf                 ) {
-                    $result += Invoke-GraphRequest -Uri ($uri + '/MemberOf')  -All       }
+                    $result += Invoke-GraphRequest -Uri ($uri + '/MemberOf')            -All}
+                elseif ($TransitiveMemberOf       ) {
+                    $result += Invoke-GraphRequest -Uri ($uri + '/TransitiveMemberOf')  -All}
                 elseif ($Select                   ) {
                     $result += Invoke-GraphRequest -Uri ($uri + '?$select=' + ($Select -join ','))}
                 else                                {
@@ -394,8 +398,15 @@ function Get-GraphUser            {
              #endregion
 
         }
-        foreach ($r in $result) {
-            if     ($r.'@odata.type' -match 'group$') {
+        foreach ($r in ($result )) {
+            if     ($r.'@odata.type' -match 'directoryRole$') {
+                    #This is a hack so we get role memberships and group memberships laying nicely
+                    [void]$r.remove('@odata.type')
+                    [void]$r.remove('roleTemplateId')
+                    [void]$r.add('GroupTypes','DirectoryRole')
+                    New-Object -Property $r -TypeName ([MicrosoftGraphGroup])
+            }
+            elseif ($r.'@odata.type' -match 'group$') {
                     [void]$r.remove('@odata.type')
                     [void]$r.remove('@odata.context')
                     [void]$r.remove('creationOptions')
