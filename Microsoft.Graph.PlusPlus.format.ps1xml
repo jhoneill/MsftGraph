@@ -990,6 +990,26 @@
                 </TableColumnItems>
             </TableRowEntry></TableRowEntries>
         </TableControl>
+       </View>
+       <View>
+            <Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteOperation</Name><ViewSelectedBy><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteOperation</TypeName></ViewSelectedBy>
+            <TableControl>
+                <TableHeaders>
+                <TableColumnHeader><Label>CreatedDateTime</Label></TableColumnHeader>
+                <TableColumnHeader><Label>LastActionDateTime</Label></TableColumnHeader>
+                <TableColumnHeader><Label>Status</Label></TableColumnHeader>
+                <TableColumnHeader><Label>ResourceLocation</Label></TableColumnHeader>
+                </TableHeaders>
+                <TableRowEntries>
+                <TableRowEntry>
+                    <TableColumnItems>
+                    <TableColumnItem><PropertyName>CreatedDateTime</PropertyName></TableColumnItem>
+                    <TableColumnItem><PropertyName>LastActionDateTime</PropertyName></TableColumnItem>
+                    <TableColumnItem><PropertyName>Status</PropertyName></TableColumnItem>
+                    <TableColumnItem><PropertyName>ResourceLocation</PropertyName></TableColumnItem>
+                    </TableColumnItems>
+                </TableRowEntry></TableRowEntries>
+            </TableControl>
         </View>
     </ViewDefinitions>
 </Configuration>

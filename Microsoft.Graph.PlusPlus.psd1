@@ -34,6 +34,7 @@
                         'ConvertTo-GraphDateTimeTimeZone',
                         'Copy-FromGraphFolder',
                         'Copy-ToGraphFolder',
+                        'Copy-GraphOneNotePage',
                         'Export-GraphGroupMember',
                         'Export-GraphUser',
                         'Find-GraphPeople',

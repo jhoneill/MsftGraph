@@ -191,18 +191,17 @@ function Get-GraphGroup             {
     process {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
         #xxxx toDo check scopes - Scopes Group.Read.All, Files.Read, Sites.Read.All, Notes.Create, Notes.Read, depending on params passed.
-        # if we didn't get passed a group but something about a group or groups was wanted, get the current user's groups,
-        # if we got a single string that looks like a name (not a GUID) resolve it.
-        # If we got nothing return the list, We'll loop through an array and (or single object) with either GUIDs or objects.
-        if      ($PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters -and $_ -notin $ID}))  {
+        # if we didn't get passed a group but we did get asked for something about a group or groups then  get the current user's groups,
+        if      ($PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters}) -and -not $ID)  {
                        $ID = Get-GraphUser -Current -MemberOf
         }
+        # If we got nothing return the list,
+        elseif  (-not  $ID) { Get-GraphGroupList ; return  }
+        # if we got a single string that looks like a name (not a GUID) resolve it.
         elseif  ($ID -is [string] -and  $ID -notmatch $guidregex)   {
                        $ID = Get-GraphGroupList -Name $id
         }
-        elseif  (-not  $ID) { Get-GraphGroupList ; return
-        }
-
+        # We'll loop through an array and (or single object) with either GUIDs or objects.
         foreach ($i in $ID) {
             <# not all teams have team set in resource procisioning options
                 if  ($i.ResourceProvisioningOptions -is [array] -and
@@ -211,11 +210,12 @@ function Get-GraphGroup             {
                 Write-Verbose "$($i.DisplayName) is a group but not a team"
                 continue
             }#>
-            if  ($i -is [string] -and  $ID -notmatch $guidregex)   {$i = Get-GraphGroupList -Name $i}
-            if  ($i.DisplayName)  {$displayname       = $i.DisplayName}
-            else                  {$displayname       = $i            }
-            if  ($i.id)           {$groupid = $teamid = $i.id         }
-            else                  {$groupid = $teamid = $i            }
+            if  ($i -is [string] -and
+                 $i -notmatch $guidregex) {$i = Get-GraphGroupList -Name $i}
+            if  ($i.DisplayName)          {$displayname       = $i.DisplayName}
+            else                          {$displayname       = $i            }
+            if  ($i.id)                   {$groupid = $teamid = $i.id         }
+            else                          {$groupid = $teamid = $i            }
             $groupURI = "$GraphURI/groups/$groupid"
             $teamURI  = "$GraphURI/teams/$teamid"
             try   {

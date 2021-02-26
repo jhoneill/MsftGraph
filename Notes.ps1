@@ -89,13 +89,15 @@ function Get-GraphOneNoteSection {
       form Get-GraphOneNotebook -Sections ) or the URL for a section.
     #>
     [cmdletbinding()]
+    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage],ParameterSetName='Pages')]
+    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteSection])]
     param    (
         #A graph URI pointing to the section, or a section object where the .self property is a graph URI...
         [Parameter(Mandatory=$true, ValueFromPipeline=$true,ParameterSetName='Sections',Position=0)]
         $Section ,
         [Parameter(ParameterSetName='Notebook')]
         $Notebook ,
-        #If Specified returns the pages in the section.
+        #If specified, returns the pages in the section.
         [Parameter(ParameterSetName='Sections')]
         [switch]$Pages,
         #If specified filters pages or Sections to those with names beginning ...
@@ -202,30 +204,180 @@ function Get-GraphOneNotePage    {
         It can get either the page metadata, the page content, or
         the page content marked up with IDs to update the page.
     #>
-    [cmdletbinding()]
+    [cmdletbinding(DefaultParameterSetName='None')]
+    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage])]
     param   (
         #A graph URI pointing to the page, or a page object where the .self property is a graph URI...
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true,Position=0)]
         $Page,
         #If specified returns the contents of the page. Ignored if ContentWithIDs is specified
+        [Parameter(ParameterSetName='Content',Mandatory=$true)]
         [switch]$Content,
         #If specified returs the contents with guids for each section where content can be inserted.
-        [switch]$ContentWithIDs
+        [Parameter(ParameterSetName='Content')]
+        [Parameter(ParameterSetName='ContentWithIDs',Mandatory=$true)]
+        [switch]$ContentWithIDs,
+        #If specified returs a text preview of the page
+        [Parameter(ParameterSetName='Preview',Mandatory=$true)]
+        [switch]$PreviewText,
+        [Parameter(ParameterSetName='Content')]
+        [Parameter(ParameterSetName='ContentWithIDs')]
+        [Parameter(ParameterSetName='Preview')]
+        $SavePath
     )
     process {
-        if     ($Page.self)        {$uri=$Page.self}
-        elseif ($page-is [string]) {$uri=$Page}
-        else   {Write-Warning -Message 'Could not process the page parameter' ; return}
-        #Normally we want Invoke-RestMethod, but here we want the unprocessed content.
-        if      ($ContentWithIDs) {Invoke-GraphRequest -Uri  "$uri/Content?includeIDs=true"}
-        elseif  ($Content)        {Invoke-GraphRequest -Uri  "$uri/Content"}
-        #should return the outer xml property as this is HTML in an XML document. Check what else it comes back as
-        else           {
-          Invoke-GraphRequest -Uri "$uri" -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage]) -ExcludeProperty 'parentSection@odata.context' ,'@odata.context'
+        $webparams = @{
+           'AsType'          =  ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage])
+           'ExcludeProperty' = 'parentSection@odata.context' ,'@odata.context'
         }
+
+        if     ($Page -is [MicrosoftGraphOnenoteSection]) {
+                $pages  = Invoke-GraphRequest -Uri "$($Page.self)/pages" -ValueOnly @webparams
+                if ($ContentWithIDs -or $Content -or $PreviewText ) {
+                      $pages | Get-GraphOneNotePage -Content:$Content -ContentWithIDs:$ContentWithIDs -PreviewText:$PreviewText
+                      return
+                }
+                else {return $pages}
+        }
+        elseif ($Page.self)            {$uri=$Page.self}
+        elseif ($Page -is [string])    {$uri=$Page}
+        else   {Write-Warning -Message 'Could not process the page parameter' ; return}
+        if     ($PreviewText -and -not $PSBoundParameters['savepath']) {
+               return (Invoke-GraphRequest -Uri  "$uri/Preview").previewText
+        }
+        elseif ($PreviewText)          {
+               (Invoke-GraphRequest -Uri  "$uri/Preview").previewText | Out-File $savePath
+               return
+        }
+        elseif (-not ($ContentWithIDs -or $Content))           {
+          Invoke-GraphRequest -Uri $uri @webparams
+          return
+        }
+        elseif (      $ContentWithIDs) {$uri = "$uri/Content?includeIDs=true"}
+        else                           {$uri ="$uri/Content"}
+
+        #Page content breaks the JSON parser, so ask for it to go to a file instead. If didn't want a file, read the file back and delete it.
+        if     (-not $PSBoundParameters['savepath']) {$SavePath = [system.io.path]::GetTempFileName() }
+        Invoke-GraphRequest -Uri  $uri  -OutputFilePath $SavePath
+        if  (-not $PSBoundParameters['savepath']) {Get-Content $SavePath; Remove-Item $SavePath}
+        #should return the outer xml property as this is HTML in an XML document. Check what else it comes back as
     }
 }
 
+function Copy-GraphOneNotePage   {
+
+    param   (
+        #The page to be copied.
+        [Parameter(Position=0,Mandatory=$true,ValueFromPipeline=$true)]
+        $Page,
+        #The section the it will be copied to
+        [Parameter(Position=1,Mandatory=$true)]
+        $DestinationSection,
+        #The group which owns the notebook if required
+        $GroupID,
+        [switch]$Wait
+    )
+    process {
+        $webparams =@{
+            'Method'          = 'POST'
+            'ContentType'     = 'application/json'
+            'ExcludeProperty' = @('@odata.context','@odata.type')
+            'AsType'          = ([MicrosoftGraphOnenoteOperation])
+
+        }
+        if     ($Page.self)            {$webparams['uri']="$($Page.self)/copyToSection"}
+        elseif ($Page -is [string])    {$webparams['uri']="$Page/copyToSection"}
+        else   {Write-Warning -Message 'Could not process the page parameter' ; return}
+
+        if     ($DestinationSection.id)           {$settings = @{id=$DestinationSection.id }}
+        elseif ($DestinationSection -is [string]) {$settings = @{id=$DestinationSection}}
+        else   {Write-Warning -Message 'Could not process the page parameter' ; return}
+        #if the group GUID in the path to self in the destination use that, otherwise look for a group ID
+        if     ($DestinationSection.Self -and
+                $DestinationSection.Self -match "groups/([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})/") {
+                                                   $settings['groupId'] = $Matches[1]}
+        elseif ($GroupID.id)                      {$settings['groupId'] = $GroupID.ID}
+        elseif ($GroupID -is [string] )           {$settings['groupId'] = $GroupID }
+        elseif ($GroupID) {Write-Warning -Message 'Could not process the page parameter' ; return}
+
+        $webparams['body'] = ConvertTo-Json $settings
+        Write-Debug $webparams['body']
+        $Op = Invoke-GraphRequest @webparams
+        if ($Wait -and $op -and $DestinationSection.self -match "^(http.*/onenote/).*$") {
+            $op2 = $op
+            while ($op2.status -ne 'completed'){
+                Write-Progress -Activity "Copying OneNote" -Status $op2.status
+                Start-Sleep -Seconds 2
+                $op2 = Invoke-GraphRequest "$($Matches[1])operations/$($op.id)" -ExcludeProperty @('@odata.context','@odata.type') -AsType ([MicrosoftGraphOnenoteOperation])
+            }
+            $op2
+        }
+        else {$op}
+    }
+}
+
+<#
+see  https://docs.microsoft.com/en-us/graph/api/section-copytonotebook?view=graph-rest-1.0&tabs=http
+Currenly /groups/{id}/onenote/sections/{id}/copyToNotebook gives a 404 error
+function Copy-GraphOneNoteSection {
+
+    param   (
+        #The section to be copied.
+        [Parameter(Position=0,Mandatory=$true,ValueFromPipeline=$true)]
+        $Section,
+        #The section the it will be copied to
+        [Parameter(Position=1,Mandatory=$true)]
+        $DestinationNotebook,
+
+        #The name of the copy. Defaults to the name of the existing item.
+        $NewName,
+
+        #The group which owns the notebook if required
+        $GroupID,
+        [switch]$Wait
+    )
+    process {
+        $webparams =@{
+            'Method'          = 'POST'
+            'ContentType'     = 'application/json'
+            'ExcludeProperty' = @('@odata.context','@odata.type')
+            'AsType'          = ([MicrosoftGraphOnenoteOperation])
+
+        }
+        if     ($Section.self)          {$webparams['uri']="$($Section.self)/copyToNotebook"}
+        elseif ($Section -is [string])  {$webparams['uri']="$Section/copyToSection"}
+        else   {Write-Warning -Message 'Could not process the page parameter' ; return}
+
+        if     ($DestinationNotebook.id)           {$settings = @{id=$DestinationNotebook.id }}
+        elseif ($DestinationNotebook -is [string]) {$settings = @{id=$DestinationNotebook}}
+        else   {Write-Warning -Message 'Could not process the page parameter' ; return}
+        #if the group GUID in the path to self in the destination use that, otherwise look for a group ID
+        if     ($DestinationNotebook.Self -and
+                $DestinationNotebook.Self -match "groups/([0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12})/") {
+                                                    $settings['groupId']  = $Matches[1]}
+        elseif ($GroupID.id)                       {$settings['groupId']  = $GroupID.ID}
+        elseif ($GroupID -is [string] )            {$settings['groupId']  = $GroupID }
+        elseif ($GroupID) {Write-Warning -Message 'Could not process the page parameter' ; return}
+
+        if     ($NewName)                          {$settings['renameAs'] = $Matches[1]}
+
+        $webparams['body'] = ConvertTo-Json $settings
+        Write-Debug $webparams['body']
+
+        $Op = Invoke-GraphRequest @webparams
+        if ($Wait -and $op -and $DestinationSection.self -match "^(http.*/onenote/).*$") {
+            $op2 = $op
+            while ($op2.status -ne 'completed'){
+                Write-Progress -Activity "Copying OneNote" -Status $op2.status
+                Start-Sleep -Seconds 2
+                $op2 = Invoke-GraphRequest "$($Matches[1])operations/$($op.id)" -ExcludeProperty @('@odata.context','@odata.type') -AsType ([MicrosoftGraphOnenoteOperation])
+            }
+            $op2
+        }
+        else {$op}
+    }
+}
+#>
 function Add-GraphOneNotePage    {
     <#
       .synopsis

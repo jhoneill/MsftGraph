@@ -258,6 +258,7 @@ foreach ($subModule in $ImportCmds.keys) {
 . "$PSScriptRoot\Notes.ps1"
 . "$PSScriptRoot\OneDrive.ps1"
 . "$PSScriptRoot\Planner.ps1"
+. "$PSScriptRoot\Sharepoint.ps1"
 
 if ($null -eq [Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
 else {Write-Host ("Already logged on as '$([Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext.Account)'." )}
