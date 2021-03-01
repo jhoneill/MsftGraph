@@ -135,6 +135,7 @@
                         'Set-GraphContact',
                         'Set-GraphEvent',
                         'Set-GraphGroup',
+                        'Set-GraphHomeDrive',
                         'Set-GraphListItem',
                         'Set-GraphPlanDetails',
                         'Set-GraphPlanTask',

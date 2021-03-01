@@ -102,14 +102,17 @@ function Get-GraphGroup             {
         Site objects include a lists property, which holds a collection of lists
         this command will fiter the lists down to those where name matches "document"
       .Example
-        >(Get-GraphGroup -Drive).root.children.where({$_.folder}) | Select  name, weburl, id,@{n="drive";e={$_.parentReference.driveId}}
+        >Get-GraphGroup -Drive  | Get-GraphDrive -Subfolders | Select  name, weburl, id,@{n="drive";e={$_.parentReference.driveId}}
         As with the previous example gets this command gets Groups/Teams for current user,
         in this case the command returns their associated drive(s)
-        Drive objects include a root property, which holds an object describing the root folder;
-        this in turn has a children property which contains files and folder objects in the root folder.
-        This example filters the children collection to folders and returns their name,
-        WebURl and the item ID and Drive ID needed to access them
+        It is possible to refer to the drive's root property, and the root's children property
+        which contains files and folder objects, amd filter to objects with a folder property but
+        for ease of reading this  pipeline passes the drive to Get-GraphDrive to get subfolders.
+        It then returns the  name, WebURl and the item ID and Drive ID needed to access each folder.
       .Example
+        >Get-GraphGroup 'Consultants' -Drive  | Set-GraphHomeDrive
+        Sets the drive for the consultants group to thebe the default graph drive for the PowerShell session.
+     .Example
         >Get-GraphGroup -Notebooks | select -ExpandProperty sections | where "Displayname" -eq "General_Notes"
         Again gets Groups/Teams for the current user and returns their associated notebooks(s)
         Notebook objects include a Sections property, which holds a collection of OneNote sections in the notebook;
@@ -140,7 +143,7 @@ function Get-GraphGroup             {
         #If Specified, retrun team's conversations (usually better to use threads)
         [Parameter(Mandatory=$true, parameterSetName='Conversations' )]
         [switch]$Conversations,
-        #If specified gets the Team's one drive
+        #If specified gets the Team's OneDrive to see contents of the root of the drive you can refer to the drives .root.children property
         [Parameter(Mandatory=$true, parameterSetName='Drive')]
         [switch]$Drive,
         #If specified returns the members of the team
@@ -254,7 +257,8 @@ function Get-GraphGroup             {
                 elseif ($Drive)              {
                     $uri = ("$groupURI/drive" + '?$expand=root($expand=children)' )
                     Invoke-GraphRequest  -Uri $uri -ExcludeProperty "@odata.context", "root@odata.context" -AsType ([MicrosoftGraphDrive]) |
-                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
+                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname |
+                        Add-Member -PassThru -MemberType AliasProperty     -Name Drive -Value 'id'
                     continue
                 }
                 elseif ($Members)            { #can do group ?$expand=Memebers, the others don't expand
@@ -1583,11 +1587,16 @@ function Get-GraphChannel           {
                 if ($ch.DisplayName) {Write-Progress -Activity 'Getting Folder information' -CurrentOperation $ch.DisplayName}
                 else                 {Write-Progress -Activity 'Getting Folder information' }
                 $uri = "$GraphUri/teams/$teamID/channels/$channelID//filesFolder"
-                $f = Invoke-GraphRequest -Uri $uri -AsType  ([MicrosoftGraphDriveItem]) -ExcludeProperty '@odata.context'
+                $f = Invoke-GraphRequest -Uri $uri -AsType  ([MicrosoftGraphDriveItem]) -ExcludeProperty '@odata.context'  |
+                        Add-Member  -PassThru -MemberType AliasProperty  -Name ItemID -Value 'id'                          |
+                        Add-Member  -PassThru -MemberType ScriptProperty -Name Drive  -Value {$this.ParentReference.DriveID}
                 if ($folder) {$f}
                 else         {
                     $uri = "$GraphUri/drives/$($f.ParentReference.DriveId)/items/$($f.id)/children"
-                    Invoke-GraphRequest -Uri $uri -ValueOnly -ExcludePropert '@odata.etag', '@microsoft.graph.downloadUrl' -AsType ([MicrosoftGraphDriveItem])
+                    Invoke-GraphRequest -Uri $uri -ValueOnly -ExcludePropert '@odata.etag', '@microsoft.graph.downloadUrl' -AsType ([MicrosoftGraphDriveItem]) |
+                        Add-Member  -PassThru -MemberType AliasProperty  -Name ItemID -Value 'id'                          |
+                        Add-Member  -PassThru -MemberType ScriptProperty -Name Drive  -Value {$this.ParentReference.DriveID}
+
                 }
                 Write-Progress -Activity 'Getting Folder information' -Completed
             }

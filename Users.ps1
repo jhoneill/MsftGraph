@@ -131,7 +131,8 @@ function Get-GraphUser            {
         (get-graphuser -Drive).root.children.name
         Gets the user's one drive. The drive object has a .root property which is represents its
         root-directory, and this has a .children property which is a collection of the objects
-        in the root directory. So this command shows the names of the objects in the root directory.
+        in the root directory. So this command shows the names of files and folders in the root directory. To just see sub folders it is possible to use
+        get-graphuser -Drive | Get-GraphDrive -subfolders
     #>
     [cmdletbinding(DefaultparameterSetName="None")]
     param   (
@@ -301,9 +302,11 @@ function Get-GraphUser            {
             try   {
                 if     ($Drive -and (ContextHas -WorkOrSchoolAccount)) {
                     Invoke-GraphRequest -Uri (
-                                         $uri + '/Drive?$expand=root($expand=children)') -Exclude '@odata.context','root@odata.context' -As ([MicrosoftGraphDrive])}
+                                         $uri + '/Drive?$expand=root($expand=children)') -Exclude '@odata.context','root@odata.context' -As ([MicrosoftGraphDrive])|
+                    Add-Member  -PassThru -MemberType AliasProperty  -Name Drive -Value 'id'                                                                           }
                 elseif ($Drive             ) {
-                    Invoke-GraphRequest -Uri ($uri + '/Drive')                           -Exclude '@odata.context','root@odata.context' -As ([MicrosoftGraphDrive])}
+                    Invoke-GraphRequest -Uri ($uri + '/Drive')                           -Exclude '@odata.context','root@odata.context' -As ([MicrosoftGraphDrive]) |
+                    Add-Member  -PassThru -MemberType AliasProperty  -Name Drive -Value 'id'                                                                           }
                 elseif ($LicenseDetails    ) {
                     Invoke-GraphRequest -Uri ($uri + '/licenseDetails')           -All                                                  -As ([MicrosoftGraphLicenseDetails]) }
                 elseif ($MailboxSettings   ) {

@@ -47,52 +47,70 @@ function Get-GraphDrive       {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Drive cache is intended to be accessible outside the module.')]
     param   (
         #The drive to examine - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
-        [parameter(ValueFromPipeline=$true)]
+        [parameter(ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
         $Drive = 'me/Drive',
-        #if specified gets the items in a folder by the path from {drive}/root:
+
+        #If specified gets the items in a folder by the path from {drive}/root:
         [Parameter(Mandatory=$true, ParameterSetName='FolderName',Position=0)]
         [ArgumentCompleter([OneDriveFolderCompleter])]
         [Alias("Path")]
         [String]$FolderPath,
+
         #If Specified gets the items in a folder by folder ID
         [Parameter(Mandatory=$true, ParameterSetName='FolderID')]
         [String]$FolderID,
-        [ValidateSet('Apps','Attachments','CameraRoll','Documents','Music','Photos','Public')]
-        #If specified returns the subfolders - if no FolderPath or FolderID is given will return folders of the root drive
+
+        #If specified gets one of the special folders (Documents, photos etc) in the drive. If they don't already exist the server appears to create them.
         [Parameter(Mandatory=$true, ParameterSetName='Special')]
+        [ValidateSet('Apps','Attachments','CameraRoll','Documents','Music','Photos','Public')]
         [String]$SpecialFolder,
+
         #If specified gets recent items in the drive
         [Parameter(Mandatory=$true, ParameterSetName='Recent')]
-        [switch]$Recent ,
+        [switch]$Recent,
+
         #If Specified gets items shared with the user
         [Parameter(Mandatory=$true, ParameterSetName='Shared')]
         [switch]$SharedWithMe ,
+
+        [Parameter(ParameterSetName='FolderID')]
+        [Parameter(ParameterSetName='FolderName')]
+        [Parameter(ParameterSetName='Special')]
+        [Parameter(ParameterSetName='Shared')]
+        [Parameter(ParameterSetName='Recent')]
+        [string]$Include,
+
         #Enables a free text search of the selected content
         [Parameter(ParameterSetName='RootSearch')]
         [Parameter(ParameterSetName='Shared')]
         [Parameter(ParameterSetName='FolderID')]
         [Parameter(ParameterSetName='FolderName')]
         [string]$Search,
-        #If specified gets one of the special folders (Documents, photos etc) in the drive. If they don't already exist the server appears to create them.
+
+        #If specified returns the subfolders - if no FolderPath or FolderID is given will return folders of the root drive
         [Parameter(ParameterSetName='RootFolders')]
         [Parameter(ParameterSetName='FolderID')]
         [Parameter(ParameterSetName='FolderName')]
         [Parameter(ParameterSetName='None')]
         [Switch]$Subfolders,
-        #if specified gets the items in a folder by the path from {drive}/root:
+
+        #if specified gets a file or folder by the path from {drive}/root:
         [ArgumentCompleter([OneDrivePathCompleter])]
         [Parameter(Mandatory=$true, ParameterSetName='ItemName')]
         [String]$ItemPath,
-        #If Specified gets the items in a folder by folder ID
-        [Parameter(Mandatory=$true, ParameterSetName='ItemID')]
+
+        #If Specified gets the a file or folder item by ID
+        [Parameter(Mandatory=$true, ParameterSetName='ItemID',ValueFromPipelineByPropertyName=$true)]
         [String]$ItemID,
+
         #If specified does not display a message when a folder is empty
         [switch]$Quiet
     )
     process {
         #region Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
-        if     ($Drive.id)               {$drive = "drives/$($drive.id)"}
+        if     ($Drive.drive)            {$drive = "drives/$($drive.drive)"}
+        elseif ($Drive.id)               {$drive = "drives/$($drive.id)"}
         elseif ($Drive -notmatch './.')  {$drive = "drives/$drive"      }
         #Strip leading and trailing / from $drive so it fits in the URI template.
         $Drive = $Drive -replace '/$','' -replace '^/',''
@@ -107,18 +125,19 @@ function Get-GraphDrive       {
             throw ("Error trying to get drive $drive - the code was " + $_.exception.response.statuscode.value__  ) ; return
         }
         #endregion
-
         #region Getting a single item (file or folder) by ID or by path.
         # Make something we can insert in a REST URI
-        if     ($ItemID   -and $ItemID -Match '^/?items')   {$ItemID =  $ItemID  -replace '^/?(.*)/?$',            '$1' } #Allow "items/{id}" Strip off any leading or trailing /
-        elseif ($ItemID   )                                 {$ItemID =  $ItemID  -replace '^/?(.*)/?$',      'items/$1' } #Allow "{id}". Strip off any leading or trailing / and prepend "items/"
-        elseif ($Itempath -in @("root:", "/", "root:/") )   {$ItemID = 'root' }                                           #Convert "root:", "/" or root:/" to "root"
-        elseif ($ItemPath -and $ItemPath -Match '^/?root:') {$ItemID =  $ItemPath -replace '^/?(.*?)[:/]*$',       '$1:'} #Allow "[/]root:{path}" strip any leading / or trailing / or : and append ":"
-        elseif ($ItemPath )                                 {$ItemID =  $ItemPath -replace '^/?(.*?)[:/]*$', 'root:/$1:'} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
+        if     ($ItemID   -and $ItemID -Match '^/?items')       {$ItemID   =  $ItemID  -replace '^/?(.*)/?$',            '$1' } #Allow "items/{id}" Strip off any leading or trailing /
+        elseif ($ItemID   )                                     {$ItemID   =  $ItemID  -replace '^/?(.*)/?$',      'items/$1' } #Allow "{id}". Strip off any leading or trailing / and prepend "items/"
+        elseif ($Itempath -in @("root:", "/", "root:/") )       {$ItemID   = 'root' }                                           #Convert "root:", "/" or root:/" to "root"
+        elseif ($ItemPath -and $ItemPath -Match '^/?root:')     {$ItemID   =  $ItemPath -replace '^/?(.*?)[:/]*$',       '$1:'} #Allow "[/]root:{path}" strip any leading / or trailing / or : and append ":"
+        elseif ($ItemPath )                                     {$ItemID   =  $ItemPath -replace '^/?(.*?)[:/]*$', 'root:/$1:'} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
         #if we had an item ID or built an itemID string from the path, get the item, add a type and return it
         if     ($ItemID ) {
             try   {
-                Invoke-GraphRequest -Uri "$GraphUri/$Drive/$ItemID" -ExcludeProperty '@odata.context', '@microsoft.graph.downloadUrl' -AsType ([MicrosoftGraphDriveItem])
+                Invoke-GraphRequest -Uri "$GraphUri/$Drive/$ItemID" -ExcludeProperty '@odata.context', '@microsoft.graph.downloadUrl' -AsType ([MicrosoftGraphDriveItem])  |
+                    Add-Member  -PassThru -MemberType AliasProperty -Name ItemID -Value 'id'           |
+                    Add-Member  -PassThru -NotePropertyName Drive -NotePropertyValue $driveObj.id
                 return
             }
             catch {
@@ -141,46 +160,55 @@ function Get-GraphDrive       {
         elseif ($FolderPath )                                   {$FolderID =  $FolderPath -replace '^/?(.*?)[:/]*$', 'root:/$1:' }
         elseif ($SpecialFolder)                                 {$FolderID = "special/$SpecialFolder"                            }
 
-        if ($FolderID -or $SharedWithMe -or $Recent) {
-            if     ($FolderID -and $Search)     {$uri = "$GraphUri/$Drive/$FolderID/search(q='$Search')?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file"}
-            elseif ($FolderID             )     {$uri = "$GraphUri/$Drive/$FolderID/children?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file" }
+        if     ($FolderID -or $SharedWithMe -or $Recent) {
+            if     ($FolderID     -and $Search) {$uri  = "$GraphUri/$Drive/$FolderID/search(q='$Search')?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file"}
+            elseif ($FolderID                 ) {$uri  = "$GraphUri/$Drive/$FolderID/children?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file"    }
             elseif ($SharedWithMe -and $search) {}  #can these be combined ?
-            elseif ($SharedWithMe             ) {$uri = "$GraphUri/me/Drive/SharedWithMe"        }
-            elseif ($Search                   ) {$uri = "$GraphUri/me/drive/search(q='$Search')" }  #me or $drive
-            elseif ($Recent                   ) {$uri = "$GraphUri/$Drive/recent"                }  #Me or $drive
-            try    {$children = Invoke-GraphRequest $uri -ValueOnly }
+            elseif ($SharedWithMe             ) {$uri  = "$GraphUri/me/drive/SharedWithMe?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file"        }
+            elseif ($Search                   ) {$uri  = "$GraphUri/me/drive/search(q='$Search')?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file" }  #me or $drive
+            elseif ($Recent                   ) {$uri  = "$GraphUri/$Drive/recent?`$Select=Name,Id,folder,Size,Weburl,specialfolder,parentReference,fileSystemInfo,folder,file"                }  #Me or $drive
+
+            if     ($Include -match '\*.*\*'  ) {Write-Warning "Graph doesn't do *something* searches"}
+            elseif ($Include -match '\*$'     ) {$uri += "&`$filter=startswith(name,'{0}')" -f ($Include -replace '\*$','') }
+            elseif ($Include -match '^\*'     ) {$uri += "&`$filter=endswith(name,'{0}')"   -f ($Include -replace '^\*','') }
+            elseif ($Include -match '\*'      ) {Write-Warning "Graph doesn't do something*something searches"}
+            elseif ($Include -match '\*'      ) {Write-Warning "Graph doesn't do something*something searches"}
+
+            try    {$Children = Invoke-GraphRequest $uri -ValueOnly -ExcludeProperty '@odata.etag', '@odata.type' -AsType ([MicrosoftGraphDriveItem])  |
+                                    Where-Object {$_.folder -or -not $Subfolders}
+
+                    $Children | Add-Member  -PassThru -MemberType AliasProperty -Name ItemID -Value 'id'      |
+                                Add-Member  -PassThru -NotePropertyName Drive -NotePropertyValue $driveObj.id |
+                                Sort-Object -Property name
+            }
             catch  {
                     if ($_.exception.response.statuscode.value__ -eq 404) {
                           Write-Warning -Message "Not found" ;return
                     }
                     else {Write-Warning -Message $_.exception.tostring() ; return}
             }
-            $children.where({$_.folder -or -not $Subfolders}) |
-                ForEach-Object {
-                    [void]$_.remove('@odata.etag')
-                    [void]$_.remove('@odata.type')
-                    New-Object -TypeName MicrosoftGraphDriveItem -Property $_
-                } | Sort-Object -Property name
-            #This may have returned nothing no subfolders.
+            #This may have returned nothing or no subfolders.
         }
         #endregion
         #region Getting the drive - either the drive object itself , or the folders in its root.
         elseif ($Subfolders) {
             $children = $driveObj.root.children.where({$_.folder})
             $children | ForEach-Object {New-Object -TypeName MicrosoftGraphDriveItem -Property $_} |
+                Add-Member  -PassThru -MemberType AliasProperty -Name ItemID -Value 'id'           |
+                Add-Member  -PassThru -NotePropertyName Drive -NotePropertyValue $driveObj.id      |
                     Sort-Object -Property Name
         }
-        else             {
+        else                 {
             [void]$driveObj.remove('root@odata.context')
             [void]$driveObj.remove('@odata.context')
-            return (New-object -TypeName MicrosoftGraphDrive -Property $driveObj)
+            New-object -TypeName MicrosoftGraphDrive -Property $driveObj |
+                Add-Member  -PassThru -MemberType AliasProperty -Name Drive -Value 'id'
+            return
         }
         #endregion
 
-        #The above will either have left a collection of items in $children, or explictly returned a result.
-        #region return any collection of items - filtered to subfolders if required. Tell the user if the folder is empty but send nothing to the pipeline
-        if (-not $children -and -not $Quiet) { Write-Host  "Folder exists, but is empty."}
-
+        #region items and drives will explictly return result. If we were looking in a folder with no suitable children, tell the user the lack of result is OK
+        if (-not $children -and -not $Quiet) { Write-Host  "Folder exists, but had nothing to return."}
         #endregion
 
         <#
@@ -543,4 +571,13 @@ function Copy-FromGraphFolder {
         }
         else {Write-Warning -Message "$Destination is not a valid path."}
     }
+}
+
+function Set-GraphHomeDrive   {
+    param    (
+        [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
+        $Drive
+    )
+    $Global:PSDefaultParameterValues["*GraphFolder:Drive"]   = $Drive
+    $Global:PSDefaultParameterValues["Get-GraphDrive:Drive"] = $Drive
 }

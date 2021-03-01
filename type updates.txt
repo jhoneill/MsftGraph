@@ -5,7 +5,7 @@
 
 * Security/alerts   https://graph.microsoft.com/v1.0/security/alerts *scopes SecurityEvents.Read.All, SecurityEvents.ReadWrite.All*
                     https://docs.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0
-
+* OneDrive     Search any drive not just my drive
 * Search            https://docs.microsoft.com/en-us/graph/api/resources/search-api-overview?view=graph-rest-1.0
 
 * User              find meeting times , below ,  https://graph.microsoft.com/beta/me/findRooms
