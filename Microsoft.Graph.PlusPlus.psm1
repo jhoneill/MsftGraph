@@ -1,8 +1,8 @@
 using namespace System.Management.Automation
 using namespace Microsoft.Graph.PowerShell.Models
 
-$global:GraphUri                  = "https://graph.microsoft.com/v1.0"   #May want this outside the module
-$script:GUIDRegex                 = "^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$"
+$global:GraphUri                  = 'https://graph.microsoft.com/v1.0'   #May want this outside the module
+$script:GUIDRegex                 = '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$'
 $script:WellKnownMailFolderRegex  = '^[/\\]?(archive|clutter|conflicts|conversationhistory|deleteditems|drafts|inbox|junkemail|localfailures|msgfolderroot|outbox|recoverableitemsdeletions|scheduled|searchfolders|sentitems|serverfailures|syncissues)[/\\]?$'
 
 #region completer, transformer, and validator attributes for parameters
@@ -32,7 +32,7 @@ class DomainCompleter             : IArgumentCompleter {
     {
         $result = [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
         if (-not $this.Domains)  {$this.Domains = Get-GraphDomain }
-        $wildcard          = ("*" + ($wordToComplete  -replace "['""]",'' )+ "*")
+        $wildcard          = ('*' + ($wordToComplete  -replace '[''"]','' )+ '*')
 
         $this.domains.id.where({$_ -like $wildcard}) |
             Sort-Object | ForEach-Object {$result.Add([System.Management.Automation.CompletionResult]::new($_))}
@@ -45,7 +45,7 @@ class GroupCompleter              : IArgumentCompleter {
         [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
         [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
     ) {
-        $result = [System.Collections.Generic.List[CompletionResult]]::new()
+        $result =  [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
 
         #strip quotes from word to complete - replace " or ' with nothing
         $wordToComplete = $wordToComplete -replace '"|''', ''
@@ -54,103 +54,9 @@ class GroupCompleter              : IArgumentCompleter {
         else                 {$uri = "$global:GraphUri/Groups/?`$Top=20"}
 
         Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
-                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
+                $result.Add([System.Management.Automation.CompletionResult]::new("'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
         }
 
-        return $result
-    }
-}
-
-class RoleCompleter               : IArgumentCompleter {
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    ) {
-        $result = [System.Collections.Generic.List[CompletionResult]]::new()
-
-        #strip quotes from word to complete - replace " or ' with nothing
-        if (-not $wordToComplete) {$wordToComplete = '*'}
-        else {$wordToComplete = "$wordToComplete*" -replace '"|''', '' }
-        Invoke-GraphRequest  -Uri "$global:GraphUri/directoryroles?`$select=displayname" -ValueOnly |
-            Where-Object displayname -like $wordToComplete | Sort-Object -Property displayname | ForEach-Object {
-                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$($_.displayname)'", $_.displayname, ([CompletionResultType]::ParameterValue) , $_.displayname) )
-        }
-        return $result
-    }
-}
-
-class TeamCompleter               : IArgumentCompleter {
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    ) {
-        $result = [System.Collections.Generic.List[CompletionResult]]::new()
-
-        #strip quotes from word to complete - replace " or ' with nothing
-        $wordToComplete = $wordToComplete -replace '"|''', ''
-
-
-        if ($wordToComplete) {$uri =  $global:GraphUri +  ("/groups?`$filter=startswith(displayname,'{0}')')" -f $wordToComplete)}
-        else                 {$uri = "$global:GraphUri/Groups/?`$Top=20"}
-        #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams so this is just completing groups for now
-        Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
-                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
-        }
-
-        return $result
-    }
-}
-
-class OneDrivePathCompleter       : IArgumentCompleter {
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    ) {
-        $result = [System.Collections.Generic.List[CompletionResult]]::new()
-
-        #strip quotes from word to complete - replace " or ' with nothing
-        $wordToComplete = $wordToComplete -replace '"|''', ''
-
-        If     ($wordToComplete -notmatch "/.+/" -or
-                $wordToComplete -eq "/root:?/" )   {$params =@{folderPath = '/'} }
-        elseif ($wordToComplete -Match '^/?root:') {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:'} } #catch after any leading / and before final /; and sandwich between / and :
-        else                                       {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:'} } #catch after any leading / and before final /; and sandwich between /root/ and :
-
-        if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
-        # #it would be better to order-by at the server, but consumer one drive doesn't support it.
-        Get-GraphDrive -quiet @params | Sort-Object -Property name | ForEach-Object {
-            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
-            if ($P -like "*$wordToComplete*") {
-                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
-            }
-        }
-        return $result
-    }
-}
-
-class OneDriveFolderCompleter     : IArgumentCompleter {
-    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
-        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
-        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
-    ) {
-        $result = [System.Collections.Generic.List[CompletionResult]]::new()
-
-        #strip quotes from word to complete - replace " or ' with nothing
-        $wordToComplete = $wordToComplete -replace '"|''', ''
-
-        If     ($wordToComplete -notmatch "/.+/" -or
-                $wordToComplete -eq "/root:?/" )   {$params =@{folderPath = '/'} }
-        elseif ($wordToComplete -Match '^/?root:') {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:'} } #catch after any leading / and before final /; and sandwich between / and :
-        else                                       {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:'} } #catch after any leading / and before final /; and sandwich between /root/ and :
-
-        if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
-        # #it would be better to order-by at the server, but consumer one drive doesn't support it.
-        Get-GraphDrive @params -subFolders -quiet | Sort-Object -Property name | ForEach-Object {
-            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
-            if ($P -like "*$wordToComplete*") {
-                $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
-            }
-        }
         return $result
     }
 }
@@ -160,7 +66,7 @@ class MailFolderCompleter         : IArgumentCompleter {
          [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
          [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
      ) {
-         $result = [System.Collections.Generic.List[CompletionResult]]::new()
+         $result =  [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
 
          #strip quotes from word to complete - replace " or ' with nothing.
          $wordToComplete = $wordToComplete -replace '"|''', ''
@@ -176,11 +82,65 @@ class MailFolderCompleter         : IArgumentCompleter {
          Get-GraphMailFolder @params | ForEach-Object {
              $p = $path+$_.displayname
              if ($p -like "$wordToComplete*") {
-                 $result.Add(( New-Object -TypeName CompletionResult -ArgumentList "'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
+                 $result.Add([System.Management.Automation.CompletionResult]::new("'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
              }
          }
          return $result
      }
+}
+
+class OneDriveFolderCompleter     : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result =  [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        $wordToComplete = $wordToComplete -replace '"|''', ''
+
+        If     ($wordToComplete -notmatch "/.+/" -or
+                $wordToComplete -eq "/root:?/" )   {$params =@{folderPath = '/'} }
+        elseif ($wordToComplete -Match '^/?root:') {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:'} } #catch after any leading / and before final /; and sandwich between / and :
+        else                                       {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:'} } #catch after any leading / and before final /; and sandwich between /root/ and :
+
+        if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
+        # #it would be better to order-by at the server, but consumer one drive doesn't support it.
+        Get-GraphDrive @params -subFolders -quiet | Sort-Object -Property name | ForEach-Object {
+            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
+            if ($P -like "*$wordToComplete*") {
+                $result.Add([System.Management.Automation.CompletionResult]::new("'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
+            }
+        }
+        return $result
+    }
+}
+
+class OneDrivePathCompleter       : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result =  [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        $wordToComplete = $wordToComplete -replace '"|''', ''
+
+        If     ($wordToComplete -notmatch "/.+/" -or
+                $wordToComplete -eq "/root:?/" )   {$params =@{folderPath = '/'} }
+        elseif ($wordToComplete -Match '^/?root:') {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$',      '/$1:'} } #catch after any leading / and before final /; and sandwich between / and :
+        else                                       {$params =@{folderPath = $wordToComplete -replace '^/?(.*)/.*?$','/root:/$1:'} } #catch after any leading / and before final /; and sandwich between /root/ and :
+
+        if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
+        # #it would be better to order-by at the server, but consumer one drive doesn't support it.
+        Get-GraphDrive -quiet @params | Sort-Object -Property name | ForEach-Object {
+            $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
+            if ($P -like "*$wordToComplete*") {
+                $result.Add([System.Management.Automation.CompletionResult]::new("'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
+            }
+        }
+        return $result
+    }
 }
 
 class SkuCompleter                : IArgumentCompleter {
@@ -217,6 +177,60 @@ class SkuPlanCompleter            : IArgumentCompleter {
         }
         $selectedSkus.ServicePlans.where({$_.ServicePlanName -like $wildcard}).ServicePlanName |
             Sort-Object | ForEach-Object {$result.Add([System.Management.Automation.CompletionResult]::new($_))}
+        return $result
+    }
+}
+
+class RoleCompleter               : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result =  [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        if (-not $wordToComplete) {$wordToComplete = '*'}
+        else                      {$wordToComplete = "$wordToComplete*" -replace '"|''', '' }
+        Invoke-GraphRequest  -Uri "$global:GraphUri/directoryroles?`$select=displayname" -ValueOnly |
+            Where-Object displayname -like $wordToComplete | Sort-Object -Property displayname | ForEach-Object {
+                $result.Add([System.Management.Automation.CompletionResult]::new("'$($_.displayname)'", $_.displayname, ([CompletionResultType]::ParameterValue) , $_.displayname) )
+        }
+        return $result
+    }
+}
+
+class TeamCompleter               : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result =  [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        $wordToComplete = $wordToComplete -replace '"|''', ''
+        if ($wordToComplete) {$uri =  $global:GraphUri +  ("/groups?`$filter=startswith(displayname,'{0}')')" -f $wordToComplete)}
+        else                 {$uri = "$global:GraphUri/Groups/?`$Top=20"}
+        #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams so this is just completing groups for now
+        Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
+                $result.Add([System.Management.Automation.CompletionResult]::new("'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
+        }
+        return $result
+    }
+}
+
+class UPNCompleter                : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result =  [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        $wordToComplete = $wordToComplete -replace '"|''', ''
+        if ($wordToComplete) {
+            Invoke-GraphRequest -ValueOnly -headers @{'ConsistencyLevel'='eventual'} -uri "$global:GraphUri/users?`$filter=startswith(userprincipalname,'$wordToComplete')&top=10&select=userprincipalName" |
+                ForEach-Object userPrincipalName | sort-object | ForEach-Object {$result.Add([System.Management.Automation.CompletionResult]::new("'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )}
+        }
         return $result
     }
 }

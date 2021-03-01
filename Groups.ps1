@@ -54,7 +54,7 @@ function Get-GraphGroupList         {
 
         [Parameter(parameterSetName='Sort')]
         [Switch]$Descending,
-        #An oData filter string; there is a graph limitation  that you can't filter by description or Visibility.
+        #An oData filter string; there is a graph limitation that you can't filter by description or Visibility.
         [Parameter(Mandatory=$true, parameterSetName='FilterByString')]
         [string]$Filter
     )
@@ -295,8 +295,11 @@ function Get-GraphGroup             {
                 }
                 elseIf ($Plans)              {
                     #would like to have expand details here but it only works with a single plan.
-                    $result  = Invoke-GraphRequest  -Uri  "$groupURI/planner/plans"  -AllValues -ExcludeProperty  "@odata.etag" -AsType ([MicrosoftGraphPlannerPlan]) |
-                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
+                    try {
+                        $result  = Invoke-GraphRequest  -Uri  "$groupURI/planner/plans"  -AllValues -ExcludeProperty  "@odata.etag" -AsType ([MicrosoftGraphPlannerPlan]) |
+                            Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
+                    }
+                    catch             { Write-Warning "Could not get plans for $($ID.DisplayName)." ;   continue}
                     if (-not $result) { Write-Host "The team $($ID.DisplayName) has not created any plans" ;   continue}
                     $dirObjectsHash = @{}
                     if ($i.displayName) {$dirObjectsHash[$teamId] = $i.displayName}
@@ -409,18 +412,18 @@ function New-GraphGroup             {
     [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphGroup])]
     [Alias("New-GraphTeam")]
     param   (
-        #The Name of the group / team
+        #The name of the Group / Team
         [Parameter(Mandatory=$true, Position=0)]
         [string]$Name,
 
-        #Unless specified groups will be mail enabled "unfied" / Microsoft365 groups
+        #Unless specified, groups will be mail enabled "unfied" / Microsoft365 groups
         #The Graph API doesn't allow mail-enabled & security-enabled,  or mail-disabled & unified
         #Only unified groups can be made into teams. Unified groups can only contain users,
         #Security groups can contain other security principals
         [parameter(ParameterSetName='Security',Mandatory=$true)]
         [Switch]$AsSecurity,
 
-        #By default the group is configured as a team unless -NoTeam is specified
+        #New-GraphGroup only enables teams functonality if -AsTeam is specified. Calling as New-GraphTeam defaults AsTeam to true
         [parameter(ParameterSetName='Team',Mandatory=$true)]
         [Switch]$AsTeam,
 
@@ -441,6 +444,7 @@ function New-GraphGroup             {
         [parameter(ParameterSetName='Owners')]
         [parameter(ParameterSetName='Security')]
         $Owners,
+
         #if specified group will be added without prompting
         [Switch]$Force
     )
@@ -458,13 +462,12 @@ function New-GraphGroup             {
                     'visibility'           = $Visibility.ToLower()
                     'groupTypes'           = @()
     }
-    if   (-not $AsSecurity ) {
+    if (-not $AsSecurity ) {
           $settings.groupTypes            += "Unified"
           if ($MyInvocation.InvocationName -eq 'New-GraphTeam' -and -not $PSBoundParameters.ContainsKey('AsTeam')) {
               $AsTeam = $true
           }
     }
-
     if ($Description) {
           $settings['description']         = $Description
     }
@@ -746,11 +749,10 @@ function Add-GraphGroupMember       {
       .Synopsis
         Adds a user (or group) to a group/team as either a member or owner.
       .Description
-        Because the group may be a team the this command has alias of Add-GraphTeamMember
-        requires consent to use the Group.ReadWrite.All, Directory.ReadWrite.All, or
+        Because the group may be a team the this command has alias of Add-GraphTeamMember.
+        it requires consent to use the Group.ReadWrite.All, Directory.ReadWrite.All, or
         Directory.AccessAsUser.All scope.
       .Example
-        >
         >$newGroup = New-GraphGroup -Name Test101
         >Get-GraphUserList -Filter "Department eq 'Accounts'" | Add-GraphGroupMember -Group $newGroup
         Creates a new group; then gets a list of users and adds them to the group.
@@ -768,6 +770,7 @@ function Add-GraphGroupMember       {
         $Group,
         #The user or nested-group to add, either as a UPN or ID or as a object with an ID
         [Parameter(Mandatory=$true, Position=1, ValueFromPipeline=$true)]
+        [ArgumentCompleter([UPNCompleter])]
         $Member,
         #If specified the user will be added as an owner, otherwise they will be a standard member
         [switch]$AsOwner,
@@ -821,7 +824,7 @@ function Remove-GraphGroupMember    {
         Directory.AccessAsUser.All scope.
       .Example
         Remove-GraphGroupMember -Group $g -FromOwners -Member alex@contoso.com -Force
-        Remmvoes a user from the owners of a group without prompting for confirmation.
+        Removes a user from the owners of a group without prompting for confirmation.
       .Example
         Get-GraphUserList -Filter "Department eq 'Accounts'" | Remove-GraphGroupMember -Group $g
         Gets a list of users and removes them from from a group.
@@ -835,6 +838,7 @@ function Remove-GraphGroupMember    {
         $Group,
         #A group object with an ID field, or a user object, user ID or UPN
         [Parameter(Mandatory=$true, Position=1, ValueFromPipeline=$true)]
+        [ArgumentCompleter([UPNCompleter])]
         $Member,
         #If specified the member will be removed from the owners rather than members
         [switch]$FromOwners,

@@ -4,8 +4,8 @@ using namespace Microsoft.Graph.PowerShell.Models
 using namespace System.Management.Automation
 
 <#
-    The Connect-Graph function incorporates work to get tokens from an Azure
-    session and to referesh tokens which was published by Justin Grote at
+    The Connect-Graph function incorporates work to get tokens from an Azure session and to referesh tokens
+    which was published by Justin Grote at
         https://github.com/JustinGrote/JustinGrote.Microsoft.Graph.Extensions/blob/main/src/Public/Connect-MgGraphAz.ps1
     and licensed by him under the same MIT terms which apply to this module (see the LICENSE file for details)
 
@@ -19,7 +19,16 @@ param()
 
 Remove-item Alias:\Invoke-GraphRequest -ErrorAction SilentlyContinue
 function Invoke-GraphRequest {
-    param(
+    <#
+      .synopsis
+        Wrappper for Invoke-MgGraphRequest.With token management and result pre-processing
+      .description
+        Adds -ValueOnly to return just the value part
+             -AllValues to return gather multiple sets when data is paged
+             -AsType to convert the retuned results to a specific type
+             -ExcludeProperty  and -PropertyNotMatch for results which have properties which aren't in the specified type
+    #>
+    param   (
         #Uri to call can be a segment such as /beta/me or a fully qualified https://graph.microsoft.com/beta/me
         [Parameter(Mandatory=$true, Position=1 )]
         [uri]$Uri,
@@ -29,11 +38,11 @@ function Invoke-GraphRequest {
         [Parameter(Position=2 )]
         $Method,
 
-        #Request Body. Required when Method is Post or Patch'
+        #Request body, required when Method is POST or PATCH
         [Parameter(Position=3,ValueFromPipeline=$true)]
         $Body,
 
-        #Optional Custom Headers
+        #Optional custom headers, commonly @{'ConsistencyLevel'='eventual'}
         [System.Collections.IDictionary]$Headers,
 
         #Output file where the response body will be saved
@@ -47,16 +56,16 @@ function Invoke-GraphRequest {
         #Indicates that the cmdlet returns the results, in addition to writing them to a file. Only valid when the OutFile parameter is also used.
         [switch]$PassThru,
 
-        #OAuth or Bearer Token to use instead of acquired token
+        #OAuth or Bearer token to use instead of acquired token
         [securestring]$Token,
 
-        #Add headers to Request Header collection without validation
+        #Add headers to request header collection without validation
         [switch]$SkipHeaderValidation,
 
-        #Body Content Type, for exmaple 'application/json'
+        #Body content type, for exmaple 'application/json'
         [string]$ContentType,
 
-        #Graph Authentication Type - default or userProvived Token
+        #Graph Authentication type - 'default' or 'userProvivedToken'
         [Microsoft.Graph.PowerShell.Authentication.Models.GraphRequestAuthenticationType]
         $Authentication,
 
@@ -82,11 +91,11 @@ function Invoke-GraphRequest {
 
         #A regular expression for keys to be removed, for example to catch many odata properties
         [string]$PropertyNotMatch,
+
         #If specified converts the JSON object to properties of the a new object of the requested type. Any properties which are expected in the JSON but not defined in the type should be excluded.
         [string]$AsType
     )
-
-    begin {
+    begin   {
         [void]$PSBoundParameters.Remove('AllValues')
         [void]$PSBoundParameters.Remove('AsType')
         [void]$PSBoundParameters.Remove('ExcludeProperty')
@@ -99,17 +108,9 @@ function Invoke-GraphRequest {
             }
             else {Write-Warning "Token appears to have expired and no refresh information is available "}
         }
-        <#  no longer needed
-        elseif ($global:__MgToken -is [secureString]) {
-            $PSBoundParameters['Token']          = $global:__MgToken
-            $PSBoundParameters['Authentication'] = 'UserProvidedToken'
-            Write-Debug "Using user-provided token"
-        }#>
     }
-
     process {
-        #my variable naming: response is an answer to a call - a partial thing
-        #Result might come from processing a response or multiple responses - the end goal.
+        #I try to use "response" when it is an interim thing not the final result.
         $response = Microsoft.Graph.Authentication\Invoke-MgGraphRequest @PSBoundParameters
         if ($ValueOnly -or $AllValues) {
             $result = $response.value
@@ -133,6 +134,24 @@ function Invoke-GraphRequest {
             else         {$r}
         }
     }
+}
+
+function Get-AccessToken     {
+param (
+    [string]$Resoure      = 'https://graph.microsoft.com',
+    [string]$GrantType    = 'client_credentials',
+    [hashtable]$BodyParts = @{}
+)
+
+$tokenUri  = "https://login.microsoft.com/$script:TenantID/oauth2/token"
+$body      = $BodyParts + @{'client_id' = $script:ClientID
+                        'client_secret' = $script:Client_secret
+                             'resource' = $Resoure
+                           'grant_type' = $GrantType
+                              }
+
+Invoke-RestMethod -Method Post -Uri $tokenUri -Body $body
+
 }
 
 Remove-Item Alias:\Connect-Graph -ErrorAction SilentlyContinue
@@ -244,16 +263,19 @@ function Connect-Graph       {
             # Send request with grant type of 'password' and creds, or 'refresh' or for the app use 'client_credentials'
             if     ($bp.Refresh)          {
                 Write-Verbose "CONNECT: Sending a 'Refresh_token' token request "
-                $authresp   =   Invoke-RestMethod -Method Post -Uri $tokenUri -Body @{
-                    'grant_type'    = 'refresh_token'
+                $authresp   =   Get-AccessToken -GrantType refresh_token -BodyParts @{'refresh_token' = $script:RefreshToken}
+               <# $authresp   =   Invoke-RestMethod -Method Post -Uri $tokenUri -Body @{
+                    'grant_type'    = 'refresh_token'  ;
                     'refresh_token' = $script:RefreshToken
                     'client_id'     = $script:ClientID
                     'client_secret' = $script:Client_secret
                     'resource'      = 'https://graph.microsoft.com'
-                }
+                } #>
             }
             elseif ($bp.Credential)       {
                 Write-Verbose "CONNECT: Sending a 'Password' token request for $($bp.Credential.UserName) "
+                 $authresp   =   Get-AccessToken -GrantType password -BodyParts @{ 'username' = $bp.Credential.UserName; 'password' = $bp.Credential.GetNetworkCredential().Password}
+              <#
                 $authresp   =   Invoke-RestMethod -Method Post -Uri $tokenUri -Body @{
                     'grant_type'    = 'password'
                     'resource'      = 'https://graph.microsoft.com'
@@ -261,16 +283,17 @@ function Connect-Graph       {
                     'password'      = $bp.Credential.GetNetworkCredential().Password
                     'client_id'     = $script:ClientID
                     'client_secret' = $script:Client_secret
-                }
+                }#>
             }
             elseif ($bp.AsApp)            {
                 Write-Verbose "CONNECT: Sending a 'client_credentials' token request for the App."
-                $authresp  = Invoke-RestMethod -Method Post -Uri $tokenUri -Body @{
+                 $authresp   =   Get-AccessToken
+                <#$authresp  = Invoke-RestMethod -Method Post -Uri $tokenUri -Body @{
                     'grant_type'    = 'client_credentials';
                     'resource'      = 'https://graph.microsoft.com';
                     'client_id'     =  $script:ClientID ;
                     'client_secret' =  $script:Client_secret;
-                }
+                }#>
             }
             #to leverage an existing Az Session call a command in the Az.Account module (V2 and later)
             elseif ($bp.FromAzureSession) {
@@ -369,18 +392,20 @@ function Connect-Graph       {
 function Show-GraphSession   {
     <#
         .Synopsis
-            Returns Basic information about the current sesssion
+            Returns information about the current sesssion
     #>
     [CmdletBinding(DefaultParameterSetName='None')]
     [OutputType([String])]
-    Param(
+    param  (
         [Parameter(ParameterSetName='Who')]
         [switch]$Who,
         [Parameter(ParameterSetName='Scopes')]
         [switch]$Scopes,
         [switch]$Options,
-        [switch]$AppName
+        [switch]$AppName,
+        [switch]$CachedToken
     )
+    if     (-not       [GraphSession]::Instance.AuthContext) {Write-Host  "Ready for Connect-Graph."; return}
     if     ($Scopes)  {[GraphSession]::Instance.AuthContext.Scopes}
     elseif ($Who)     {[GraphSession]::Instance.AuthContext.Account}
     elseif ($AppName) {[GraphSession]::Instance.AuthContext.AppName}
@@ -390,8 +415,25 @@ function Show-GraphSession   {
         'ClientSecretSet' = $script:Client_Secret -as [bool]
         'DefaultScopes'   = $script:DefaultGraphScopes -join ', '
     }}
-
-    else  {Get-MgContext}
+    elseif (-not $CachedToken)  {Get-MgContext}
+    else {
+        $id               = [GraphSession]::Instance.AuthContext.ClientId
+        $path             = Join-Path -ChildPath ".graph\$($id)cache.bin3" -Path ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::UserProfile))
+        if (-not(Test-Path $path)) {
+                Write-Warning "Could not find a cache file for app id $id in the .graph folder."
+                return
+        }
+        #read and decrypted the ached file, it comes up as not very nice JSON so unpick that.
+        $tokenBytes       = [System.Security.Cryptography.ProtectedData]::Unprotect( (Get-Content $path -AsByteStream) , $null, 0)
+        $tokendata        = ConvertFrom-Json ([string]::new($tokenBytes)  -replace '(Token|Account|AppMetaData)":{".*?":{' ,'$1":{"X":{' -replace '"secret":".*?",','')
+        $tokendata.account.x | Select-Object Name, Username, Local_account_id, Realm, Authority_type,
+                                @{n='environment';    e={$tokendata.AccessToken.x.environment}},
+                                @{n='client_id';      e={$tokendata.AccessToken.x.client_id}},
+                                @{n='credential_type';e={$tokendata.AccessToken.x.credential_type}},
+                                @{n='target';         e={$tokendata.AccessToken.x.target}},
+                                @{n='cached_at';      e={[datetime]::UnixEpoch.AddSeconds($tokendata.AccessToken.x.cached_at)}},
+                                @{n='expires_on';     e={[datetime]::UnixEpoch.AddSeconds($tokendata.AccessToken.x.expires_on)}}
+    }
 }
 
 function ContextHas          {
@@ -424,10 +466,10 @@ function ContextHas          {
     if ($WorkOrSchoolAccount)  {
         $state = $state -and [GraphSession]::Instance.AuthContext.WorkOrSchool
     }
-    if ($AsUser) {
+    if ($AsUser)      {
         $state = $state -and [GraphSession]::Instance.AuthContext.Account
     }
-    if ($AsApp) {
+    if ($AsApp)       {
         $state = $state -and -not [GraphSession]::Instance.AuthContext.Account
     }
     if ($BreakIfNot ) {

@@ -9,6 +9,7 @@ function Get-GraphReminderView   {
     [outputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphReminder])]
     param   (
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
+        [ArgumentCompleter([UPNCompleter])]
         $User = $global:GraphUser,
         #Time zone to rennder event times. By default the time zone of the local machine will me use
         $Timezone = $(tzutil.exe /g),

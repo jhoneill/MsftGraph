@@ -16,7 +16,7 @@ function Get-GraphServicePrincipal {
         .Description
             A replacement for the SDK's Get-MgServicePrincipal
             That has orderby which doesn't work - the it's in the Docs but the API errors if you try
-            It doesn't have search my name, or select managedIDs or Applications.
+            It doesn't have search by name, or select managedIDs or Applications.
     #>
     [CmdletBinding(DefaultParameterSetName='List1')]
     [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphAppRole],ParameterSetName=('AllRoles','FilteredRoles'))]
@@ -28,15 +28,18 @@ function Get-GraphServicePrincipal {
         [Parameter(ParameterSetName='AllScopes',      Mandatory=$true, Position=0)]
         [Parameter(ParameterSetName='FilteredScopes', Mandatory=$true, Position=0)]
         [Parameter(ParameterSetName='Get2',           Mandatory=$true, Position=0)]
-        # key: id of servicePrincipal
+        #The GUID(s) for servicePrincipal(s). If a name is given the command will try to resolve matching Service principals
         [String[]]$ServicePrincipalId,
 
+        #Produces a list filtered to only managed identities
         [Parameter(ParameterSetName='List2')]
         [switch]$ManagedIdentity,
 
+        #Produces a list filtered to only applications
         [Parameter(ParameterSetName='List3')]
         [switch]$Application,
 
+        #Produces a convenience list of office 365 security principals
         [Parameter(ParameterSetName='List4')]
         [switch]$O365ServicePrincipals,
 
@@ -54,15 +57,19 @@ function Get-GraphServicePrincipal {
         [Parameter(ParameterSetName='List3')]
         [String]$Search,
 
+        #Returns the list of application roles to those the role name, displayname or ID match the parameter value. Wildcards are supported
         [Parameter(ParameterSetName='AllRoles', Mandatory=$true)]
         [switch]$ExpandAppRoles,
 
+        #Filters the list of application roles available within a SP
         [Parameter(ParameterSetName='FilteredRoles', Mandatory=$true)]
         [string]$AppRoleFilter,
 
+        #Returns the list of (user) oauth scopes available within a SP
         [Parameter(ParameterSetName='AllScopes', Mandatory=$true)]
         [switch]$ExpandScopes,
 
+        #Filters the list of oauth scopes to those where the scope name, displayname or ID match the parameter value. Wildcards are supported
         [Parameter(ParameterSetName='FilteredScopes', Mandatory=$true)]
         [string]$ScopeFilter
     )
@@ -84,54 +91,54 @@ function Get-GraphServicePrincipal {
         ).foreach{"appId eq '$PSItem'"} -join ' or '
     }
     process {
-        if (-not $ServicePrincipalId) {
-            if ($PSBoundParameters['Filter'] -and  $O365ServicePrincipals) {
-                $PSBoundParameters['Filter'] ="( $($PSBoundParameters['Filter']) ) and $managedIdentityFilter"
+        if  (   -not    $ServicePrincipalId)    {
+            if         ($O365ServicePrincipals  -and $PSBoundParameters['Filter']) {
+                        $PSBoundParameters['Filter'] ="( $($PSBoundParameters['Filter']) ) and $managedIdentityFilter"
             }
-            elseif ($O365ServicePrincipals) {
-                $PSBoundParameters['Filter'] =  $managedIdentityFilter
+            elseif     ($O365ServicePrincipals) {
+                        $PSBoundParameters['Filter'] =  $managedIdentityFilter
             }
-            elseif ($ManagedIdentity) {
-                $psboundParameters['Filter']="servicePrincipaltype eq 'ManagedIdentity'"
+            elseif     ($ManagedIdentity)       {
+                        $PSBoundParameters['Filter']="servicePrincipaltype eq 'ManagedIdentity'"
             }
-            elseif ($Application) {
-                $psboundParameters['Filter']="servicePrincipaltype eq 'Application'"
+            elseif     ($Application)           {
+                        $PSBoundParameters['Filter']="servicePrincipaltype eq 'Application'"
             }
-            foreach ($param in @('Application', 'ManagedIdentity', 'O365ServicePrincipals')) {
-                [void]$PSBoundParameters.Remove($param )
+            foreach    ($param in @('Application', 'ManagedIdentity', 'O365ServicePrincipals')) {
+                  [void]$PSBoundParameters.Remove($param )
             }
             Microsoft.Graph.Applications.private\Get-MgServicePrincipal_List1 @PSBoundParameters -all -ConsistencyLevel Eventual | Sort-Object displayname
         }
         else {
-            foreach ($param in @('ServicePrincipalId', 'ExpandAppRoles', 'ExpandScopes', 'AppRoleFilter', 'ScopeFilter')) {
-                [void]$PSBoundParameters.Remove($param )
+            foreach    ($param in @('ServicePrincipalId', 'ExpandAppRoles', 'ExpandScopes', 'AppRoleFilter', 'ScopeFilter')) {
+                  [void]$PSBoundParameters.Remove($param )
             }
             foreach    ($sp in $ServicePrincipalId) {
-                if     ($sp -match $GUIDRegex) {
-                      $result = Microsoft.Graph.Applications.private\Get-MgServicePrincipal_Get2 -ServicePrincipalId $sp @PSBoundParameters
+                if     ($sp -match $GUIDRegex)      {
+                        $result = Microsoft.Graph.Applications.private\Get-MgServicePrincipal_Get2 -ServicePrincipalId $sp @PSBoundParameters
                 }
                 else   {
-                      [void]$PSBoundParameters.Remove('ServicePrincipalId')
-                      $psboundParameters['Filter']="startswith(displayName,'$sp')"
-                      $result = Microsoft.Graph.Applications.private\Get-MgServicePrincipal_List1 @PSBoundParameters -ConsistencyLevel Eventual | Sort-Object displayname
+                        [void]$PSBoundParameters.Remove('ServicePrincipalId')
+                        $psboundParameters['Filter']="startswith(displayName,'$sp')"
+                        $result = Microsoft.Graph.Applications.private\Get-MgServicePrincipal_List1 @PSBoundParameters -ConsistencyLevel Eventual | Sort-Object displayname
                 }
                 if     ($AppRoleFilter)  {
-                      $result | Select-Object -ExpandProperty approles |
+                        $result | Select-Object -ExpandProperty approles |
                                     Where-Object {$_.id -like $AppRoleFilter  -or $_.DisplayName -like $AppRoleFilter -or $_.value -like $AppRoleFilter } |
                                         Sort-Object -Property Value
                 }
                 elseif ($ExpandAppRoles) {
-                      $result | Select-Object -ExpandProperty approles | Sort-Object -Property Value
+                        $result | Select-Object -ExpandProperty approles | Sort-Object -Property Value
                 }
-                elseif     ($ScopeFilter)  {
-                      $result | Select-Object -ExpandProperty Oauth2PermissionScopes |
+                elseif ($ScopeFilter)    {
+                        $result | Select-Object -ExpandProperty Oauth2PermissionScopes |
                                     Where-Object {$_.id -like $ScopeFilter  -or $_.AdminConsentDisplayName -like $ScopeFilter -or $_.value -like $ScopeFilter } |
                                         Sort-Object -Property Value
                 }
-                elseif ($ExpandScopes) {
-                      $result | Select-Object -ExpandProperty Oauth2PermissionScopes | Sort-Object -Property Value
+                elseif ($ExpandScopes)   {
+                        $result | Select-Object -ExpandProperty Oauth2PermissionScopes | Sort-Object -Property Value
                 }
-                else {$result}
+                else   {$result}
             }
         }
     }

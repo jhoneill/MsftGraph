@@ -38,6 +38,7 @@
                         'Export-GraphGroupMember',
                         'Export-GraphUser',
                         'Find-GraphPeople',
+                        'Get-AccessToken',
                         'Get-GraphBucketTaskList',
                         'Get-GraphChannel',
                         'Get-GraphChannelReply',

@@ -29,6 +29,7 @@ function Get-GraphUserList        {
     param   (
         #If specified searches for users whose first name, surname, displayname, mail address or UPN start with that name.
         [parameter(Mandatory=$true, parameterSetName='FilterByName', Position=0,ValueFromPipeline=$true )]
+        [ArgumentCompleter([UPNCompleter])]
         [string[]]$Name,
 
         #Names of the fields to return for each user.
@@ -137,6 +138,7 @@ function Get-GraphUser            {
         #UserID as a guid or User Principal name. If not specified, it will assume "Current user" if other paraneters are given, or "All users" otherwise.
         [parameter(Position=0,valueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
         [alias('id')]
+        [ArgumentCompleter([UPNCompleter])]
         $UserID,
         #Get the user's Calendar(s)
         [parameter(Mandatory=$true, parameterSetName="Calendars")]
@@ -384,10 +386,10 @@ function Get-GraphUser            {
             }
             #if we get a not found error that's propably OK - bail for any other error.
             catch {
-                if ($_.exception.response.statuscode.value__ -eq 404) {
+                if     ($_.exception.response.statuscode.value__ -eq 404) {
                     Write-Warning -Message "'Not found' error while getting data for user '$userid'"
                 }
-                if ($_.exception.response.statuscode.value__ -eq 403) {
+                elseif ($_.exception.response.statuscode.value__ -eq 403) {
                     Write-Warning -Message "'Forbidden' error while getting data for user '$userid'. Do you have access to the correct scope?"
                 }
                 else {
@@ -441,6 +443,7 @@ function Set-GraphUser            {
     param   (
         #ID for the user if not the current user
         [parameter(Position=0,ValueFromPipeline=$true)]
+        [ArgumentCompleter([UPNCompleter])]
         $UserID = "me",
         #A freeform text entry field for the user to describe themselves.
         [String]$AboutMe,
@@ -768,6 +771,7 @@ function Reset-GraphUserPassword  {
         [Parameter(Mandatory=$true,ValueFromPipelineByPropertyName=$true)]
         [ValidateNotNullOrEmpty()]
         [alias("UPN")]
+        [ArgumentCompleter([UPNCompleter])]
         [string]$UserPrincipalName,
 
         #The replacement password for the user. If none is specified one will be generated and output by the command
@@ -811,6 +815,7 @@ function Remove-GraphUser         {
     param   (
         #ID for the user
         [parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
+        [ArgumentCompleter([UPNCompleter])]
         $UserID,
         #If specified the user is deleted without a confirmation prompt.
         [Switch]$Force
@@ -824,7 +829,7 @@ function Remove-GraphUser         {
             if     ($u.displayName)       {$displayname = $u.displayname}
             elseif ($u.UserPrincipalName) {$displayName = $u.UserPrincipalName}
             else                          {$displayName = $u}
-            if     ($u.id)                {$u =$U.id}
+            if     ($u.id)                {$u = $U.id}
             elseif ($u.UserPrincipalName) {$u = $U.UserPrincipalName}
             if ($Force -or $pscmdlet.ShouldProcess($displayname,"Delete User")) {
                 try {

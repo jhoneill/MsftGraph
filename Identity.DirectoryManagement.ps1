@@ -168,6 +168,7 @@ function Grant-GraphUserLicense     {
 
         #ID for the user (required. "me" will select the current user)
         [parameter(Position=1, ValueFromPipeline=$true, Mandatory = $true)]
+        [ArgumentCompleter([UPNCompleter])]
         $UserID ,
 
         #Disables individual parts of the the SKU
@@ -289,6 +290,7 @@ function Revoke-GraphUserLicense    {
 
         #ID for the user (required. "me" will select the current user)
         [parameter(Position=1, ValueFromPipeline=$true, Mandatory = $true)]
+        [ArgumentCompleter([UPNCompleter])]
         $UserID ,
 
         #Runs the command without a confirmation dialog
