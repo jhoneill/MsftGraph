@@ -719,10 +719,10 @@ function New-GraphUser            {
     if (-not ($DisplayName -and $MailNickName -and $UserPrincipalName)) {
         throw "couldn't make sense of those parameters"
     }
-    #A simple way to create one in 100K temporaty passwords. You might get 10Oct2126 - easy to type and meets complexity rules.
+    #A simple way to create one in 100K temporary passwords. You might get 10Oct2126 - easy to type and meets complexity rules.
     if (-not $Initialpassword)    {
              $Initialpassword   = ([datetime]"1/1/1800").AddDays((Get-Random 146000)).tostring("ddMMMyyyy")
-             Write-Output "$UserPrincipalName, $Initialpassword"
+             [pscustomobject]@{'UserPrincipalName'= $UserPrincipalName; 'Initialpassword'= $Initialpassword}
     }
     $settings = @{
         'accountEnabled'    = $true
@@ -951,7 +951,7 @@ function Import-GraphUser         {
                     continue
             }
             elseif ($user.Action -eq 'Add'    -and (-not $user.DisplayName) ) {
-                Write-Warning "User was missing a UPN"
+                Write-Warning "User was missing a DisplayName"
                 continue
             }
             elseif ($user.Action -eq 'Add'    -and

@@ -37,6 +37,7 @@
                         'Copy-GraphOneNotePage',
                         'Export-GraphGroupMember',
                         'Export-GraphUser',
+                        'Export-GraphWorkSheet',
                         'Find-GraphPeople',
                         'Get-AccessToken',
                         'Get-GraphBucketTaskList',
@@ -75,11 +76,13 @@
                         'Get-GraphToDoList'
                         'Get-GraphUser',
                         'Get-GraphUserList',
+                        'Get-GraphWorkBook',
                         'Grant-GraphDirectoryRole',
                         'Grant-GraphUserLicense',
                         'Import-GraphGroup',
                         'Import-GraphGroupMember',
                         'Import-GraphUser',
+                        'Import-GraphWorkSheet',
                         'Invoke-GraphRequest',
                         'Move-GraphMailItem',
                         'New-ContactAddress',
@@ -105,6 +108,7 @@
                         'New-GraphToDoList',
                         'New-GraphToDoTask',
                         'New-GraphUser',
+                        'New-GraphWorkBook',
                         'New-RecurrencePattern',
                         'Out-GraphOneNote',
                         'Remove-GraphChannel',
@@ -167,7 +171,8 @@
                         'ChoiceColumn',
                         'CalculatedColumn',
                         'BooleanColumn',
-                        'ListColumn'
+                        'ListColumn',
+                        'igr'
   )
 
   PrivateData = @{

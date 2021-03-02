@@ -1,6 +1,6 @@
 ﻿using namespace Microsoft.Graph.PowerShell.Models
 
-function Get-GraphDrive       {
+function Get-GraphDrive        {
     <#
       .Synopsis
         Gets information about a OneDrive volume
@@ -109,9 +109,9 @@ function Get-GraphDrive       {
     process {
         #region Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
-        if     ($Drive.drive)            {$drive = "drives/$($drive.drive)"}
-        elseif ($Drive.id)               {$drive = "drives/$($drive.id)"}
-        elseif ($Drive -notmatch './.')  {$drive = "drives/$drive"      }
+        if     ($Drive.drive)            {$Drive = "drives/$($Drive.drive)"}
+        elseif ($Drive.id)               {$Drive = "drives/$($Drive.id)"}
+        elseif ($Drive -notmatch './.')  {$Drive = "drives/$Drive"      }
         #Strip leading and trailing / from $drive so it fits in the URI template.
         $Drive = $Drive -replace '/$','' -replace '^/',''
         try   {
@@ -222,7 +222,7 @@ function Get-GraphDrive       {
     }
 }
 
-function New-GraphFolder      {
+function New-GraphFolder       {
     <#
       .synopsis
         Creates a new folder on OneDrive.
@@ -259,8 +259,8 @@ function New-GraphFolder      {
     begin   {
         #  Sort out the Drive - it might be "me/drives" (the default), "drives/drive-id", "drive-id" or a drive object with an ID.
         #       Fix up the last two; check the drive is accessible and then cache the id --> name
-        if     ($Drive.id)               {$drive = "drives/$($drive.id)"}
-        elseif ($Drive -notmatch './.')  {$drive = "drives/$drive"      }
+        if     ($Drive.id)               {$drive = "drives/$($Drive.id)"}
+        elseif ($Drive -notmatch './.')  {$drive = "drives/$Drive"      }
         #Strip leading and trailing / from $drive so it fits in the URI template.
         $Drive = $Drive -replace '/$','' -replace '^/',''
         try   {
@@ -305,7 +305,7 @@ function New-GraphFolder      {
     }
 }
 
-function Show-GraphFolder     {
+function Show-GraphFolder      {
     <#
       .synopsis
         Opens a OneDrive folder in a browser
@@ -348,7 +348,7 @@ function Show-GraphFolder     {
    }
 }
 
-function Copy-ToGraphFolder   {
+function Copy-ToGraphFolder    {
     <#
       .synopsis
         Copies filse from the local computer to one drive
@@ -410,12 +410,12 @@ function Copy-ToGraphFolder   {
         #region Figure out what the URI should be
         #was destination writen out in full as drives/{id}/root:/{path} ? (with or without a leading /)
         if     ($Destination.parentReference -and
-                $Destination.fileSystemInfo)                   { $uri = "$GraphUri/drives/" + $Destination.parentReference.driveId + "/items/" + $Destination.id}
-        elseif ($Destination -match '/?drives.*:/\w')           {$uri = "$GraphUri/" + ($Destination -replace '^/','') }
+                $Destination.fileSystemInfo)                   { $uri  = "$GraphUri/drives/" + $Destination.parentReference.driveId + "/items/" + $Destination.id}
+        elseif ($Destination -match '/?drives.*:/\w')           {$uri  = "$GraphUri/" + ($Destination -replace '^/','') }
         else { #We didn't get the drive in the destination, so is it an object, a partial path "drives/id"  or "me/drive", or just an ID
-            if     ($Drive.id)                                  {$uri  = "$GraphUri/drives/$($drive.id)/"}
-            elseif ($Drive -match './.')                        {$uri  = "$GraphUri/$drive/"             }
-            elseif ($Drive)                                     {$uri  = "$GraphUri/drives/$drive/"      }
+            if     ($Drive.id)                                  {$uri  = "$GraphUri/drives/$($Drive.id)/"}
+            elseif ($Drive -match './.')                        {$uri  = "$GraphUri/$Drive/"             }
+            elseif ($Drive)                                     {$uri  = "$GraphUri/drives/$Drive/"      }
             # the root might be "/" root: or root:/ (/root will be assumed to be a folder) anywhere else we can bolt on to the URI. We may need to put root: in front and strip leading /
             If     ($Destination -in @("root:", "/", "root:/")) {$uri += "root/"                                       }
             elseif ($Destination -Match '^/?root:')             {$uri += ($Destination -replace '^/', '')              }
@@ -452,7 +452,7 @@ function Copy-ToGraphFolder   {
                         }
                         else  { Write-Warning -Message "There was a problem with $Destination as a target path. Neither it nor its parent look like valid folders."; return}
                     }
-                    Catch     { Write-Warning -Message "There was a problem with $Destination as a target path. Neither it nor its parent look like valid folders."; return}
+                    catch     { Write-Warning -Message "There was a problem with $Destination as a target path. Neither it nor its parent look like valid folders."; return}
                 }
                 #we got something other than a 404 error
                 else          { Write-Warning -Message $_.exception.tostring() ; return}
@@ -464,7 +464,17 @@ function Copy-ToGraphFolder   {
         if ($ConflictBehavior -eq 'fail') {$ForceResumable = $true}
         if ($PSCmdlet.ShouldProcess($uploadItem.FullName,"Upload file")){
             if ($uploadItem.Length -lt 3.5mb -and -not $ForceResumable) {
-                Invoke-GraphRequest -Method Put  ($uri + ":/Content") -InputFilePath $uploadItem.FullName -ContentType $ContentType -AsType ([MicrosoftGraphDriveItem])  -ExcludeProperty '@odata.context', '@microsoft.graph.downloadUrl'
+                $webparams = @{
+                    'Method'          = 'Put'
+                    'URI'             =  ($uri + ":/Content")
+                    'InputFilePath'   =  $uploadItem.FullName
+                    'ContentType'     =   $ContentType
+                    'AsType'          = ([MicrosoftGraphDriveItem])
+                    'ExcludeProperty' = @('@odata.context', '@microsoft.graph.downloadUrl')
+                }
+                Invoke-GraphRequest @webparams |
+                    Add-Member  -PassThru -MemberType AliasProperty -Name ItemID -Value 'id'  |
+                    Add-Member  -PassThru -NotePropertyName Drive -NotePropertyValue $drive
             }
             else {
                 $body               = ConvertTo-Json $settings
@@ -486,14 +496,16 @@ function Copy-ToGraphFolder   {
                 $resultHash         = ConvertFrom-Json $result.content -AsHashtable
                 $keysToRemove        = $resultHash.Keys.where({$_ -match '@'})
                 foreach ($k in $keysToRemove) {[void]$resultHash.Remove($k)}
-                New-Object -TypeName MicrosoftGraphDriveItem -Property $resultHash
+                New-Object -TypeName MicrosoftGraphDriveItem -Property $resultHash |
+                    Add-Member  -PassThru -MemberType AliasProperty -Name ItemID -Value 'id'  |
+                    Add-Member  -PassThru -NotePropertyName Drive -NotePropertyValue $drive
                 $ProgressPreference = $oldprogressPref
             }
         }
     }
 }
 
-function Copy-FromGraphFolder {
+function Copy-FromGraphFolder  {
     <#
       .Synopsis
         Copies files from OneDrive to the local computer
@@ -542,9 +554,9 @@ function Copy-FromGraphFolder {
             elseif ($Path -isnot [string]        ) {throw 'An invalid Object was passed as a Path Parameter' ; return }
             elseif ($Path -match '/?drives.*:/\w') {$uri  = '$GraphUri/' + ($path -replace '^/','') }
             else { #We didn't get the drive in the destination, so is it an object, a partial path "drives/id"  or "me/drive", or just an ID
-                if     ($Drive.id)                 {$uri  = "$GraphUri/drives/$($drive.id)/"}
-                elseif ($Drive -match './.')       {$uri  = "$GraphUri/$drive/"             }
-                elseif ($Drive)                    {$uri  = "$GraphUri/drives/$drive/"      }
+                if     ($Drive.id)                 {$uri  = "$GraphUri/drives/$($Drive.id)/"}
+                elseif ($Drive -match './.')       {$uri  = "$GraphUri/$Drive/"             }
+                elseif ($Drive)                    {$uri  = "$GraphUri/drives/$Drive/"      }
                 if     ($path -Match '^/?root:')   {$uri += ($path -replace '^/', '')              }
                 else                               {$uri += ($path -replace '^/?(.*$)', 'root:/$1')}
             }
@@ -573,11 +585,260 @@ function Copy-FromGraphFolder {
     }
 }
 
-function Set-GraphHomeDrive   {
+function Set-GraphHomeDrive    {
     param    (
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
         $Drive
     )
-    $Global:PSDefaultParameterValues["*GraphFolder:Drive"]   = $Drive
-    $Global:PSDefaultParameterValues["Get-GraphDrive:Drive"] = $Drive
+    $Global:PSDefaultParameterValues["*GraphFolder:Drive"]    = $Drive
+    $Global:PSDefaultParameterValues["*GraphWorkBook:Drive"]  = $Drive
+    $Global:PSDefaultParameterValues["*GraphWorksheet:Drive"] = $Drive
+    $Global:PSDefaultParameterValues["Get-GraphDrive:Drive"]  = $Drive
+}
+
+Function Get-GraphWorkBook     {
+    param    (
+        #The drive to examine - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
+        [parameter(ValueFromPipelineByPropertyName=$true)]
+        $Drive = 'me/Drive',
+
+        #if specified gets a file or folder by the path from {drive}/root:
+        [ArgumentCompleter([OneDrivePathCompleter])]
+        [Parameter(ValueFromPipeline=$true,Mandatory=$true, ParameterSetName='ItemName',Position=0)]
+        $ItemPath,
+
+        #If Specified gets the a file or folder item by ID
+        [Parameter(Mandatory=$true, ParameterSetName='ItemID',ValueFromPipelineByPropertyName=$true)]
+        $ItemID
+    )
+    process {
+        if     ($ItemPath.drive)      {$Drive  = $ItemPath.drive}    #we might get a file with drive as a property.
+        elseif ($Drive.drive)         {$Drive  = $Drive.drive   }    #Or a drive object or drive as a string
+        elseif ($Drive.id)            {$Drive  = $Drive.id      }
+        elseif ($Drive -is [string])  {$Drive  = $Drive -replace "^/?(drives/)?(.*?)/?$",'$2'}   #Allow "{id}" or "drives/{id}" with any leading or trailing /
+
+        if     ($ItemPath.itemId)     {$ItemID = $ItemPath.ItemId}   #we might get the item as an object with an ItemID or ID or the path as string or an ID
+        elseif ($ItemPath.Id)         {$ItemID = $ItemPath.id}
+        elseif ($ItemPath )           {$ItemID = (Invoke-GraphRequest ("$GraphUri/drives/$drive" + ($ItemPath -replace  '^/?(root:/)?(.*?)[:/]*$','/root:/$2:' ) )).id} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
+        elseif ($ItemID -is [string]) {$ItemID = $ItemID  -replace '^/?(items/)?(.*?)/?$', '$2' } #Allow "{id}" or "items/{id}" with any leading or trailing /
+
+        $webparams = @{
+          'Uri'              =  "$GraphUri/drives/$drive/items/$ItemID/workbook?`$expand=application,comments,functions,names,operations,tables,worksheets"
+          'PropertyNotMatch' =  '@odata'
+          'AsType'           = ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphWorkbook])
+        }
+        Invoke-GraphRequest @webparams |
+            Add-Member -PassThru -NotePropertyName ItemId -NotePropertyValue $ItemID |
+            Add-Member -PassThru -NotePropertyName Drive  -NotePropertyValue $Drive
+    }
+}
+
+Function Import-GraphWorksheet {
+    param    (
+        #The drive to examine - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
+        [parameter(ValueFromPipelineByPropertyName=$true)]
+        $Drive = 'me/Drive',
+
+        #if specified gets a file or folder by the path from {drive}/root:
+        [ArgumentCompleter([OneDrivePathCompleter])]
+        [Parameter(Mandatory=$true, ParameterSetName='ItemName',Position=0)]
+        $ItemPath,
+
+        #If Specified gets the a file or folder item by ID
+        [Parameter(Mandatory=$true, ParameterSetName='ItemID',ValueFromPipelineByPropertyName=$true)]
+        $ItemID,
+
+        #The name of a workSheet within the file
+        [alias('WorkSheetName')]
+        [Parameter(Position=1)]
+        [string]$SheetName = 'Sheet1',
+
+        [switch]$AsHashTable
+    )
+    process {
+        if     ($ItemPath.drive)      {$Drive  = $ItemPath.drive}    #we might get a file with drive as a property.
+        elseif ($Drive.drive)         {$Drive  = $Drive.drive   }    #Or a drive object or drive as a string
+        elseif ($Drive.id)            {$Drive  = $Drive.id      }
+        elseif ($Drive -is [string])  {$Drive  = $Drive -replace "^/?(drives/)?(.*?)/?$",'$2'}   #Allow "{id}" or "drives/{id}" with any leading or trailing /
+
+        if     ($ItemPath.itemId)     {$ItemID = $ItemPath.ItemId}   #we might get the item as an object with an ItemID or ID or the path as string or an ID
+        elseif ($ItemPath.Id)         {$ItemID = $ItemPath.id}
+        elseif ($ItemPath )           {$ItemID = (Invoke-GraphRequest ("$GraphUri/drives/$Drive" + ($ItemPath -replace  '^/?(root:/)?(.*?)[:/]*$','/root:/$2:' ) )).id} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
+        elseif ($ItemID -is [string]) {$ItemID = $ItemID  -replace '^/?(items/)?(.*?)/?$', '$2' } #Allow "{id}" or "items/{id}" with any leading or trailing /
+
+        <#
+            information about the sheet instead of data in the sheet ...
+            * expanding charts seems to cause an issue at least if a pivot chart is present.
+            $uri = "$GraphUri/drives/$drive/items/$ItemID/workbook/worksheets/$sheetName`?`$expand=charts"
+            $uri = "$GraphUri/drives/$drive/items/$ItemID/workbook/worksheets/$sheetName`?`$expand=names,tables"
+            Invoke-GraphRequest -Uri $uri -PropertyNotMatch odata -AsType ([MicrosoftGraphWorkbookWorksheet])
+            Can get info about charts with
+            $GraphUri/drives/$drive/items/$ItemID/workbook/worksheets/$sheetName/charts/{{id}}}}`$expand=series,legend,title,format,datalabels,axes
+        #>
+        $sheet    =  Invoke-GraphRequest "$GraphUri/drives/$Drive/items/$ItemID/workbook/worksheets/$SheetName/usedrange?`$select=Values,address,rowcount,columncount,valueTypes"
+        #can select a cell range using  "$GraphUri/drives/$drive/items/$ItemID/workbook/worksheets/$SheetName/range(address='A1:B2')"
+        #Or sheet-scoped named range    "$GraphUri/drives/$drive/items/$ItemID/workbook/worksheets/$SheetName/names/$RANGEName/range"
+        #Or a table name                "$GraphUri/drives/$drive/items/$ItemID/workbook/tables/$TABLEName/range"
+        <# Create ranges with
+            $body = ' {   "name": "<<RANGENAME>>",   "reference": "=<<SHEETNAME>$A$1:$E$5",   "comment": "" }
+            #workbook-scoped range
+            Invoke-GraphRequest "$GraphUri/drives/$($f.drive)/items/$($f.ItemID)/workbook/names/add" -method post -body $body -ContentType "application/json"
+            # or sheet-scoped range    $GraphUri/drives/$($f.drive)/items/$($f.ItemID)/workbook/worksheets/Processes/names/add"
+        #>
+        $headings = $sheet.Values[0] #headings is row 0 - then look at rows 1..end
+        foreach ($r in 1..($sheet.rowCount-1)) {
+            $c = 0  #r and c are row and column.
+            #Starting at column zero, for each heading read cell into hashTable[heading] move to next column
+            $newrow = [ordered]@{}
+            foreach ($h in $headings) {
+                if ($sheet.numberFormat[1][2] -match '[dmy]+\W*[dmy]+\W*[dmy]') {
+                      $newrow[$h] = [datetime]::FromOADate($sheet.values[$r][$c])
+                }
+                else {$newrow[$h] = $sheet.values[$r][$c]}
+                $c++
+            }
+            if ($AsHashTable)         { $newrow}
+            else      { [pscustomObject]$newrow}
+        }
+    }
+}
+
+function Export-GraphWorkSheet {
+    param   (
+        #The drive to examine - defaults to the user's OneDrive but can be a shared one e.g. Drives/{ID}
+        $Drive = 'me/Drive',
+
+        #if specified gets a file or folder by the path from {drive}/root:
+        [ArgumentCompleter([OneDrivePathCompleter])]
+        [Parameter(Mandatory=$true, ParameterSetName='ItemName',Position=0)]
+        $ItemPath,
+
+        #If Specified gets the a file or folder item by ID
+        [Parameter(Mandatory=$true, ParameterSetName='ItemID')]
+        $ItemID,
+
+        #The name of a workSheet within the file
+        [alias('WorkSheetName')]
+        [Parameter(Position=1)]
+        [string]$SheetName = 'Sheet1',
+
+        [Parameter(ValueFromPipeline=$true)]
+        $InputObject,
+
+        [switch]$NoHeader,
+
+        [Parameter(ParameterSetName='Table')]
+        [switch]$AsTable,
+        [Parameter(ParameterSetName='Range')]
+        [string]$RangeName,
+        [string]$dateFormat = ([cultureinfo]::CurrentCulture.DateTimeFormat.ShortDatePattern + " " + [cultureinfo]::CurrentCulture.DateTimeFormat.ShortTimePattern)
+    )
+    begin   {
+        if     ($ItemPath.drive)      {$Drive  = $ItemPath.drive}    #we might get a file with drive as a property.
+        elseif ($Drive.drive)         {$Drive  = $Drive.drive   }    #Or a drive object or drive as a string
+        elseif ($Drive.id)            {$Drive  = $Drive.id      }
+        elseif ($Drive -is [string])  {$Drive  = $Drive -replace "^/?(drives/)?(.*?)/?$",'$2'}   #Allow "{id}" or "drives/{id}" with any leading or trailing /
+
+        if     ($ItemPath.itemId)     {$ItemID = $ItemPath.ItemId}   #we might get the item as an object with an ItemID or ID or the path as string or an ID
+        elseif ($ItemPath.Id)         {$ItemID = $ItemPath.id}
+        elseif ($ItemPath )           {$ItemID = (Invoke-GraphRequest ("$GraphUri/drives/$Drive" + ($ItemPath -replace  '^/?(root:/)?(.*?)[:/]*$','/root:/$2:' ) )).id} #Allow "{path}", strip any leading / or trailing / or : and place between "root:/" and ":"
+        elseif ($ItemID -is [string]) {$ItemID = $ItemID  -replace '^/?(items/)?(.*?)/?$', '$2' } #Allow "{id}" or "items/{id}" with any leading or trailing /
+
+        $workBookUrl = "$GraphUri/drives/$drive/items/$ItemID/workbook/"
+        try {
+            if ($sheetname -notin (Invoke-GraphRequest "$workBookUrl/worksheets?`$select=name" -ValueOnly | ForEach-Object {$_.name})) {
+                        $null = Invoke-GraphRequest "$workBookUrl/worksheets" -Method post  -ContentType "application/json" -Body ('{{ "name": "{0}" }}' -f $sheetName)
+            }
+        }
+        catch { throw [System.IO.FileNotFoundException]::new('Could not connect to the given XLSX file') ; break       }
+
+        $outValues  = New-Object System.Collections.ArrayList
+        $outFormats = New-Object System.Collections.ArrayList
+        $Header     = $null
+        $row        = 1
+        $firstTimeThru = $true
+    }
+    process {
+        if ($null -eq $InputObject) {$row += 1}
+        foreach ($TargetData in $InputObject) {
+            if ($firstTimeThru) {
+                $firstTimeThru = $false
+                $isDataTypeValueType = ($null -eq $TargetData) -or ($TargetData -is [ValueType]) -or ($TargetData -is [string])
+                if ($isDataTypeValueType ) {
+                    $Header = @(".")       # dummy value to make sure we go through the "for each name in $header"
+                    if (-not $Append) {$row -= 1} # By default row will be 1, it is incremented before inserting values (so it ends pointing at final row.);  si first data row is 2 - move back up 1 if there is no header .
+                }
+            }
+
+            if (-not $Header) {
+                $Header = $TargetData.PSObject.Properties.Name
+                foreach ($exclusion in $ExcludeProperty) {$Header = $Header -notlike $exclusion}
+                if ($NoHeader) { $row -= 1 }
+                else {
+                    $formatrow  = New-Object System.Collections.ArrayList
+                    foreach ($h in $Header) {$null = $formatrow.add('General')}
+                    $null = $OutValues.Add($Header)
+                    $Null = $OutFormats.Add($formatrow)
+                }
+            }
+            $row += 1
+
+            $formatrow  = New-Object System.Collections.ArrayList
+            $datarow    = New-Object System.Collections.ArrayList
+            foreach ($Name in $Header) {
+                if   ($isDataTypeValueType) {$v = $TargetData}
+                else {$v = $TargetData.$Name}
+                    if     ($v -is    [DateTime]) {
+                            $null = $datarow.add($v.ToOADate()) , $formatrow.add($dateFormat)
+                    }
+                    elseif ($v -is    [TimeSpan]) {
+                            $null = $datarow.add($v.totalDays)  , $formatrow.add('[h]:mm:ss')
+                    }
+                    elseif ($v -is    [System.ValueType] -or $v -is [string] -or $null -eq $v) {
+                            $null = $datarow.add($v)            , $formatrow.add($null)
+                    }
+                    else{   $null = $datarow.add($v.tostring()) , $formatrow.add($null) }
+            }
+            $null = $OutValues.Add($datarow) , $OutFormats.Add($formatrow)
+        }
+    }
+    end     {
+        $dividend = $Header.Count
+        $columnName = New-Object System.Collections.ArrayList
+        while($dividend -gt 0) {
+            $modulo    =  ($dividend -1)% 26
+            $columnName.Insert(0,([char](65 + $modulo)))
+            $dividend    = ($dividend - $modulo -1) /26
+        }
+        $range = '$A$1:${0}${1}' -f ($columnName -join ''), $row
+        $body = convertto-Json -depth 5 @{values = $OutValues ;   numberFormat = $OutFormats}  -Compress
+
+        $null = Invoke-GraphRequest "$workBookUrl/worksheets/$sheetName/range(address='$range')" -Method PATCH -ContentType "application/json" -Body $body
+
+        if ($AsTable) {
+            $null = Invoke-GraphRequest "$workBookUrl/worksheets/$sheetName/tables/`$/add" -body ('{{"address": "{0}!{1}" , "hasheaders": true}}' -f $SheetName,$range)  -ContentType "application/json" -method POST
+        }
+        elseif ($RangeName){
+            $null = Invoke-GraphRequest "$workBookUrl/names/add" -Method POST -Body ('{{"name": "{2}",   "reference": "={0}!{1}" }}' -f $SheetName,$range,$RangeName )  -ContentType "application/json"
+        }
+        if ($Show) {
+            Start-Process (Invoke-GraphRequest ("$workBookUrl" -replace "/workbook/?$") ).weburl
+        }
+    }
+}
+
+function New-GraphWorkBook     {
+    param    (
+        #Location file should be copied to can be in the form "/files/" to copy to users "files" folder, or "/drives/{id}/root:/folder/Subfolder" to select another drive
+        [Parameter(Mandatory=$true,position=0)]
+        [ArgumentCompleter([OneDriveFolderCompleter])]
+        [string]$Destination,
+        #The drive, by default the current user's OneDrive.
+        $Drive = 'me/Drive',
+        $TemplatePath
+    )
+
+    if (-not $TemplatePath) {$TemplatePath = (Join-Path $PSScriptRoot 'Blank.xlsx')}
+    Copy-ToGraphFolder -Path $TemplatePath -Destination $Destination -Drive $Drive -ConflictBehavior fail -ContentType 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
 }

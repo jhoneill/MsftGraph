@@ -106,8 +106,8 @@ class OneDriveFolderCompleter     : IArgumentCompleter {
 
         if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
         #I do mean = no -eq in the next line.
-        elseif ($key = $Gloabal:PSDefaultParameterValues.Keys.where({"$CommandName`:Drive" -like $_})) {
-            $params['Drive'] = $Gloabal:PSDefaultParameterValues[$key]
+        elseif ($key = $Global:PSDefaultParameterValues.Keys.where({"$CommandName`:Drive" -like $_})) {
+            $params['Drive'] = $Global:PSDefaultParameterValues[$key]
         }
         # #it would be better to order-by at the server, but consumer one drive doesn't support it.
         Get-GraphDrive @params -subFolders -quiet | Sort-Object -Property name | ForEach-Object {
@@ -137,8 +137,8 @@ class OneDrivePathCompleter       : IArgumentCompleter {
 
         if ($FakeBoundParameters['Drive']) {  $params['Drive'] = $FakeBoundParameters['Drive']}
         #I do mean = no -eq in the next line.
-        elseif ($key = $Gloabal:PSDefaultParameterValues.Keys.where({"$CommandName`:Drive" -like $_})) {
-            $params['Drive'] = $Gloabal:PSDefaultParameterValues[$key]
+        elseif ($key = $Global:PSDefaultParameterValues.Keys.where({"$CommandName`:Drive" -like $_})) {
+            $params['Drive'] = $Global:PSDefaultParameterValues[$key]
         }
         # #it would be better to order-by at the server, but consumer one drive doesn't support it.
         Get-GraphDrive -quiet @params | Sort-Object -Property name | ForEach-Object {

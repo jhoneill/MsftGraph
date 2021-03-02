@@ -28,6 +28,7 @@ function Invoke-GraphRequest {
              -AsType to convert the retuned results to a specific type
              -ExcludeProperty  and -PropertyNotMatch for results which have properties which aren't in the specified type
     #>
+    [alias('igr')]
     param   (
         #Uri to call can be a segment such as /beta/me or a fully qualified https://graph.microsoft.com/beta/me
         [Parameter(Mandatory=$true, Position=1 )]
@@ -402,37 +403,46 @@ function Show-GraphSession   {
         [Parameter(ParameterSetName='Scopes')]
         [switch]$Scopes,
         [switch]$Options,
-        [switch]$AppName,
-        [switch]$CachedToken
+        [switch]$AppName
     )
-    if     (-not       [GraphSession]::Instance.AuthContext) {Write-Host  "Ready for Connect-Graph."; return}
-    if     ($Scopes)  {[GraphSession]::Instance.AuthContext.Scopes}
-    elseif ($Who)     {[GraphSession]::Instance.AuthContext.Account}
-    elseif ($AppName) {[GraphSession]::Instance.AuthContext.AppName}
-    elseif ($options) {[pscustomobject]@{
-        'TenantID'        = $script:TenantID
-        'ClientID'        = $script:ClientID
-        'ClientSecretSet' = $script:Client_Secret -as [bool]
-        'DefaultScopes'   = $script:DefaultGraphScopes -join ', '
-    }}
-    elseif (-not $CachedToken)  {Get-MgContext}
-    else {
-        $id               = [GraphSession]::Instance.AuthContext.ClientId
-        $path             = Join-Path -ChildPath ".graph\$($id)cache.bin3" -Path ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::UserProfile))
-        if (-not(Test-Path $path)) {
-                Write-Warning "Could not find a cache file for app id $id in the .graph folder."
-                return
+    dynamicparam {
+        $paramDictionary     = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
+        if ($PSVersionTable.PSVersion.Major -gt 5 -and $PSVersionTable.Platform -like 'win*') {
+            $paramDictionary.Add('CachedToken',[RuntimeDefinedParameter]::new("CachedToken", [SwitchParameter],[ParameterAttribute]::new()))
         }
-        #read and decrypted the ached file, it comes up as not very nice JSON so unpick that.
-        $tokenBytes       = [System.Security.Cryptography.ProtectedData]::Unprotect( (Get-Content $path -AsByteStream) , $null, 0)
-        $tokendata        = ConvertFrom-Json ([string]::new($tokenBytes)  -replace '(Token|Account|AppMetaData)":{".*?":{' ,'$1":{"X":{' -replace '"secret":".*?",','')
-        $tokendata.account.x | Select-Object Name, Username, Local_account_id, Realm, Authority_type,
-                                @{n='environment';    e={$tokendata.AccessToken.x.environment}},
-                                @{n='client_id';      e={$tokendata.AccessToken.x.client_id}},
-                                @{n='credential_type';e={$tokendata.AccessToken.x.credential_type}},
-                                @{n='target';         e={$tokendata.AccessToken.x.target}},
-                                @{n='cached_at';      e={[datetime]::UnixEpoch.AddSeconds($tokendata.AccessToken.x.cached_at)}},
-                                @{n='expires_on';     e={[datetime]::UnixEpoch.AddSeconds($tokendata.AccessToken.x.expires_on)}}
+        return $paramDictionary
+
+    }
+    end {
+        if     (-not       [GraphSession]::Instance.AuthContext) {Write-Host  "Ready for Connect-Graph."; return}
+        if     ($Scopes)  {[GraphSession]::Instance.AuthContext.Scopes}
+        elseif ($Who)     {[GraphSession]::Instance.AuthContext.Account}
+        elseif ($AppName) {[GraphSession]::Instance.AuthContext.AppName}
+        elseif ($options) {[pscustomobject]@{
+            'TenantID'        = $script:TenantID
+            'ClientID'        = $script:ClientID
+            'ClientSecretSet' = $script:Client_Secret -as [bool]
+            'DefaultScopes'   = $script:DefaultGraphScopes -join ', '
+        }}
+        elseif (-not $PSBoundParameters['CachedToken'])  {Get-MgContext}
+        else {
+            $id               = [GraphSession]::Instance.AuthContext.ClientId
+            $path             = Join-Path -ChildPath ".graph\$($id)cache.bin3" -Path ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::UserProfile))
+            if (-not(Test-Path $path)) {
+                    Write-Warning "Could not find a cache file for app id $id in the .graph folder."
+                    return
+            }
+            #read and decrypted the ached file, it comes up as not very nice JSON so unpick that.
+            $tokenBytes       = [System.Security.Cryptography.ProtectedData]::Unprotect( (Get-Content $path -AsByteStream) , $null, 0)
+            $tokendata        = ConvertFrom-Json ([string]::new($tokenBytes)  -replace '(Token|Account|AppMetaData)":{".*?":{' ,'$1":{"X":{' -replace '"secret":".*?",','')
+            $tokendata.account.x | Select-Object Name, Username, Local_account_id, Realm, Authority_type,
+                                    @{n='environment';    e={$tokendata.AccessToken.x.environment}},
+                                    @{n='client_id';      e={$tokendata.AccessToken.x.client_id}},
+                                    @{n='credential_type';e={$tokendata.AccessToken.x.credential_type}},
+                                    @{n='target';         e={$tokendata.AccessToken.x.target}},
+                                    @{n='cached_at';      e={[datetime]::UnixEpoch.AddSeconds($tokendata.AccessToken.x.cached_at)}},
+                                    @{n='expires_on';     e={[datetime]::UnixEpoch.AddSeconds($tokendata.AccessToken.x.expires_on)}}
+        }
     }
 }
 

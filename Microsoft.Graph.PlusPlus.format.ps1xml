@@ -226,7 +226,7 @@
                   <TableRowEntries><TableRowEntry>
                     <Wrap/>
                     <TableColumnItems>
-                        <TableColumnItem><ScriptBlock>if ($_.file) {'-----'} else {if ($_.specialFolder.name) {'&lt;' + $_.specialFolder.name +'&gt;'} else {'&lt;dir&gt;'}}</ScriptBlock><Alignment>Left</Alignment></TableColumnItem>
+                        <TableColumnItem><ScriptBlock>if ($_.file.MimeType) {'-----'} else {if ($_.specialFolder.name) {'&lt;' + $_.specialFolder.name +'&gt;'} else {'&lt;dir&gt;'}}</ScriptBlock><Alignment>Left</Alignment></TableColumnItem>
                         <TableColumnItem><ScriptBlock>[String]::Format("{0:d}  {0:t}", ([dateTime]$_.fileSystemInfo.lastModifiedDateTime))</ScriptBlock><Alignment>Right</Alignment></TableColumnItem>
                         <TableColumnItem><Alignment>right</Alignment><ScriptBlock>$_.size.tostring("N0")</ScriptBlock></TableColumnItem>
                         <TableColumnItem><PropertyName>Name</PropertyName><Alignment>Left</Alignment></TableColumnItem>
