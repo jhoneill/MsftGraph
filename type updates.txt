@@ -1,25 +1,17 @@
 * New types to add
     Microsoft.Graph.PowerShell.Models.MicrosoftGraphProfilePhoto        ??GraphPhoto  ??
 
-* ToDoLists and task check the use of *1 cmdlets and type returned. Support user objects
+* ToDoLists and tasks:  check the use of *1 cmdlets and type returned. Support user objects
+* OneDrive              Search any drive not just my drive
+* Search                https://docs.microsoft.com/en-us/graph/api/resources/search-api-overview?view=graph-rest-1.0
 
-* Security/alerts   https://graph.microsoft.com/v1.0/security/alerts *scopes SecurityEvents.Read.All, SecurityEvents.ReadWrite.All*
-                    https://docs.microsoft.com/en-us/graph/api/resources/security-api-overview?view=graph-rest-1.0
-* OneDrive     Search any drive not just my drive
-* Search            https://docs.microsoft.com/en-us/graph/api/resources/search-api-overview?view=graph-rest-1.0
+* User                  find meeting times , below ,  https://graph.microsoft.com/beta/me/findRooms
+  User                  export personal data, to a shared access signature (SAS) URL for an Azure Storage account,  https://docs.microsoft.com/en-us/graph/api/user-exportpersonaldata?view=graph-rest-1.0&tabs=http
+  user                  inbox rules        # Invoke-GraphRequest  -Uri  "$GraphUri/me/mailFolders/inbox/messagerules"
+  user                  outlook Categories # Invoke-GraphRequest  -Uri  "$GraphUri/me/outlook/mastercategories" -ValueOnly
 
-* User              find meeting times , below ,  https://graph.microsoft.com/beta/me/findRooms
-  User              export personal data, to a shared access signature (SAS) URL for an Azure Storage account,  https://docs.microsoft.com/en-us/graph/api/user-exportpersonaldata?view=graph-rest-1.0&tabs=http
-  user              inbox rules        # Invoke-GraphRequest  -Uri  "$GraphUri/me/mailFolders/inbox/messagerules"
-  user              outlook Categories # Invoke-GraphRequest  -Uri  "$GraphUri/me/outlook/mastercategories" -ValueOnly
-
-* Group             assign licence,   ** requires at least Azure AD P1 licensing   https://docs.microsoft.com/en-us/graph/api/group-assignlicense?view=graph-rest-1.0&tabs=http
-  group             setting templates   Invoke-GraphRequest  -Uri "https://graph.microsoft.com/v1.0/groupsettingTemplates" -all
-  group             dynamic membership
-
-app    4 Excel.ps1
-    9 ActionCard.ps1 <-- bring back or dump ?
-
+* group                 setting templates   Invoke-GraphRequest  -Uri "https://graph.microsoft.com/v1.0/groupsettingTemplates" -all
+  group                 dynamic membership
 <#
  Others to explore
  https://docs.microsoft.com/en-us/graph/api/resources/call?view=graph-rest-beta  calls in teams for bot type applications

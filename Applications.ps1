@@ -13,11 +13,33 @@
 
 function Get-GraphServicePrincipal {
     <#
-        .Description
-            A replacement for the SDK's Get-MgServicePrincipal
-            That has orderby which doesn't work - the it's in the Docs but the API errors if you try
-            It doesn't have search by name, or select managedIDs or Applications.
+      .Synopsis
+        Returns information about Service Principals
+      .Description
+        A replacement for the SDK's Get-MgServicePrincipal
+        That has orderby which doesn't work - it's in the Docs but the API errors if you try
+        It doesn't have search by name, or select Application or Managed IDs
+      .Example
+        PS > Get-GraphServicePrincipal "Microsoft graph"
+
+        Id                                   DisplayName                      AppId                                SignInAudience
+        --                                   -----------                      -----                                --------------
+        25b13fbf-2f44-457a-9e68-d3414fc97915 Microsoft Graph                  00000003-0000-0000-c000-000000000000 AzureADMultipleOrgs
+        4e71d88a-0a46-4274-85b8-82ad86877010 Microsoft Graph Change Tracking  0bf30f3b-4a52-48df-9a82-234910c4a086 AzureADMultipleOrgs
+        ...
+
+        Run with just a name the command returns service principals with matching names.
+        .Example
+        PS >Get-GraphServicePrincipal 25b13fbf-2f44-457a-9e68-d3414fc97915 -ExpandAppRoles
+
+        Value                         DisplayName                Enabled Id
+        -----                         -----------                ------- --
+        AccessReview.Read.All         Read all access reviews    True    d07a8cc0-3d51-4b77-b3b0-32704d1f69fa
+        AccessReview.ReadWrite.All    Manage all access reviews  True    ef5f7d5c-338f-44b0-86c3-351f46c8bb5f
+        ...
+        In this example GUID for Microsoft Graph was used from the previous example, and the command has listed the roles available to applications
     #>
+
     [CmdletBinding(DefaultParameterSetName='List1')]
     [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphAppRole],ParameterSetName=('AllRoles','FilteredRoles'))]
     [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphPermissionScope],ParameterSetName=('AllScopes','FilteredScopes'))]
@@ -28,7 +50,7 @@ function Get-GraphServicePrincipal {
         [Parameter(ParameterSetName='AllScopes',      Mandatory=$true, Position=0)]
         [Parameter(ParameterSetName='FilteredScopes', Mandatory=$true, Position=0)]
         [Parameter(ParameterSetName='Get2',           Mandatory=$true, Position=0)]
-        #The GUID(s) for servicePrincipal(s). If a name is given the command will try to resolve matching Service principals
+        #The GUID(s) for ServicePrincipal(s). If a name is given instead, the command will try to resolve matching Service principals
         [String[]]$ServicePrincipalId,
 
         #Produces a list filtered to only managed identities
@@ -43,15 +65,15 @@ function Get-GraphServicePrincipal {
         [Parameter(ParameterSetName='List4')]
         [switch]$O365ServicePrincipals,
 
-        # Select properties to be returned
+        #Select properties to be returned
         [Alias('Select')]
         [String[]]$Property,
 
-        # Filter items by property values
+        #Filters items by property values
         [Parameter(ParameterSetName='List1')]
         [String]$Filter,
 
-        # Search items by search phrases
+        #Search items by search phrases
         [Parameter(ParameterSetName='List1')]
         [Parameter(ParameterSetName='List2')]
         [Parameter(ParameterSetName='List3')]

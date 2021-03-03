@@ -1,17 +1,17 @@
 #Requires -Module Microsoft.Graph.Authentication
-using namespace Microsoft.Graph.PowerShell.Authentication
-using namespace Microsoft.Graph.PowerShell.Models
-using namespace System.Management.Automation
-
 <#
-    The Connect-Graph function incorporates work to get tokens from an Azure session and to referesh tokens
-    which was published by Justin Grote at
+    The Connect-Graph function incorporates work to get tokens from an Azure
+    session and to referesh tokens which was published by Justin Grote at
         https://github.com/JustinGrote/JustinGrote.Microsoft.Graph.Extensions/blob/main/src/Public/Connect-MgGraphAz.ps1
     and licensed by him under the same MIT terms which apply to this module (see the LICENSE file for details)
 
     Portions of this file are   Copyright 2021 Justin Grote @justinwgrote
     The remainder is Copyright 2018-2021 James O'Neill
 #>
+using namespace Microsoft.Graph.PowerShell.Authentication
+using namespace Microsoft.Graph.PowerShell.Models
+using namespace System.Management.Automation
+
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification='Write host used for colored information message telling user to make a change and remove the message')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidGlobalVars', '', Justification='Items needed outside the module')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification='False positive for global vars.')]
@@ -138,21 +138,40 @@ function Invoke-GraphRequest {
 }
 
 function Get-AccessToken     {
-param (
-    [string]$Resoure      = 'https://graph.microsoft.com',
-    [string]$GrantType    = 'client_credentials',
-    [hashtable]$BodyParts = @{}
-)
+<#
+  .Synopsis
+    Requests a token for a resource path, used by connect graph but available to other tools.
+  .Description
+    An access token is obtained form "https://login.microsoft.com/<<tenant-ID>>/oauth2/token"
+    By specifying the ID, and secret of a client app known to in that tenant,
+    different modes of granting a token to access a resource (logging on) are possible:
+    Extra fields passed in BodyParts    grant_type
+    * Username and password            'Password'
+    * Refresh_token                    'Referesh_token'
+    * None (logon as the app itself)   'client_credentials'
+    The Set-GraphConnectionOptions command sets the tenant ID, a client ID and a client secret
+    for the session.  By default, when the module loads it looks at $env:MGSettingsPath or for
+     AuthSettings.ps1  in the module folder, and executes it to set these values)
+    Get-AccessToken relies on these if they are not set Connect-Graph removes the parameters
+    which support non-intereactive logons and calling it seperately will fail
 
-$tokenUri  = "https://login.microsoft.com/$script:TenantID/oauth2/token"
-$body      = $BodyParts + @{'client_id' = $script:ClientID
-                        'client_secret' = $script:Client_secret
-                             'resource' = $Resoure
-                           'grant_type' = $GrantType
-                              }
-
-Invoke-RestMethod -Method Post -Uri $tokenUri -Body $body
-
+#>
+    param (
+        [string]$Resoure      = 'https://graph.microsoft.com',
+        [string]$GrantType    = 'client_credentials',
+        [hashtable]$BodyParts = @{}
+    )
+    if (-not ($script:TenantID -and $script:ClientID -and $script:Client_secret)) {
+        [UnauthorizedAccessException]::new('The tenant, ClientID and/or Client_Secret need to be set with Set-GraphConnectionOptions before calling this command.')
+    }
+    $tokenUri  = "https://login.microsoft.com/$script:TenantID/oauth2/token"
+    $body      = $BodyParts + @{
+                    'client_id'     = $script:ClientID
+                    'client_secret' = $script:Client_secret
+                    'resource'      = $Resoure
+                    'grant_type'    = $GrantType
+    }
+    Invoke-RestMethod -Method Post -Uri $tokenUri -Body $body
 }
 
 Remove-Item Alias:\Connect-Graph -ErrorAction SilentlyContinue
@@ -163,6 +182,7 @@ function Connect-Graph       {
         .Description
             This commands is a wrapper for Connect-MgGraph it extends the authentication methods available
             and caches information needed by other commands.
+
     #>
     [cmdletbinding(DefaultParameterSetName='UserParameterSet')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification='False positive for global vars.')]
@@ -493,6 +513,10 @@ function ContextHas          {
 }
 
 function Set-GraphConnectionOptions {
+<#
+    .synopsis
+        Sets the tenant client ID & Client Secret used when logging on without a web dialog or the the scopes requested when logging on with one.
+#>
 [cmdletbinding()]
 param (
     #Your Tennant ID

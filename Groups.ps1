@@ -1057,7 +1057,7 @@ function Import-GraphGroup          {
 function New-GraphTeamPlan          {
     <#
       .Synopsis
-        Creates new a plan for a team.
+        Creates new a plan (in the planner app) for a team.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
     [outputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphPlannerPlan])]

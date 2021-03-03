@@ -154,22 +154,28 @@ function Get-GraphSKU               {
     }
 }
 
-function Grant-GraphUserLicense     {
+function Grant-GraphLicense         {
     <#
       .Synopsis
-        Grants the licence to use a particular stock-keeping-unit (SKU) to a user
+        Grants the licence to use a particular stock-keeping-unit (SKU) to users or groups
     #>
-    [cmdletbinding(SupportsShouldprocess=$true)]
+    [cmdletbinding(SupportsShouldprocess=$true,DefaultParameterSetName='ByUserID')]
     param   (
         #The SKU to get either as an ID or a SKU object containing an ID
         [parameter(Position=0, Mandatory=$true)]
         [ArgumentCompleter([SkuCompleter])]
         $SKUID ,
 
-        #ID for the user (required. "me" will select the current user)
-        [parameter(Position=1, ValueFromPipeline=$true, Mandatory = $true)]
+        #ID(s) for users to receive permission ("me" will select the current user), the command will accept user objects and attempt to resolve names to IDs
+        [parameter(Position=1,  ParameterSetName='ByUserID', ValueFromPipeline=$true, Mandatory = $true)]
         [ArgumentCompleter([UPNCompleter])]
         $UserID ,
+
+        #ID(s) for group(s) to receive permission, the command will accept group objects and attempt to resolve names to IDs
+        [parameter(Position=2, ParameterSetName='ByGroupID', Mandatory = $true)]
+        [ArgumentCompleter([GroupCompleter])]
+        [Alias("Team")]
+        $GroupID,
 
         #Disables individual parts of the the SKU
         [ArgumentCompleter([SkuPlanCompleter])]
@@ -270,18 +276,52 @@ function Grant-GraphUserLicense     {
             if ($Force -or $Pscmdlet.Shouldprocess($userdisplayname,"License $licensePartNos to user")) {
                 $u = Invoke-GraphRequest  @webparams -SkipHttpErrorCheck
                 if ($u.error) {Write-Warning "Licensing $licensePartNos to user '$userDisplayName' caused error '$($u.error.message)'."  }
-                else          {Write-Verbose "GRANT-GRAPHUSERLICENSE: $licensePartNos  Granted to $($u.userPrincipalName)"            }
+                else          {Write-Verbose "GRANTGRAPHLICENSE: $licensePartNos  Granted to $($u.userPrincipalName)"            }
+            }
+        }
+        if ($Groupid -is [String]  -and  $GroupID -Notmatch $GUIDRegex)  {$groupID = Get-GraphGroup -Group $GroupID -NoTeamInfo }
+        foreach ($g in $GroupID) {
+            if ($g.SecurityEnabled -eq $false ) {
+                Write-Warning "$($g.DisplayName) is not a security group. Only Security groups can be licensed." ; Continue
+            }
+            if ($g.ID) {
+                    $webparams['uri']   = "$GraphUri/groups/$($g.id)/assignLicense"
+                    $groupDisplayName   = $g.Id
+            }
+            elseif ($g -is [string] -and $g -match $GUIDRegex) {
+                    $webparams['uri']   = "$GraphUri/groups/$g/assignLicense"
+                    $groupDisplayName   = $g
+            }
+            elseif ($g -is [string]) {
+                $g = Get-GraphGroup -Group $g -NoTeamInfo
+                if ($g.count -eq 1 -and $g.SecurityIdentifier) {
+                    $webparams['uri']   = "$GraphUri/groups/$($g.id)/assignLicense"
+                }
+                else {
+                    Write-Warning "Could not resolve $g to a single Security group. Ignoring"
+                    continue
+                }
+            }
+            else {
+                    Write-Warning "$g does not seem to be a Group. Ignoring"
+                    continue
+            }
+            if ($g.DisplayName) {$groupDisplayName = $g.DisplayName }
+            if ($Force -or $Pscmdlet.Shouldprocess($groupDisplayName,"License $licensePartNos to user")) {
+                $g = Invoke-GraphRequest  @webparams -SkipHttpErrorCheck
+                if ($g.error) {Write-Warning "Licensing $licensePartNos to group '$groupDisplayName' caused error '$($g.error.message)'."  }
+                else          {Write-Verbose "GRANT-GRAPHLICENSE: $licensePartNos granted to group '$groupDisplayName'."            }
             }
         }
     }
 }
 
-function Revoke-GraphUserLicense    {
+function Revoke-GraphLicense        {
     <#
       .Synopsis
-        Revokes a user's licence to use a particular stock-keeping-unit (SKU)
+        Revokes a users or groups licences to use a particular stock-keeping-unit (SKU)
     #>
-    [cmdletbinding(SupportsShouldprocess=$true)]
+    [cmdletbinding(SupportsShouldprocess=$true,DefaultParameterSetName='ByUserID')]
     param   (
         #The SKU to revoke either as an ID or a SKU object containing an ID
         [parameter(Position=0, Mandatory=$true)]
@@ -289,9 +329,15 @@ function Revoke-GraphUserLicense    {
         $SKUID ,
 
         #ID for the user (required. "me" will select the current user)
-        [parameter(Position=1, ValueFromPipeline=$true, Mandatory = $true)]
+        [parameter(Position=1, ParameterSetName='ByUserID', ValueFromPipeline=$true, Mandatory = $true)]
         [ArgumentCompleter([UPNCompleter])]
         $UserID ,
+
+        #ID(s) for group(s) to receive permission, the command will accept group objects and attempt to resolve names to IDs
+        [parameter(Position=2, ParameterSetName='ByGroupID', Mandatory = $true)]
+        [ArgumentCompleter([GroupCompleter])]
+        [Alias("Team")]
+        $GroupID,
 
         #Runs the command without a confirmation dialog
         [Switch]$Force,
@@ -320,7 +366,7 @@ function Revoke-GraphUserLicense    {
                 $request.removeLicenses += $s
             }
             else {
-                 $sku = Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_List @invokeParams |
+                 $sku = Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgSubscribedSku_List  |
                             Where-Object -Property SkuPartNumber -Like $s
                 if     (-not $sku -or $sku.Count -gt 1) {Write-Warning "$s did not match a unique SKU" ; continue }
                 else   { $request.removeLicenses +=  $sku.SkuId}
@@ -362,21 +408,58 @@ function Revoke-GraphUserLicense    {
                 Write-Verbose "REVOKE-GRAPHUSERLICENSE - licence(s) for $($request.removeLicenses.Count) SKU(s) from $($u.userPrincipalName)"
             }
         }
+        if ($Groupid -is [String]  -and  $GroupID -Notmatch $GUIDRegex)  {$groupID = Get-GraphGroup -Group $GroupID -NoTeamInfo }
+        foreach ($g in $GroupID) {
+            if ($g.SecurityEnabled -eq $false ) {
+                Write-Warning "$($g.DisplayName) is not a security group. Only Security groups can be licensed." ; Continue
+            }
+            if ($g.ID) {
+                    $webparams['uri']   = "$GraphUri/groups/$($g.id)/assignLicense"
+                    $groupDisplayName   = $g.Id
+            }
+            elseif ($g -is [string] -and $g -match $GUIDRegex) {
+                    $webparams['uri']   = "$GraphUri/groups/$g/assignLicense"
+                    $groupDisplayName    = $g
+            }
+            elseif ($g -is [string]) {
+                $g = Get-GraphGroup -Group $g -NoTeamInfo
+                if ($g.count -eq 1 -and $g.SecurityIdentifier) {
+                    $webparams['uri'] = "$GraphUri/groups/$($g.id)/assignLicense"
+                }
+                else {
+                    Write-Warning "Could not resolve $g to a single Security group. Ignoring"
+                    continue
+                }
+            }
+            else {
+                    Write-Warning "$g does not seem to be a Group. Ignoring"
+                    continue
+            }
+            if ($g.DisplayName) {$groupDisplayName = $g.DisplayName }
+            if ($Force -or $Pscmdlet.Shouldprocess($groupDisplayName,"Revoke licence(s) for $($request.removeLicenses.Count) SKU(s)")) {
+                $g = Invoke-GraphRequest  @webparams -SkipHttpErrorCheck
+                if ($g.error) {Write-Warning "Licensing $licensePartNos to group '$groupDisplayName' caused error '$($g.error.message)'."  }
+                else          {Write-Verbose "REVOKE-GRAPHLICENSE: licence(s) for $($request.removeLicenses.Count) SKU(s) from group '$groupDisplayName'."            }
+            }
+        }
     }
 }
 
-function Get-GraphSkuLicensedUser   {
+function Get-GraphLicense           {
     <#
       .Synopsis
         Get stock-keeping-unit (SKU)
     #>
+    [cmdletbinding(DefaultParameterSetName='None')]
     param   (
         #The SKU to get either as an ID or a SKU object containing an ID
         [parameter(Position=0, ValueFromPipeline=$true, Mandatory=$true)]
         [ArgumentCompleter([SkuCompleter])]
         $SKUID ,
-
-        [switch]$Expand
+        [Parameter(ParameterSetName='Users')]
+        [switch]$UsersOnly,
+        [Parameter(ParameterSetName='Groups')]
+        [switch]$GroupsOnly
     )
     begin   {
         $result = @()
@@ -396,23 +479,33 @@ function Get-GraphSkuLicensedUser   {
             elseif  ($s -notmatch $GuidRegex) {
                 Write-Warning "$s doesn't look like a valid SKU" ; continue
             }
+
             $uri     = $GraphUri + '/users?$Select=id,displayName,userPrincipalName,assignedLicenses&$filter=assignedLicenses/any(x:x/skuId eq {0})' -f  $s
-            if ($expand) {
+            if ($UsersOnly) {Invoke-GraphRequest -Uri $uri -ValueOnly -AsType ([MicrosoftGraphUser]) }
+            elseif (-not $GroupsOnly) {
                 $result +=  Invoke-GraphRequest -Uri $uri -ValueOnly
             }
-            else {
-                Invoke-GraphRequest -Uri $uri -ValueOnly -AsType "Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser"
+
+            $uri     = $GraphUri + '/groups?$Select=id,displayName,assignedLicenses&$filter=assignedLicenses/any(x:x/skuId eq {0})' -f  $s
+            if ($GroupsOnly) {Invoke-GraphRequest -Uri $uri -ValueOnly -AsType ([MicrosoftGraphGroup]) }
+            elseif (-not $UsersOnly) {
+                $result +=  Invoke-GraphRequest -Uri $uri -ValueOnly
             }
-        }
+         }
     }
     end     {
-        if ($Expand -and $result) {
+        if ($result -and -not ($UsersOnly -or $GroupsOnly)) {
             $result | ForEach-Object {
-                    $Upn = $_.userPrincipalName
+                    $upn = $_.userPrincipalName
+                    $displayName = $_.displayName
                     foreach ($l in $_.assignedLicenses) {
-                        New-Object psobject -Property ([ordered]@{UserPrincipalName = $UPN; SkuPartNumber = $idToPartNo[$l.skuID]})
+                        New-Object psobject -Property ([ordered]@{
+                            'DisplayName'       = $DisplayName
+                            'UserPrincipalName' = $upn
+                            'SkuPartNumber'     = $idToPartNo[$l.skuID]
+                            'SkuID'             = $l.skuID  })
                     }
-            } | Sort-Object -Property  UserPrincipalName,SkuPartNumber -Unique
+            } | Sort-Object -Property  UserPrincipalName,DisplayName,SkuPartNumber -Unique | Where-Object {$_.skupartnumber -in $SKUID -or $_.skuid -in $SKUID}
         }
     }
 }
