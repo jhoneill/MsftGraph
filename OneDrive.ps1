@@ -588,7 +588,7 @@ function Copy-FromGraphFolder  {
 function Set-GraphHomeDrive    {
     param    (
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
-        $Drive
+        [Microsoft.Graph.PowerShell.Models.MicrosoftGraphDrive]$Drive
     )
     $Global:PSDefaultParameterValues["*GraphFolder:Drive"]    = $Drive
     $Global:PSDefaultParameterValues["*GraphWorkBook:Drive"]  = $Drive

@@ -135,6 +135,7 @@ function Get-GraphUser            {
         get-graphuser -Drive | Get-GraphDrive -subfolders
     #>
     [cmdletbinding(DefaultparameterSetName="None")]
+    [Alias('ggu')]
     param   (
         #UserID as a guid or User Principal name. If not specified, it will assume "Current user" if other paraneters are given, or "All users" otherwise.
         [parameter(Position=0,valueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
@@ -345,11 +346,7 @@ function Get-GraphUser            {
                                           '/onenote/notebooks?$expand=sections' ) -All  -Exclude 'sections@odata.context'               -As ([MicrosoftGraphNotebook])
                     #Section fetched this way won't have parentNotebook, so make sure it is available when needed
                     foreach ($bookobj in $response) {
-                        foreach ($s in $b.Sections) {
-                                $s.parentNotebook.id          = $b.id
-                                $s.parentNotebook.displayname = $b.displayname
-                                $s.parentNotebook.self        = $b.self
-                        }
+                        foreach ($s in $bookobj.Sections) {$s.parentNotebook = $bookobj }
                         $bookobj
                     }
                 }
@@ -626,8 +623,8 @@ function New-GraphUser            {
         [string]$MailNickName,
 
         #Domain for the new user - used to create UPN name if the UPN paramater is not provided
-        [Parameter(ParameterSetName='UPNFromDomainLast',Mandatory=$true)]
-        [Parameter(ParameterSetName='UPNFromDomainDisplay',Mandatory=$true)]
+        [Parameter(ParameterSetName='UPNFromDomainLast')]
+        [Parameter(ParameterSetName='UPNFromDomainDisplay')]
         [ValidateNotNullOrEmpty()]
         [ArgumentCompleter([DomainCompleter])]
         [string]$Domain,
@@ -655,15 +652,15 @@ function New-GraphUser            {
         [Alias('LastName')]
         [string]$Surname,
 
-        #A script block specifying how the displayname should be built, by default if is {"$GivenName $Surname"};
+        #A script block specifying how the displayname should be built, by default it is {"$GivenName $Surname"};
         [Parameter(ParameterSetName='UPNFromDomainLast')]
         [Parameter(ParameterSetName='DomainFromUPNLast')]
         [scriptblock]$DisplayNameRule = {"$GivenName $Surname"},
 
-        #A script block specifying how the mailnickname should be built, by default if is {"$GivenName.$Surname"};
+        #A script block specifying how the mailnickname should be built, by default it is $GivenName.$Surname with punctuation removed;
         [Parameter(ParameterSetName='UPNFromDomainLast')]
         [Parameter(ParameterSetName='DomainFromUPNLast')]
-        [scriptblock]$NickNameRule    = {"$GivenName.$Surname"},
+        [scriptblock]$NickNameRule    = {($GivenName -replace '\W','') +'.' + ($Surname -replace '\W','')},
 
         #A two letter country code (ISO standard 3166). Required for users that will be assigned licenses due to legal requirement to check for availability of services in countries.  Examples include: 'US', 'JP', and 'GB'
         [ValidateNotNullOrEmpty()]
@@ -702,9 +699,7 @@ function New-GraphUser            {
     #re-create any scriptblock passed as a parameter, otherwise variables in this function are out of its scope.
     if ($NickNameRule)            {$NickNameRule      = [scriptblock]::create( $NickNameRule )   }
     if ($DisplayNameRule)         {$DisplayNameRule   = [scriptblock]::create( $DisplayNameRule) }
-    #if we didn't get a display name build it
-    if (-not $DisplayName)        {$DisplayName       = Invoke-Command -ScriptBlock $DisplayNameRule}
-    #if we didn't get a UPN or a mail nickname, make the nickname first, then add the domain to make the UPN
+     #if we didn't get a UPN or a mail nickname, make the nickname first, then add the domain to make the UPN
     if (-not $UserPrincipalName -and
         -not $MailNickName  )     {$MailNickName      = Invoke-Command -ScriptBlock $NickNameRule
     }
@@ -712,17 +707,26 @@ function New-GraphUser            {
     elseif ($UserPrincipalName -and
               -not $MailNickName) {$MailNickName      = $UserPrincipalName -replace '@.*$','' }
     #If we didn't get a UPN we should have a domain and a nickname, combine them
-    if (($MailNickName -and $Domain) -and
-         -not $UserPrincipalName) {$UserPrincipalName = "$MailNickName@$Domain"    }
+    if ($MailNickName -and
+         -not $UserPrincipalName) {
+         if (-not $Domain) {
+             $Domain = (Invoke-GraphRequest "$GraphUri/domains?`$select=id,isDefault" -ValueOnly -AsType ([psobject]) |
+                            Where-Object {$_.isdefault}  #filter doesn't work in the rest call :-(
+                       ).id
+        }
+         $UserPrincipalName = "$MailNickName@$Domain"    }
+
+    #if we didn't get a display name build it
+    if (-not $DisplayName)        {$DisplayName       = Invoke-Command -ScriptBlock $DisplayNameRule}
 
     #We should have all 3 by now
-    if (-not ($DisplayName -and $MailNickName -and $UserPrincipalName)) {
+    if (-not ($DisplayName -and $MailNickName -and $UserPrincipalName -and $UserPrincipalName -match "\w+@\w+")) {
         throw "couldn't make sense of those parameters"
     }
     #A simple way to create one in 100K temporary passwords. You might get 10Oct2126 - easy to type and meets complexity rules.
     if (-not $Initialpassword)    {
              $Initialpassword   = ([datetime]"1/1/1800").AddDays((Get-Random 146000)).tostring("ddMMMyyyy")
-             [pscustomobject]@{'UserPrincipalName'= $UserPrincipalName; 'Initialpassword'= $Initialpassword}
+             [pscustomobject]@{'DisplayName'=$DisplayName; 'UserPrincipalName'= $UserPrincipalName; 'Initialpassword'= $Initialpassword}
     }
     $settings = @{
         'accountEnabled'    = $true

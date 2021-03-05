@@ -122,7 +122,7 @@ function Get-GraphGroup             {
         Gets the teams conversation threads which have been updated in the last 7 days.
     #>
     [Cmdletbinding(DefaultparameterSetName="None")]
-    [Alias("Get-GraphTeam")]
+    [Alias("Get-GraphTeam","ggg")]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '',  Justification='Write-warning could be used, but the is informational non-output.')]
     param   (
         #The name of a team.
@@ -284,15 +284,11 @@ function Get-GraphGroup             {
                 elseif ($Notebooks)          {
                     #if groups can have more than one book , then add if name ... uri = blah + "?`$expand=sections&`$filter=startswith(tolower(displayname),'$name')"
                     $uri = $groupURI + '/onenote/notebooks?$expand=sections'
-                    $result = Invoke-GraphRequest  -Uri $uri -ValueOnly -ExcludeProperty 'sections@odata.context'  -AsType ([MicrosoftGraphNotebook]) |
+                    $response = Invoke-GraphRequest  -Uri $uri -ValueOnly -ExcludeProperty 'sections@odata.context'  -AsType ([MicrosoftGraphNotebook]) |
                         Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
-                    foreach ($bookobj in $result) {
+                    foreach ($bookobj in $response) {
                         #Section fetched this way won't have parentNotebook, so make sure it is available when needed
-                        foreach ($s in $bookobj.sections) {
-                             $s.ParentNotebook.id          = $r.id
-                             $s.ParentNotebook.displayname = $r.displayName;
-                             $s.ParentNotebook.Self        = $r.self
-                        }
+                        foreach ($s in $bookobj.sections) {$s.ParentNotebook = $bookobj}
                         $bookobj
                     }
                     continue
@@ -427,6 +423,10 @@ function New-GraphGroup             {
         [parameter(ParameterSetName='Security',Mandatory=$true)]
         [Switch]$AsSecurity,
 
+        #If specified allows Azure AD roles can be assigned to the group. This forces visibility to be private, and can't be changed.
+        [parameter(ParameterSetName='Security')]
+        [Switch]$AsAssignableToRole,
+
         #New-GraphGroup only enables teams functonality if -AsTeam is specified. Calling as New-GraphTeam defaults AsTeam to true
         [parameter(ParameterSetName='Team',Mandatory=$true)]
         [Switch]$AsTeam,
@@ -471,6 +471,10 @@ function New-GraphGroup             {
           if ($MyInvocation.InvocationName -eq 'New-GraphTeam' -and -not $PSBoundParameters.ContainsKey('AsTeam')) {
               $AsTeam = $true
           }
+    }
+    elseif ($AsAssignableToRole) {
+          $settings['isAssignableToRole']  = $true
+          $settings['visibility']          ='Private'
     }
     if ($Description) {
           $settings['description']         = $Description

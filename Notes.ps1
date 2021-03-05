@@ -1,7 +1,49 @@
 ﻿using namespace System.Management.Automation
 using namespace Microsoft.Graph.PowerShell.Models
 
-function Get-GraphOneNoteBook    {
+#To do allow Copy-GraphOneNotePage to specify a destination-section by name (with a completer - which requires a destination notebook parameter which may cause a conflict with page which doesn't have the notebook)
+function Set-GraphOneNoteHome   {
+    <#
+      .synopsis
+        Sets a default notebook (and optionally section). Set to $Null to clear the setting
+      .example
+        >Get-GraphGroup 'Consultants' -Notebooks | Get-GraphOneNoteBook -SectionName general*  | Set-GraphOneNoteHome -Verbose
+        The first command in the pipeline gets the notebook for the consultants group ,
+        the second finds the section in the notebook with an display name beginning "general"
+        and the third sets the default section for Add-FileToGraphOneNote, Add-GraphOneNotePage,
+        Get-GraphOneNotePage, and Out-GraphOneNote to the this section, and sets the
+        default Notebook for All the GraphOneNoteBook and all the GraphOneNoteSection commands
+        to the consultants group's notebook.
+    #>
+
+    param    (
+        [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
+        [AllowNull()]
+        #A note book or notebook section to set as the default location for oneNoteCommands. Passing Null will clear the default.
+        $Notebook
+    )
+    @("*GraphOneNoteBook*:Notebook", '*GraphOneNoteSection*:Notebook', "Add-FileToGraphOneNote:Section",
+    "Add-GraphOneNotePage:Section", "Get-GraphOneNotePage:Section", "Out-GraphOneNote:Section") | ForEach-Object {
+       $null = $Global:PSDefaultParameterValues.Remove($_)
+    }
+
+    if ($notebook -is [MicrosoftGraphOnenoteSection]) {
+        Write-Verbose "Setting Default Section to $($notebook.displayname) ... "
+       $Global:PSDefaultParameterValues["Add-FileToGraphOneNote:Section"] = $Notebook
+       $Global:PSDefaultParameterValues["Add-GraphOneNotePage:Section"]   = $Notebook
+       $Global:PSDefaultParameterValues["Get-GraphOneNotePage:Section"]   = $Notebook
+       $Global:PSDefaultParameterValues["Out-GraphOneNote:Section"]       = $Notebook
+       $Notebook = $Notebook.parentNotebook
+    }
+   if ($Notebook -is [Microsoft.Graph.PowerShell.Models.MicrosoftGraphNotebook]) {
+       Write-Verbose "Setting Default Notebook to $($notebook.displayname)"
+       $Global:PSDefaultParameterValues["*GraphOneNoteBook*:Notebook"]    = $Notebook
+       $Global:PSDefaultParameterValues['*GraphOneNoteSection*:Notebook'] = $Notebook
+       $Global:PSDefaultParameterValues["*GraphOneNotePage*:Notebook"]    = $Notebook
+   }
+}
+
+function Get-GraphOneNoteBook   {
     <#
       .Synopsis
         Gets notebook objects or sections of notebooks
@@ -11,54 +53,63 @@ function Get-GraphOneNoteBook    {
         If run with -Notebook and -Sections it will return the sections in that notebook,
         And if run with just -Sections it will return all the sections in the user's personal notebooks.
       .Example
-       >Get-Graphuser -teams | select -First 1 |  Get-GraphTeam -Notebooks | select -first 1 | Get-GraphOneNoteBook -Sections | ft DisplayName, @{n="Notebook";e={$_.parentNotebook.DisplayName}}
-        Gets the first team for a user; gets the first notebook for that team and gets its sections, which are formatted as a table.
+        >Get-GraphOneNoteBook   team
+        Looks for a workbook with a displayname begining "team" in the users workbooks. the search is case insensitive.
       .Example
-        >Get-GraphOneNoteBook  -name general
-        Gets a users workbook with the name "General", "GENERAL", "general" - the search is case insensitive.
+        >Get-GraphOneNoteBook  -SectionName Powershell
+        Finds a "PowerShell" secion in any of the users workbooks. Again the search is case insensitive
       .Example
-        >Get-GraphOneNoteBook  -Sections -name Powershell
-        Finds a PowerShell secion in any of the users workbooks. Again the search is casse insensitive
+        >Get-GraphTeam 'Consultants' -Notebooks | Set-GraphHomeNotebook
+        >Get-GraphOneNoteBook -AllSections
+        The first command changes the default notebook and selects different sections from the the previous command
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
+    [Alias('Get-GraphNoteBook')]
     param    (
         #A graph URI pointing to the notebook, or a notebook object where the .self property is a graph URI...
-        [Parameter(ValueFromPipeline=$true)]
         $Notebook ,
+        [Parameter(ValueFromPipeline=$true,DontShow=$true)]
+        $InputObject,
         #If specified returns the sections of the notebook.
-        [switch]$Sections,
+        [switch]$AllSections,
         #if specified filters the returned objects by to those with names begining with ...
-        [string]$Name
+        [ArgumentCompleter([OneNoteSectionCompleter])]
+        [string]$SectionName
     )
     process  {
-        if ($Notebook.self) {$Notebook=$Notebook.self}
-        if ($Name) {$Name = '?$filter=startswith(tolower(displayname),''{0}'')' -f ($Name.ToLower() -replace '\*$','') }
-
-        #Combinations of params. Just notebook, Just Sections or both (with or without name), neither
-        Write-Progress "Getting Notebook Information"
-        if     ($sections)    {
-            if ($notebook) {$uri =            "$Notebook/sections" + $Name }
-            else           {$uri = "$GraphUri/me/onenote/sections" + $Name }
-            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty 'parentSectionGroup@odata.context',  'parentNotebook@odata.context'
+        if ($InputObject) {$Notebook = $InputObject}
+        $msg = "Getting Information about Notebook $($Notebook.DisplayName)"
+        Write-Progress $msg
+        #convert notebook object with self property to a string. If we don't have a string ager this something is wrong
+        if  ($Notebook.self) {$Notebook=$Notebook.self}
+        if  ($Notebook -and $Notebook -isnot [string] ) {
+            Write-Warning "Invalid notebook parameter" ; return
         }
-        else { #if not $sections
-            if ($Notebook) { $params = @{uri =                      "$Notebook`?`$expand=Sections" + ($Name -replace "^\?","&") }}
-            else           { $params = @{uri = ("$GraphUri/me/onenote/notebooks?`$expand=Sections" + ($Name -replace '^\?','&'))
-                                         valueonly = $true}
+        $webparams = @{
+            'AsType'                = ([MicrosoftGraphNotebook])
+            'ExcludeProperty'       = '@odata.context', 'sections@odata.context'
+        }
+        #If it didn't come in as sting or an object with a self parameter bail out.
+        #if it is a path to a notebook use that
+        if ($Notebook -and $Notebook -match "$GraphUri/.*/onenote/notebooks/.+") {
+                $webparams['uri']       = "$Notebook`?`$expand=Sections"
             }
-
-            $bookobj =  Invoke-GraphRequest @params -AsType ([MicrosoftGraphNotebook]) -ExcludeProperty '@odata.context', 'sections@odata.context'
-            #Section fetched this way won't have parentNotebook, so make sure it is available when needed
-            foreach ($b in $bookobj) {
-                foreach ($s in $b.sections) {
-                    $s.parentNotebook = $b <#.id          = $b.id
-                    $s.parentNotebook.displayname = $b.displayname
-                    $s.parentNotebook.self        = $b.self #>
-                 }
-                $b
+        else {
+            $webparams['valueonly'] = $true
+            $webparams['uri']       = "$GraphUri/me/onenote/notebooks?`$expand=Sections"
+            if ($Notebook) { #it had a notebook parameter as a string but it wasn't a path so look for it by name
+                $webparams['uri']  += ('&$filter=startswith(tolower(displayname),''{0}'')' -f ($Notebook.ToLower() -replace '\*$',''))
             }
         }
-        Write-Progress "Getting Notebook Information" -Completed
+        $response = Invoke-GraphRequest @webparams
+        #Sections fetched this way won't have parentNotebook, so make sure it is available when needed
+        foreach ($bookobj in $response) {
+            foreach ($s in $bookobj.sections) { $s.parentNotebook = $bookobj }
+            if     ($AllSections) {$bookobj.Sections}
+            elseif ($SectionName) {$bookobj.Sections.where({$_.displayname -like $SectionName})}
+            else                  {$bookobj}
+        }
+        Write-Progress $msg -Completed
     }
 }
 
@@ -76,64 +127,84 @@ function Get-GraphOneNoteSection {
         If given a section parameter it either returns details of the section, or
         if the -Pages or -Name Parameters are given returns pages from the section
       .Example
-        >
-        >$notebook = Get-GraphTeam -ByName accounts -Notebooks
-        >Get-GraphOneNoteSection -Pages $notebook.sections[0]
-
-        The first line gets the Notebooks object for the Accounts team. This has a sections
-        collection. The second line gets the pages in the first section.
+        >$notebook = Get-GraphTeam  consultants -Notebooks
+        >$notebook.sections[0]  | Get-GraphOneNoteSection  -PageTitle change
+        The first line gets the Notebooks object for the 'consultants' team. This object
+        has a 'sections' collection. The second line uses pipes a member of this collection as the
+        into Get-GraphOneNoteSection to return the pages in the first section, with the title begining "change".
       .Example
-      >Get-GraphOneNoteSection -Section $section -Pages -Name "test" | Remove-GraphOneNotePage -Force
-      Gets all pages with names that begin 'Test...' and removes
+        >Get-GraphOneNoteSection private -notebook $notebook -allpages
+        In this example the notebook used in the first example is passed as a notebook is piped into command to get a section, by contrast with the previous section
+
+      .Example
+        >Get-GraphOneNoteSection -Section $section -Pages -Name "test" | Remove-GraphOneNotePage -Force
+        >Gets all pages with names that begin 'Test...' and removes
       $section may be the a section object (from the Sections collection of a notebook object, or
       form Get-GraphOneNotebook -Sections ) or the URL for a section.
     #>
     [cmdletbinding()]
     [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage],ParameterSetName='Pages')]
     [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteSection])]
+    [Alias('Get-GraphNoteBookSection')]
     param    (
-        #A graph URI pointing to the section, or a section object where the .self property is a graph URI...
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true,ParameterSetName='Sections',Position=0)]
+        #A graph URI pointing to the section, or a section object where the .self property is a graph URI or a section name...
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true,Position=0)]
+        [ArgumentCompleter([OneNoteSectionCompleter])]
         $Section ,
-        [Parameter(ParameterSetName='Notebook')]
+        [Parameter()]
+        #The notebook to query for section(s) if sections is empty or contains a name
         $Notebook ,
-        #If specified, returns the pages in the section.
-        [Parameter(ParameterSetName='Sections')]
-        [switch]$Pages,
+        #If specified, returns the pages in the section(s).
+        [switch]$AllPages,
         #If specified filters pages or Sections to those with names beginning ...
-        [string]$Name
+        [string]$PageTitle
     )
     process  {
-        if ($section -is [MicrosoftGraphNotebook]) {$Notebook = $Section}
-        if     ($Notebook) {
+        $msg = "Getting Information about Notebook section $($section.DisplayName)"
+        Write-Progress $msg
+        if     ($Section -is [MicrosoftGraphNotebook]) {$Notebook = $Section}
+        elseif ($Section.self) {$Section = $Section.self}
+        if     ($Notebook -and  ($Section -isnot [string] -or $section -Notmatch "^$graphuri.*/onenote/sections/.+")) {
             #A notebook has sections URL we'll use it. If not if it's an object with a self parameter try with that, otherwise if it is a string, assume it's the URI for the notebook
-            if     ($Notebook.sectionsUrl)  {$uri  = $Notebook.sectionsUrl}
-            elseif ($Notebook.self)         {$uri  = $Notebook.self +"/sections?`$expand=parentNotebook"}
-            elseif ($Notebook -is [string]) {$uri  = $Notebook      +"/sections?`$expand=parentNotebook"}
-            else   {Write-warning -Message 'Could not process the notebook parameter provided'}
-            if     ($Name)                  {$uri += ('?$filter=startswith(tolower(displayname),''{0}'')' -f ($Name.ToLower() -replace '\*$','')) }
+            if     ($Notebook.sectionsUrl)  {$uri  = $Notebook.sectionsUrl  +  '?$expand=parentNotebook'}
+            elseif ($Notebook.self)         {$uri  = $Notebook.self + '/sections?$expand=parentNotebook'}
+            elseif ($Notebook -is [string]) {$uri  = $Notebook      + '/sections?$expand=parentNotebook'}
+            else   {Write-warning -Message 'Could not process the notebook parameter provided' }
+            if     ($Section -is [string])  {$uri += ('&$filter=startswith(tolower(displayname),''{0}'')' -f ($Section.ToLower() -replace '\*$','')) }
             $results = Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty 'parentSectionGroup@odata.context',  'parentNotebook@odata.context'
-            if      ($Pages) {
-                $results | Get-GraphOneNoteSection -pages
-                return
+            if      ($AllPages) {
+                  $results | Get-GraphOneNoteSection -AllPages
+                  return
+            }
+            elseif ($PageTitle) {
+                  $results | Get-GraphOneNoteSection -PageTitle $PageTitle
+                  return
             }
             else {return $results}
         }
-        if     ($Section.self)         {$uri = $Section.self}
-        elseif ($Section -is [string]) {$uri = $Section}
-        else   {Write-Warning 'Can not process the Section Parameter' ; Return }
-        if     ($Name -or $Pages) {
-            if ($Name)     {$uri =  "$uri/Pages?`$expand=parentSection,ParentNotebook&`$filter=startswith(tolower(title),'$Name')" }
-            else           {$uri =  "$uri/Pages?`$expand=parentSection,ParentNotebook"}
-
-            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenotepage]) -ExcludeProperty 'parentSection@odata.context','parentNotebook@odata.context'
-
+        if     ($Section -isnot [string]  -or $Section -Notmatch "^$graphuri.*/onenote/sections/.+") {
+                    Write-Warning 'Can not process the Section Parameter' ; Return
+        }
+        if     ($PageTitle -or $AllPages) {
+            # $expand in the REST API ignores ParentNotebook so if it is empty we'll populate it
+            if ($PageTitle) {$uri =  $Section + ('/Pages?$expand=parentSection,ParentNotebook&$filter=startswith(tolower(title),''{0}'')'  -f
+                                                  $PageTitle.ToLower() ) }
+            else            {$uri =  $Section +  '/Pages?$expand=parentSection,ParentNotebook'}
+            Invoke-GraphRequest -Uri $uri -ValueOnly  -AsType ([MicrosoftGraphOnenotepage]) -PropertyNotMatch '@odata.context' |
+                ForEach-Object {
+                        if ((-not $_.ParentNotebook.DisplayName) -and $PSBoundParameters.section.parentnotebook) {
+                                  $_.parentNotebook = $PSBoundParameters.section.parentnotebook
+                        }
+                $_
+            }
             return
         }
         else   {
-           Invoke-GraphRequest -Uri  ("$uri`?`$expand=parentNotebook")  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty 'parentSectionGroup@odata.context',  'parentNotebook@odata.context', '@odata.context'
+            Invoke-GraphRequest -Uri  ($Section + '?$expand=parentNotebook')  -AsType ([MicrosoftGraphOnenoteSection]) -ExcludeProperty 'parentSectionGroup@odata.context',  'parentNotebook@odata.context', '@odata.context'
         }
+        Write-Progress $msg -Completed
     }
+
 }
 
 function New-GraphOneNoteSection {
@@ -158,8 +229,9 @@ function New-GraphOneNoteSection {
         and the third adds a welcome page to the new section.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
+    [Alias('New-GraphNoteBookSection')]
     param   (
-        #A graph URI pointing to the notebook, or a notebook object
+        #A graph URI pointing to the notebook, or a notebook object, this can be set by Set-GraphOneNoteHome
         [Parameter(Mandatory=$true)]
         $Notebook ,
         #Name for the new section.
@@ -206,55 +278,100 @@ function Get-GraphOneNotePage    {
     #>
     [cmdletbinding(DefaultParameterSetName='None')]
     [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage])]
+    [Alias('Get-GraphNoteBookPage')]
     param   (
         #A graph URI pointing to the page, or a page object where the .self property is a graph URI...
-        [Parameter(Mandatory=$true, ValueFromPipeline=$true,Position=0)]
+        [Parameter(ParameterSetName='Page',              Mandatory=$true, ValueFromPipeline=$true,Position=0)]
+        [Parameter(ParameterSetName='PageContent',       Mandatory=$true, ValueFromPipeline=$true,Position=0)]
+        [Parameter(ParameterSetName='PageContentWithIDs',Mandatory=$true, ValueFromPipeline=$true,Position=0)]
+        [Parameter(ParameterSetName='PagePreview',       Mandatory=$true, ValueFromPipeline=$true,Position=0)]
         $Page,
+
+        #A graph URI pointing to a notebook, or a notebook object. this can be set by Set-GraphOneNoteHome
+        [Parameter()]
+        $Notebook,
+
+        #A graph URI pointing to a section, or a Section object  this can be set by Set-GraphOneNoteHome
+        [Parameter()]
+        [ArgumentCompleter([OneNoteSectionCompleter])]
+        $Section,
+
         #If specified returns the contents of the page. Ignored if ContentWithIDs is specified
-        [Parameter(ParameterSetName='Content',Mandatory=$true)]
+        [Parameter(ParameterSetName='PageContent',Mandatory=$true,ValueFromPipelineByPropertyName=$true)]
         [switch]$Content,
+
         #If specified returs the contents with guids for each section where content can be inserted.
-        [Parameter(ParameterSetName='Content')]
-        [Parameter(ParameterSetName='ContentWithIDs',Mandatory=$true)]
+        [Parameter(ParameterSetName='PageContent')]
+        [Parameter(ParameterSetName='PageContentWithIDs',Mandatory=$true,ValueFromPipelineByPropertyName=$true)]
         [switch]$ContentWithIDs,
+
         #If specified returs a text preview of the page
-        [Parameter(ParameterSetName='Preview',Mandatory=$true)]
+        [Parameter(ParameterSetName='PagePreview',Mandatory=$true,ValueFromPipelineByPropertyName=$true)]
         [switch]$PreviewText,
-        [Parameter(ParameterSetName='Content')]
-        [Parameter(ParameterSetName='ContentWithIDs')]
-        [Parameter(ParameterSetName='Preview')]
+
+        #If specified writes the preview or content to a file
+        [Parameter(ParameterSetName='PageContent')]
+        [Parameter(ParameterSetName='PageContentWithIDs')]
+        [Parameter(ParameterSetName='PagePreview')]
         $SavePath
     )
     process {
         $webparams = @{
-           'AsType'          =  ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage])
-           'ExcludeProperty' = 'parentSection@odata.context' ,'@odata.context'
+           'AsType'           =  ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage])
+           'PropertyNotMatch' = '@odata'
         }
-
-        if     ($Page -is [MicrosoftGraphOnenoteSection]) {
-                $pages  = Invoke-GraphRequest -Uri "$($Page.self)/pages" -ValueOnly @webparams
+        if     ($Page -is [MicrosoftGraphOnenoteSection]) {$Section = $Page}
+        elseif ($Page.self)            {$Page=$Page.self}
+        if     ($Section -and ($Page -isnot [string] -or $page -notmatch "$graphuri/.*/onenote/pages/.+" )) {
+                if     ($Section.self) {
+                        $webParams['uri'] =   "$($Section.self)/pages?`$expand=parentsection(`$expand=ParentNotebook)"
+                }
+                elseif ($Section -is [string] -and $Section -match "^$graphuri.*/onenote/sections/.+") {
+                        $webParams['uri'] =   "$Section/pages?`$expand=parentsection(`$expand=ParentNotebook)"
+                }
+                elseif ($Section -is [string] -and $Notebook) {
+                        $Section = Get-GraphOneNoteSection -Section $Section -Notebook $Notebook
+                         if (-not $Section -or $Section.Count -gt 1) {
+                            Write-Warning "Could not resolve $Section to a unique section in the notebook."
+                        }
+                        else {$webParams['uri'] =   "$($Section.self)/pages?`$expand=parentsection(`$expand=ParentNotebook)"}
+                }
+                else {Write-Warning "Can't resolve the section given"; return }
+                if ($Page -is [string]) {
+                    $webParams['uri'] += '&$filter=startswith(tolower(title),''{0}'')' -f ($Page.ToLower() -replace '\*$','')
+                }
+                $pages     = Invoke-GraphRequest @webparams -ValueOnly
                 if ($ContentWithIDs -or $Content -or $PreviewText ) {
-                      $pages | Get-GraphOneNotePage -Content:$Content -ContentWithIDs:$ContentWithIDs -PreviewText:$PreviewText
+                      $null = $PSBoundParameters.Remove('Page'), $PSBoundParameters.Remove('Notebook'), $PSBoundParameters.Remove('section')
+                      $pages | Get-GraphOneNotePage @PSBoundParameters
                       return
                 }
-                else {return $pages}
+                else {
+                    foreach ($p in $pages)   {
+                        if ((-not $p.ParentNotebook.DisplayName) -and $Section.parentnotebook) {
+                                  $p.parentNotebook = $Section.parentnotebook
+                        }
+                        $p
+                    }
+                    return
+                }
         }
-        elseif ($Page.self)            {$uri=$Page.self}
-        elseif ($Page -is [string])    {$uri=$Page}
-        else   {Write-Warning -Message 'Could not process the page parameter' ; return}
+        elseif ($Page -isnot [string] -or $page -notmatch "$graphuri/.*/onenote/pages/.+") {
+                Write-Warning -Message 'Could not process the page parameter' ; return
+        }
         if     ($PreviewText -and -not $PSBoundParameters['savepath']) {
-               return (Invoke-GraphRequest -Uri  "$uri/Preview").previewText
+               return (Invoke-GraphRequest -Uri  "$Page/Preview").previewText
         }
         elseif ($PreviewText)          {
-               (Invoke-GraphRequest -Uri  "$uri/Preview").previewText | Out-File $savePath
+               (Invoke-GraphRequest -Uri  "$Page/Preview").previewText | Out-File $savePath
                return
         }
         elseif (-not ($ContentWithIDs -or $Content))           {
-          Invoke-GraphRequest -Uri $uri @webparams
+          Invoke-GraphRequest -Uri $page @webparams
           return
         }
-        elseif (      $ContentWithIDs) {$uri = "$uri/Content?includeIDs=true"}
-        else                           {$uri ="$uri/Content"}
+        elseif (      $ContentWithIDs) {$uri = "$Page/Content?includeIDs=true"}
+        else                           {$uri ="$Page/Content"}
 
         #Page content breaks the JSON parser, so ask for it to go to a file instead. If didn't want a file, read the file back and delete it.
         if     (-not $PSBoundParameters['savepath']) {$SavePath = [system.io.path]::GetTempFileName() }
@@ -265,7 +382,11 @@ function Get-GraphOneNotePage    {
 }
 
 function Copy-GraphOneNotePage   {
-
+<#
+  .synopsis
+    Copies a one note page to a different section in the same notebook.
+#>
+    [Alias('Copy-GraphNoteBookPage')]
     param   (
         #The page to be copied.
         [Parameter(Position=0,Mandatory=$true,ValueFromPipeline=$true)]
@@ -324,6 +445,7 @@ function Copy-GraphOneNoteSection {
     param   (
         #The section to be copied.
         [Parameter(Position=0,Mandatory=$true,ValueFromPipeline=$true)]
+         [ArgumentCompleter([OneNoteSectionCompleter])]
         $Section,
         #The section the it will be copied to
         [Parameter(Position=1,Mandatory=$true)]
@@ -403,8 +525,9 @@ function Add-GraphOneNotePage    {
         With $Section already defined this adds a simple page, with a title and a short body.
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
+    [Alias('Add-GraphNoteBookPage')]
     param   (
-        #The section either as a URL or or as section object, which contrains a self URL or a pages URL
+        #The section either as a URL or or as section object, which contains a self URL or a pages URL  this can be set by Set-GraphOneNoteHome
         [Parameter(Mandatory=$true)]
         $Section ,
         #The content of the page formatted as HTML
@@ -465,14 +588,15 @@ function Add-FileToGraphOneNote  {
         Add-GraphOneNotePage.
     #>
     [CmdletBinding(SupportsShouldProcess=$true)]
+    [Alias('Add-FileToGraphNoteBook')]
     param   (
         #The file to upload to OneNote
         [Parameter(ValueFromPipeline=$true,Mandatory=$true)]
         $Path ,
         #Title for the page. If not specified the file name will be used.
         [String]$Title,
-        #Section to post to - the URL for a default section can be stored in the environment variable DefaultOneNoteSection
-        $Section = $env:DefaultOneNoteSection,
+        #Section to post to -  this can be set by Set-GraphOneNoteHome
+        $Section,
         #Specifies text to add before the embedded object. By default, there is no text in that position.
         [ValidateNotNullOrEmpty()][string[]]$PreContent,
         #Specifies text to add after the embedded object. By default, there is no text in that position.
@@ -568,6 +692,7 @@ function Update-GraphOneNotePage {
             https://docs.microsoft.com/en-gb/graph/onenote-update-page
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]
+    [Alias('Update-GraphNoteBookPage')]
     param   (
         #A graph URI pointing to the page, or a page object where the .self property is a graph URI...
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
@@ -637,6 +762,7 @@ function Remove-GraphOneNotePage {
         within this sectioned finds page names that begin "process..." and removes them
     #>
     [cmdletbinding(ConfirmImpact='High',SupportsShouldProcess=$true)]
+    [Alias('Remove-GraphNoteBookPage')]
     param   (
         #A graph URI pointing to the page, or a page object where the .self property is a graph URI...
         [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
@@ -680,6 +806,7 @@ function Out-GraphOneNote        {
         Generates a page in the default section (using the environment variable DefaultOneNoteSection) and opens it in a web browser.
     #>
     [CmdletBinding(DefaultParameterSetName='Page')]
+    [Alias('Out-GraphNoteBook')]
     param   (
         #Specifies the objects to be represented in HTML.
         [parameter(ValueFromPipeline=$true)]
@@ -687,8 +814,8 @@ function Out-GraphOneNote        {
         #Includes the specified properties of the objects in the output
         [Parameter(Position=0)]
         [String[]]$Property = @('*'),
-        #The section to the content to this can be set in an environment variable DefaultOneNoteSection.
-        $Section = $env:DefaultOneNoteSection,
+        #The section where the content will be created: to this can be set by Set-GraphOneNoteHome
+        $Section ,
         [Parameter(ParameterSetName='Page', Position=4)]
         #Specifies the text to add after the opening <BODY> tag. By default, there is no text in that position.
         [string[]]$Body,

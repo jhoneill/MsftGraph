@@ -31,11 +31,12 @@ class DomainCompleter             : IArgumentCompleter {
     )
     {
         $result = [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
-        if (-not $this.Domains)  {$this.Domains = Get-GraphDomain }
+        if (-not $this.Domains)  {$this.Domains = Invoke-GraphRequest "$global:GraphUri/domains?`$select=id" -ValueOnly |
+                                                         ForEach-Object id | Sort-Object
+        }
         $wildcard          = ('*' + ($wordToComplete  -replace '[''"]','' )+ '*')
 
-        $this.domains.id.where({$_ -like $wildcard}) |
-            Sort-Object | ForEach-Object {$result.Add([System.Management.Automation.CompletionResult]::new($_))}
+        foreach ($d in $this.domains.where({$_ -like $wildcard}))  {$result.Add([System.Management.Automation.CompletionResult]::new($_))}
         return $result
     }
 }
@@ -144,6 +145,33 @@ class OneDrivePathCompleter       : IArgumentCompleter {
         Get-GraphDrive -quiet @params | Sort-Object -Property name | ForEach-Object {
             $P = ($_.parentReference.path -replace "/drive/|/drives/.*?/","" ) + "/" + $_.name
             if ($P -like "*$wordToComplete*") {
+                $result.Add([System.Management.Automation.CompletionResult]::new("'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
+            }
+        }
+        return $result
+    }
+}
+
+class OneNoteSectionCompleter     : IArgumentCompleter {
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result =  [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        $wordToComplete = $wordToComplete -replace '"|''', ''
+        $values = @()
+        if ($FakeBoundParameters['Notebook'] -and $FakeBoundParameters['Notebook'].Sections  ) {$values=$FakeBoundParameters['Notebook'].Sections.DisplayName}
+        #I do mean = no -eq in the next line.
+        elseif ($key = $Global:PSDefaultParameterValues.Keys.where({"$CommandName`:Notebook" -like $_})) {
+            $values = $Global:PSDefaultParameterValues[$key].Sections.DisplayName
+        }
+        foreach ($p in $values) {
+            if ($P -like "$wordToComplete*" -and $p -match '^\w+$') {
+                $result.Add([System.Management.Automation.CompletionResult]::new($p, $p, ([CompletionResultType]::ParameterValue) , $p) )
+            }
+            elseif ($P -like "$wordToComplete*") {
                 $result.Add([System.Management.Automation.CompletionResult]::new("'$p'", $p, ([CompletionResultType]::ParameterValue) , $p) )
             }
         }

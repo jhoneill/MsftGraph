@@ -285,69 +285,52 @@ function Connect-Graph       {
             if     ($bp.Refresh)          {
                 Write-Verbose "CONNECT: Sending a 'Refresh_token' token request "
                 $authresp   =   Get-AccessToken -GrantType refresh_token -BodyParts @{'refresh_token' = $script:RefreshToken}
-               <# $authresp   =   Invoke-RestMethod -Method Post -Uri $tokenUri -Body @{
-                    'grant_type'    = 'refresh_token'  ;
-                    'refresh_token' = $script:RefreshToken
-                    'client_id'     = $script:ClientID
-                    'client_secret' = $script:Client_secret
-                    'resource'      = 'https://graph.microsoft.com'
-                } #>
             }
             elseif ($bp.Credential)       {
                 Write-Verbose "CONNECT: Sending a 'Password' token request for $($bp.Credential.UserName) "
                  $authresp   =   Get-AccessToken -GrantType password -BodyParts @{ 'username' = $bp.Credential.UserName; 'password' = $bp.Credential.GetNetworkCredential().Password}
-              <#
-                $authresp   =   Invoke-RestMethod -Method Post -Uri $tokenUri -Body @{
-                    'grant_type'    = 'password'
-                    'resource'      = 'https://graph.microsoft.com'
-                    'username'      = $bp.Credential.UserName
-                    'password'      = $bp.Credential.GetNetworkCredential().Password
-                    'client_id'     = $script:ClientID
-                    'client_secret' = $script:Client_secret
-                }#>
             }
             elseif ($bp.AsApp)            {
                 Write-Verbose "CONNECT: Sending a 'client_credentials' token request for the App."
                  $authresp   =   Get-AccessToken
-                <#$authresp  = Invoke-RestMethod -Method Post -Uri $tokenUri -Body @{
-                    'grant_type'    = 'client_credentials';
-                    'resource'      = 'https://graph.microsoft.com';
-                    'client_id'     =  $script:ClientID ;
-                    'client_secret' =  $script:Client_secret;
-                }#>
             }
             #to leverage an existing Az Session call a command in the Az.Account module (V2 and later)
             elseif ($bp.FromAzureSession) {
                 if ($bp.DefaultProfile) {$global:__MgAzContext = $DefaultProfile }
-                $authresp =  Get-AzAccessToken -ResourceUrl 'https://graph.microsoft.com' DefaultProfile $global:__MgAzContext
+                $authresp =  Get-AzAccessToken -ResourceUrl 'https://graph.microsoft.com' -DefaultProfile $global:__MgAzContext
             }
             #did it work ? If so store the token and what'll we need for refreshing it
-            if ($authresp.access_token)   {
-                Write-Verbose ("CONNECT: Token Response= " + ($authresp | get-member -MemberType NoteProperty).name -join ", ")
-                $null = $paramsToPass.Add("AccessToken",  $authresp.access_token)
-                if     ($authresp.scope)         {Write-Verbose "CONNECT: Scope= $($authresp.scope)" }
-                if     ($authresp.refresh_token) {$script:RefreshToken       = $authresp.refresh_token}
-                if     ($authresp.expires_in)    {$global:__MgAzTokenExpires = (Get-Date).AddSeconds([int]$authresp.expires_in -60 )}
-                elseif ($authresp.expires_on)    {
-                    if ($authresp.expires_on -is [string] -and
-                        $authresp.expires_on -match "^\w{10}$") {
-                                                  $global:__MgAzTokenExpires = [datetime]::UnixEpoch.AddSeconds($oauthAPP.expires_on)}
-                elseif ($authresp.ExpiresOn  -is [datetimeoffset]){
-                                                  $global:__MgAzTokenExpires = $authresp.ExpiresOn.LocalDateTime }
-                }
-                if     ($bp.NoRefresh)           {
-                    $script:RefreshParams      = $null
-                }
-                elseif ($bp.FromAzureSession)    {
-                    $script:RefreshParams      = @{'Quiet' = $true; 'FromAzureSession' = $True}
-                    $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -FromAzureSession '))
-                }
-                else                             {
-                    $script:RefreshParams      = @{'Quiet' = $true; 'Refresh' = $true}
-                     $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -Refresh '))
-                }
+            if (-not ($authresp.access_token -or $authResp.Token))    {
+                throw [System.UnauthorizedAccessException]::new("No Token was returned")
             }
-            else {throw [System.UnauthorizedAccessException]::new("No Token was returned")}
+            Write-Verbose ("CONNECT: Token Response= " + ($authresp | Get-Member -MemberType NoteProperty).name -join ", ")
+            if     ($authresp.access_token) {
+                    $null = $paramsToPass.Add("AccessToken",  $authresp.access_token)
+            }
+            elseif ($authresp.Token) {
+                    $null = $paramsToPass.Add("AccessToken",  $authresp.Token)
+            }
+            if     ($authresp.scope)         {Write-Verbose "CONNECT: Scope= $($authresp.scope)" }
+            if     ($authresp.refresh_token) {$script:RefreshToken       = $authresp.refresh_token}
+            if     ($authresp.expires_in)    {$global:__MgAzTokenExpires = (Get-Date).AddSeconds([int]$authresp.expires_in -60 )}
+            elseif ($authresp.expires_on)    {
+                if ($authresp.expires_on -is [string] -and
+                    $authresp.expires_on -match "^\w{10}$") {
+                                              $global:__MgAzTokenExpires = [datetime]::UnixEpoch.AddSeconds($oauthAPP.expires_on)}
+                elseif ($authresp.ExpiresOn  -is [datetimeoffset]){
+                                              $global:__MgAzTokenExpires = $authresp.ExpiresOn.LocalDateTime }
+            }
+            if     ($bp.NoRefresh)           {
+                $script:RefreshParams      = $null
+            }
+            elseif ($bp.FromAzureSession)    {
+                $script:RefreshParams      = @{'Quiet' = $true; 'FromAzureSession' = $True}
+                $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -FromAzureSession '))
+            }
+            else                             {
+                $script:RefreshParams      = @{'Quiet' = $true; 'Refresh' = $true}
+                $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -Refresh '))
+            }
         }
         #endregion
 

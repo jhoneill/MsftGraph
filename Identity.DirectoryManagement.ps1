@@ -97,7 +97,7 @@ function Get-GraphOrganization      {
 function Get-GraphSKU               {
     <#
       .Synopsis
-        Gets details of SKUs organization an organization has subscribed to
+        Gets details of SKUs that an organization has subscribed to
       .Example
         Get-GraphSKU "enterprise*" -ServicePlans | sort servicePlanName | format-table
         Finds any SKU with a name starting "Enterprise" and displays its service plans in alphabetical order.
@@ -448,7 +448,7 @@ function Revoke-GraphLicense        {
 function Get-GraphLicense           {
     <#
       .Synopsis
-        Get stock-keeping-unit (SKU)
+        Returns users or groups (or both) who are licensed to user a given SKU
     #>
     [cmdletbinding(DefaultParameterSetName='None')]
     param   (
@@ -513,7 +513,7 @@ function Get-GraphLicense           {
 function Get-GraphDirectoryRole     {
 <#
     .synopsis
-        Gets a directory role or its members
+        Gets an Azure AD directory role or its members
     .example
         PS C:\> Get-GraphDirectoryRole external* -Members | ft displayname,role
         Lists all members of groups whose names begin "external"
@@ -529,13 +529,13 @@ function Get-GraphDirectoryRole     {
         [switch]$Members
     )
     process {
-        if     ($role.count -gt 1) {
+        if     ($Role.count -gt 1) {
             $Role | Get-GraphDirectoryRole -Members:$Members
             return
         }
         if     ($Role -is [MicrosoftGraphDirectoryRole]) {$roles = $Role}
         elseif ($Role -is [string] -and $role -match $GUIDRegex) {
-            $roles = Invoke-GraphRequest  -Uri "$GraphUri/directoryroles/$Role`?`$expand=members"       -AsType  ([MicrosoftGraphDirectoryRole] ) -ExcludeProperty '@odata.context'
+            $roles = Invoke-GraphRequest  -Uri "$GraphUri/directoryroles/$Role`?`$expand=members"        -AsType  ([MicrosoftGraphDirectoryRole] ) -ExcludeProperty '@odata.context'
         }
         else {
             $roles = Invoke-GraphRequest  -Uri "$GraphUri/directoryroles?`$expand=members" -ValueOnly    -AsType  ([MicrosoftGraphDirectoryRole] )  |
@@ -563,14 +563,20 @@ function Get-GraphDirectoryRole     {
 }
 
 function Grant-GraphDirectoryRole   {
+    <#
+      .synopsis
+        Grants a directory role to a user or group
+    #>
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
     param   (
         #The role(s) to revoke, either as role names or a role objects.
         [Parameter(Position=0,Mandatory=$true)]
         [ArgumentCompleter([RoleCompleter])]
-        $Role ,        #The member to add , can be a user name, or a user or group object
+        $Role ,
+        #The member to add, can be a user name, or an object representing a group with IsAssignableToRole set or a user.
         [Parameter(ValueFromPipeline=$true,Position=1,Mandatory=$true)]
         $Member ,
+        #Runs the command with no confirmation.
         [switch]$Force
     )
     begin   {
@@ -595,6 +601,10 @@ function Grant-GraphDirectoryRole   {
 }
 
 function Revoke-GraphDirectoryRole  {
+    <#
+     .synopsis
+       Removes a user or group from a an Azure AD directory role
+     #>
     [cmdletbinding(SupportsShouldProcess=$True,ConfirmImpact='High')]
     param   (
         [Parameter(Position=0,Mandatory=$true)]
@@ -602,8 +612,9 @@ function Revoke-GraphDirectoryRole  {
         [ArgumentCompleter([RoleCompleter])]
         $Role ,
         [Parameter(ValueFromPipeline=$true,Position=1)]
-        #The member to add , can be a user name, or a user or group object
-        $Member ,
+        #The member to remove , can be a user name, or a user or group object
+        $Member,
+        #Runs the command without confirmation.
         [switch]$Force
     )
     begin   {
@@ -624,8 +635,17 @@ function Revoke-GraphDirectoryRole  {
 }
 
 function Get-GraphDeletedObject     {
+    <#
+      .synopsis
+        Returns deleted users or groups from the AAD recycle bin
+      .description
+        It can filter by name, and selects users by default or groups if -Group is selected
+        The results can be piped into Restore-GraphDeletedObject
+    #>
     param (
+        #If specified filters the returned objects to those with a name starts with...
         $Name,
+        #By default user objects are returned. This switches the choice to group objects.
         [switch]$Group
     )
     if ($name)  {$u    = "?`$filter=startswith(displayName,'{0}')" -f ($Name -replace "'","''" )}
@@ -635,11 +655,18 @@ function Get-GraphDeletedObject     {
 }
 
 function Restore-GraphDeletedObject {
+    <#
+      .synopsis
+        Recovers a user or group from the AAD recycle bin
+    #>
     [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
     param   (
+        #A deleted object or the ID of one.
         [Parameter(ValueFromPipeline=$true,position=0)]
         $ID,
+        #Specifies that the ID is associated with a group, not a user.
         [switch]$Group,
+        #If specified supresses any confirmation prompt
         [switch]$Force
     )
     process {
