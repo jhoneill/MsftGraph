@@ -1,5 +1,7 @@
 using namespace System.Management.Automation
 using namespace Microsoft.Graph.PowerShell.Models
+using namespace Microsoft.Graph.PowerShell.Authentication
+
 
 $global:GraphUri                  = 'https://graph.microsoft.com/v1.0'   #May want this outside the module
 $script:GUIDRegex                 = '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$'
@@ -299,7 +301,7 @@ foreach ($subModule in $ImportCmds.keys) {
     else {Write-Verbose "Microsoft.Graph.$subModule.private.dll  not found $subModule won't be loaded "}
     if ($result) {
         .  "$PSScriptRoot\$subModule.ps1"
-        foreach ($cmd in $ImportCmds[$module]) { (Get-Command $cmd).Visibility = 'Private'  }
+        foreach ($cmd in $ImportCmds[$subModule]) { (Get-Command $cmd).Visibility = 'Private'  }
     }
 }
 
@@ -310,5 +312,7 @@ foreach ($subModule in $ImportCmds.keys) {
 . "$PSScriptRoot\Planner.ps1"
 . "$PSScriptRoot\Sharepoint.ps1"
 
-if ($null -eq [Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
-else {Write-Host ("Already logged on as '$([Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext.Account)'." )}
+if ($null -eq [GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
+elseif ([GraphSession]::instance.AuthContext.AppName -and -not [GraphSession]::instance.AuthContext.Account) {
+      Write-Host ("Already logged on as the app '$([GraphSession]::instance.AuthContext.AppName)'." )}
+else {Write-Host ("Already logged on as '$([GraphSession]::instance.AuthContext.Account)'." )}

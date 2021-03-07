@@ -17,8 +17,12 @@ using namespace System.Management.Automation
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification='False positive for global vars.')]
 param()
 
+#Functions we will define are aliases in Microsoft.Graph.Authentication so remove them
 Remove-item Alias:\Invoke-GraphRequest -ErrorAction SilentlyContinue
-function Invoke-GraphRequest {
+Remove-Item Alias:\Connect-Graph       -ErrorAction SilentlyContinue
+Set-Alias   -Value Get-MgContext       -Name "Get-GraphContext"
+
+function Invoke-GraphRequest        {
     <#
       .synopsis
         Wrappper for Invoke-MgGraphRequest.With token management and result pre-processing
@@ -137,7 +141,7 @@ function Invoke-GraphRequest {
     }
 }
 
-function Get-AccessToken     {
+function Get-AccessToken            {
 <#
   .Synopsis
     Requests a token for a resource path, used by connect graph but available to other tools.
@@ -158,24 +162,23 @@ function Get-AccessToken     {
 #>
     param (
         [string]$Resoure      = 'https://graph.microsoft.com',
-        [string]$GrantType    = 'client_credentials',
+        [Parameter(Mandatory=$true)]
+        [string]$GrantType ,
         [hashtable]$BodyParts = @{}
     )
-    if (-not ($script:TenantID -and $script:ClientID -and $script:Client_secret)) {
-        [UnauthorizedAccessException]::new('The tenant, ClientID and/or Client_Secret need to be set with Set-GraphConnectionOptions before calling this command.')
+    if (-not ($script:TenantID -and $script:ClientID)) {
+        [UnauthorizedAccessException]::new('The tenant, and ClientID need to be set with Set-GraphConnectionOptions before calling this command.')
     }
     $tokenUri  = "https://login.microsoft.com/$script:TenantID/oauth2/token"
     $body      = $BodyParts + @{
                     'client_id'     = $script:ClientID
-                    'client_secret' = $script:Client_secret
                     'resource'      = $Resoure
                     'grant_type'    = $GrantType
     }
     Invoke-RestMethod -Method Post -Uri $tokenUri -Body $body
 }
 
-Remove-Item Alias:\Connect-Graph -ErrorAction SilentlyContinue
-function Connect-Graph       {
+function Connect-Graph              {
     <#
         .Synopsis
             Starts a session with Microsoft Graph
@@ -214,20 +217,20 @@ function Connect-Graph       {
         $paramDictionary     = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
         $NoRefreshAttributeCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
         if ($script:Client_secret -and $script:ClientID -and $script:TenantID) {
-            $NoRefreshAttributeCollection.Add((New-Object System.Management.Automation.ParameterAttribute -Property @{       ParameterSetName='CredParameterSet'}))
-            $CredParamAttribute    = New-Object System.Management.Automation.ParameterAttribute -Property @{Mandatory=$true; ParameterSetName='CredParameterSet'}
             $AppParamAttribute     = New-Object System.Management.Automation.ParameterAttribute -Property @{Mandatory=$true; ParameterSetName='AppSecretParameterSet';}
-            $RefreshParamAttribute = New-Object System.Management.Automation.ParameterAttribute -Property @{Mandatory=$true; ParameterSetName='RefreshParameterSet'}
-
-            #A credential object to logon with an app registered in the tennant
-            $paramDictionary.Add('Credential',[RuntimeDefinedParameter]::new("Credential",  [pscredential],   $CredParamAttribute))
             #If Specified logs in as the app and gets the access granted to the app instead of logging on as a user.
             $paramDictionary.Add('AsApp',[RuntimeDefinedParameter]::new("AsApp",       [SwitchParameter],$AppParamAttribute))
-            if ($script:RefreshToken) {
-                $paramDictionary.Add('Refresh',[RuntimeDefinedParameter]::new("Refresh", [SwitchParameter],$RefreshParamAttribute))
-            }
         }
         if ($script:ClientID -and $script:TenantID) {
+            $NoRefreshAttributeCollection.Add((New-Object System.Management.Automation.ParameterAttribute -Property @{       ParameterSetName='CredParameterSet'}))
+            $CredParamAttribute      = New-Object System.Management.Automation.ParameterAttribute -Property @{Mandatory=$true; ParameterSetName='CredParameterSet'}
+            $RefreshParamAttribute   = New-Object System.Management.Automation.ParameterAttribute -Property @{Mandatory=$true; ParameterSetName='RefreshParameterSet'}
+            #A credential object to logon with an app registered in the tennant
+            $paramDictionary.Add('Credential',[RuntimeDefinedParameter]::new("Credential", [pscredential], $CredParamAttribute))
+            if ($script:RefreshToken) {
+               $paramDictionary.Add('Refresh',[RuntimeDefinedParameter]::new("Refresh", [SwitchParameter], $RefreshParamAttribute))
+            }
+
             $CertNameAttributeSet    = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
             $CertNameAttributeSet.add((New-Object System.Management.Automation.Aliasattribute     -ArgumentList 'CertificateSubject'))
             $CertNameAttributeSet.add((New-Object System.Management.Automation.ParameterAttribute -Property @{ParameterSetName='AppCertNameParameterSet'; Position=1}))
@@ -270,6 +273,12 @@ function Connect-Graph       {
     end          {
         $bp = @{} + $PSBoundParameters #I do not know why psb doesn't work normally with dynamic params but this works round it....
         $paramsToPass         = @{}
+        if ($script:TenantID) {
+            $paramsToPass['TenantID'] = $script:TenantID
+        }
+        if ($pscmdlet.ParameterSetName -match '^AppCert') {
+            $paramsToPass['ClientId'] = $script:ClientID
+        }
 
         #Sometimes when we want to convert an opaque drive ID (e.g. on a file or folder) to a name; save extra calls to the server by caching the id-->name
         if (-not $bp.refresh)           {$global:DriveCache          = @{}  }
@@ -277,78 +286,89 @@ function Connect-Graph       {
         #Justin used this variable, for checking expiry I have moved it on to an extra property of [graphSession].instance I'll remove this when I'm happy on compat.
         if ($global:__MgAzTokenExpires) {$global:__MgAzTokenExpires = $null}
 
-        #region to get a token for a name / password with a registerd appID and secret, or to refresh one
         #credential , refresh, Azaupp, FromAzureSession are dynamic to hide them if we dont have what they need
+        #If specified, get (or refresh) a token for a user name / password with a registerd appID in a known tennant,
+        #or for an app-id / secret, or by calling Get-AzAccessToken in the Az.Accounts module (V2 and later)
         if ($bp.Credential -or $bp.Refresh -or $bp.AsApp -or $bp.FromAzureSession ){
             $tokenUri   = "https://login.microsoft.com/$script:TenantID/oauth2/token"
-            # Send request with grant type of 'password' and creds, or 'refresh' or for the app use 'client_credentials'
-            if     ($bp.Refresh)          {
+            if     ($bp.Refresh)              {
                 Write-Verbose "CONNECT: Sending a 'Refresh_token' token request "
-                $authresp   =   Get-AccessToken -GrantType refresh_token -BodyParts @{'refresh_token' = $script:RefreshToken}
+                $authresp      = Get-AccessToken -GrantType refresh_token -BodyParts @{'refresh_token' = $script:RefreshToken}
             }
-            elseif ($bp.Credential)       {
+            elseif ($bp.Credential)           {
                 Write-Verbose "CONNECT: Sending a 'Password' token request for $($bp.Credential.UserName) "
-                 $authresp   =   Get-AccessToken -GrantType password -BodyParts @{ 'username' = $bp.Credential.UserName; 'password' = $bp.Credential.GetNetworkCredential().Password}
+                 $authresp     = Get-AccessToken -GrantType password -BodyParts @{ 'username' = $bp.Credential.UserName; 'password' = $bp.Credential.GetNetworkCredential().Password}
             }
-            elseif ($bp.AsApp)            {
+            elseif ($bp.AsApp)                {
                 Write-Verbose "CONNECT: Sending a 'client_credentials' token request for the App."
-                 $authresp   =   Get-AccessToken
+                 $authresp     = Get-AccessToken  -GrantType client_credentials -BodyParts @{'client_secret' = $script:Client_secret}
             }
-            #to leverage an existing Az Session call a command in the Az.Account module (V2 and later)
-            elseif ($bp.FromAzureSession) {
+            elseif ($bp.FromAzureSession)     {
                 if ($bp.DefaultProfile) {$global:__MgAzContext = $DefaultProfile }
                 $authresp =  Get-AzAccessToken -ResourceUrl 'https://graph.microsoft.com' -DefaultProfile $global:__MgAzContext
             }
-            #did it work ? If so store the token and what'll we need for refreshing it
+
+            #Did we get our token? If so, store it and whatever we need to refreshing
             if (-not ($authresp.access_token -or $authResp.Token))    {
                 throw [System.UnauthorizedAccessException]::new("No Token was returned")
             }
             Write-Verbose ("CONNECT: Token Response= " + ($authresp | Get-Member -MemberType NoteProperty).name -join ", ")
-            if     ($authresp.access_token) {
+            if       ($authresp.access_token) {
                     $null = $paramsToPass.Add("AccessToken",  $authresp.access_token)
             }
-            elseif ($authresp.Token) {
+            elseif   ($authresp.Token)        {
                     $null = $paramsToPass.Add("AccessToken",  $authresp.Token)
             }
-            if     ($authresp.scope)         {Write-Verbose "CONNECT: Scope= $($authresp.scope)" }
-            if     ($authresp.refresh_token) {$script:RefreshToken       = $authresp.refresh_token}
-            if     ($authresp.expires_in)    {$global:__MgAzTokenExpires = (Get-Date).AddSeconds([int]$authresp.expires_in -60 )}
-            elseif ($authresp.expires_on)    {
-                if ($authresp.expires_on -is [string] -and
-                    $authresp.expires_on -match "^\w{10}$") {
-                                              $global:__MgAzTokenExpires = [datetime]::UnixEpoch.AddSeconds($oauthAPP.expires_on)}
-                elseif ($authresp.ExpiresOn  -is [datetimeoffset]){
-                                              $global:__MgAzTokenExpires = $authresp.ExpiresOn.LocalDateTime }
+
+            if     ($authresp.scope)          {Write-Verbose "CONNECT: Scope= $($authresp.scope)" }
+            if     ($authresp.refresh_token)  {$script:RefreshToken       = $authresp.refresh_token}
+            if     ($authresp.expires_in)     {$global:__MgAzTokenExpires = (Get-Date).AddSeconds([int]$authresp.expires_in -60 )}
+            elseif ($authresp.expires_on -or  $authresp.expireson )    {
+                if ($authresp.expires_on) {$e = $authresp.expires_on} else {$e = $authresp.ExpiresOn}
+                if ($e -is [string] -and
+                    $e.expires_on -match "^\w{10}$") {
+                                              $global:__MgAzTokenExpires = [datetime]::UnixEpoch.AddSeconds($e)}
+                elseif ($e  -is [datetimeoffset]){
+                                              $global:__MgAzTokenExpires = $e.LocalDateTime }
             }
-            if     ($bp.NoRefresh)           {
+
+            if     ($bp.NoRefresh)            {
                 $script:RefreshParams      = $null
             }
-            elseif ($bp.FromAzureSession)    {
+            elseif ($bp.FromAzureSession)     {
                 $script:RefreshParams      = @{'Quiet' = $true; 'FromAzureSession' = $True}
                 $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -FromAzureSession '))
             }
-            else                             {
+            elseif ($bp.AsApp)                {
+                $script:RefreshParams      = @{'Quiet' = $true; 'AsApp' = $true}
+                $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -Refresh '))
+            }
+            else                              {
                 $script:RefreshParams      = @{'Quiet' = $true; 'Refresh' = $true}
                 $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -Refresh '))
             }
         }
-        #endregion
 
-        #now connect, either using a token - passed or just fetched, or using a cert, or using the device dialog as needed
-
-        #region collect parameters and call Connect-MGGraph
+        #region gather params and call Connect-MGGraph with a token (passed or just fetched), or with a cert, or opening the device dialog
+        #common parameters need to processed differently
         $paramsinTarget       = (Get-Command Connect-MgGraph).Parameters.Keys |
                                     Where-Object {$_ -notin [System.Management.Automation.Cmdlet]::CommonParameters}
-        $paramsFromCurrentSet = $pscmdlet.MyInvocation.MyCommand.ParameterSets.Where({$_.name -eq $PSCmdlet.ParameterSetName})
-        $paramsFromCurrentSet = $paramsFromCurrentSet.parameters.Name | Where-Object {$_ -in $paramsinTarget -and (Get-Variable $_ -ValueOnly -ErrorAction SilentlyContinue)}
-        foreach ($p in $paramsFromCurrentSet ) {$paramsToPass[$p] = Get-Variable $P -ValueOnly   ; Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p]) }
+        $paramsFromCurrentSet =  $pscmdlet.MyInvocation.MyCommand.Parameters.values.where({
+                                    ($_.ParameterSets.containskey($pscmdlet.ParameterSetName) -or
+                                     $_.ParameterSets.containskey('__AllParameterSets')     ) -and
+                                     $_.Name -in $paramsinTarget -and
+                                     (Get-Variable $_.Name -ValueOnly -ErrorAction SilentlyContinue)})
+
+        foreach ($p in $paramsFromCurrentSet.Name ) {
+            $paramsToPass[$p] = Get-Variable $P -ValueOnly   ; Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p])
+        }
         foreach ($p in [System.Management.Automation.Cmdlet]::CommonParameters.Where({$bp.ContainsKey($_)})) {
-            $paramsToPass[$p] = $bp[$p]  ; Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p])
+            $paramsToPass[$p] = $bp[$p]                      ; Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p])
         }
 
         $result = Connect-MgGraph @paramsToPass
         #endregion
-        #region if succesful cache information about the user and session, and if necessary setup a trigger to auto-refresh tokens we fetched above
+        #region connection succeeds, cache information about the user and session, and if necessary setup a trigger to auto-refresh tokens we fetched above
         if ($result -match "Welcome To Microsoft Graph") {
             $authcontext      = [GraphSession]::Instance.AuthContext
             #we could call Get-Mgorganization but this way we don't depend on anything outside authentication module
@@ -370,7 +390,7 @@ function Connect-Graph       {
                 Add-Member -Force -InputObject $authcontext -NotePropertyName UserDisplayName     -NotePropertyValue $user.displayName
                 Add-Member -Force -InputObject $authcontext -NotePropertyName UserID              -NotePropertyValue $user.ID
             }
-            else {$result           = "Welcome To Microsoft Graph, connected as the app '{0}'." -f $authcontext.AppName }
+            else {$result           = "Welcome To Microsoft Graph, connected to tenant '{1}' as the app '{0}'." -f $authcontext.AppName, $authcontext.TenantName }
             Add-Member     -Force -InputObject $authcontext -NotePropertyName RefreshTokenPresent -NotePropertyValue ($script:RefreshToken -as [bool])
             Add-Member     -Force -InputObject $authcontext -NotePropertyName TokenAutoRefresh    -NotePropertyValue ($RefreshScriptBlock  -as [bool])
             if    ($global:__MgAzTokenExpires) {
@@ -393,7 +413,7 @@ function Connect-Graph       {
     }
 }
 
-function Show-GraphSession   {
+function Show-GraphSession          {
     <#
         .Synopsis
             Returns information about the current sesssion
@@ -449,7 +469,7 @@ function Show-GraphSession   {
     }
 }
 
-function ContextHas          {
+function ContextHas                 {
     <#
         .Syopsis
             Checks if the the current context is a work/school account and/or has access with the right scopes
@@ -538,6 +558,6 @@ param (
     Write-Verbose ('Scopes: ' + ($script:DefaultGraphScopes -join ', '))
 }
 
-#calls file with calls to Set-GraphConnectionoptions
-if     ($env:MGSettingsPath )                      {. $env:MGSettingsPath}
-elseif(Test-Path "$PSScriptRoot\AuthSettings.ps1") {. "$PSScriptRoot\AuthSettings.ps1"}
+#call a script with calls to Set-GraphConnectionoptions
+if     ($env:MGSettingsPath )                       {. $env:MGSettingsPath}
+elseif (Test-Path "$PSScriptRoot\AuthSettings.ps1") {. "$PSScriptRoot\AuthSettings.ps1"}
