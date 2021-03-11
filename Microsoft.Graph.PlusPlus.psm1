@@ -296,7 +296,7 @@ foreach ($subModule in $ImportCmds.keys) {
         $result = Import-Module (Join-Path $PSScriptRoot -ChildPath "Microsoft.Graph.$subModule.private.dll") -Cmdlet $ImportCmds[$subModule] -PassThru
     }
     # I do mean get module and assign it to module and if it works then... not "$module -eq"
-    elseif ($module = Get-Module -ListAvailable "Microsoft.Graph.$submodule") {
+    elseif ($module = Get-Module -ListAvailable "Microsoft.Graph.$submodule" | Sort-Object -Property Version | Select-Object -Last 1) {
         $result = Import-Module (Join-Path (Split-Path $module.Path) -ChildPath "bin\Microsoft.Graph.$submodule.private.dll") -Cmdlet $ImportCmds[$subModule]  -PassThru
     }
     else {
