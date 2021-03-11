@@ -15,9 +15,9 @@
   CompanyName       =   'Mobula Consulting'
 
   GUID              =   'f564c0f9-7d96-4452-a715-679dc47c20cc'
-  ModuleVersion     =   '2.0'
+  ModuleVersion     =   '1.4.0'
   rootModule        =   '.\Microsoft.Graph.PlusPlus.psm1'
-  RequiredModules   = @(@{ModuleName = 'Microsoft.Graph.Authentication'; ModuleVersion = '1.2.0'; })
+  RequiredModules   = @(@{ModuleName = 'Microsoft.Graph.Authentication'; ModuleVersion = '1.4.0'; })
   FormatsToProcess  =   'Microsoft.Graph.PlusPlus.format.ps1xml'
   FunctionsToExport = @('Add-FileToGraphOneNote',
                         'Add-GraphEvent',
@@ -35,6 +35,7 @@
                         'Copy-FromGraphFolder',
                         'Copy-ToGraphFolder',
                         'Copy-GraphOneNotePage',
+                        'Expand-GraphConditionalAccessPolicy',
                         'Export-GraphGroupMember',
                         'Export-GraphUser',
                         'Export-GraphWorkSheet',
@@ -43,10 +44,12 @@
                         'Get-GraphBucketTaskList',
                         'Get-GraphChannel',
                         'Get-GraphChannelReply',
+                        'Get-GraphConditionalAccessPolicy',
                         'Get-GraphContact',
                         'Get-GraphDeletedObject',
                         'Get-GraphDirectoryLog',
                         'Get-GraphDirectoryRole',
+                        'Get-GraphDirectoryRoleTemplate',
                         'Get-GraphDomain',
                         'Get-GraphDrive',
                         'Get-GraphEvent',
@@ -59,6 +62,7 @@
                         'Get-GraphMailFolder',
                         'Get-GraphMailItem',
                         'Get-GraphMailTips',
+                        'Get-GraphNamedLocation',
                         'Get-GraphOneNoteBook',
                         'Get-GraphOneNotePage',
                         'Get-GraphOneNoteSection',

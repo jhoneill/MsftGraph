@@ -3,7 +3,7 @@ using namespace Microsoft.Graph.PowerShell.Models
 #Uses functions from  and MicrosoftGraphSubscribedSku type from  Microsoft.Graph.Identity.DirectoryManagement.private.dll
 
 #xxxx todo: check context is a workorschool account and that it has the right scopes and warn / error / throw if not.
-function Get-GraphDomain            {
+function Get-GraphDomain                {
     <#
       .synopsis
         Gets domains in the current tenant
@@ -59,7 +59,7 @@ function Get-GraphDomain            {
     }
 }
 
-function Get-GraphOrganization      {
+function Get-GraphOrganization          {
     <#
       .Synopsis
         Gets a summary of organization information from MSGraph
@@ -94,7 +94,7 @@ function Get-GraphOrganization      {
     Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgOrganization_List1 @PSBoundParameters
 }
 
-function Get-GraphSKU               {
+function Get-GraphSKU                   {
     <#
       .Synopsis
         Gets details of SKUs that an organization has subscribed to
@@ -154,7 +154,7 @@ function Get-GraphSKU               {
     }
 }
 
-function Grant-GraphLicense         {
+function Grant-GraphLicense             {
     <#
       .Synopsis
         Grants the licence to use a particular stock-keeping-unit (SKU) to users or groups
@@ -316,7 +316,7 @@ function Grant-GraphLicense         {
     }
 }
 
-function Revoke-GraphLicense        {
+function Revoke-GraphLicense            {
     <#
       .Synopsis
         Revokes a users or groups licences to use a particular stock-keeping-unit (SKU)
@@ -445,7 +445,7 @@ function Revoke-GraphLicense        {
     }
 }
 
-function Get-GraphLicense           {
+function Get-GraphLicense               {
     <#
       .Synopsis
         Returns users or groups (or both) who are licensed to user a given SKU
@@ -510,7 +510,7 @@ function Get-GraphLicense           {
     }
 }
 
-function Get-GraphDirectoryRole     {
+function Get-GraphDirectoryRole         {
 <#
     .synopsis
         Gets an Azure AD directory role or its members
@@ -562,7 +562,7 @@ function Get-GraphDirectoryRole     {
     }
 }
 
-function Grant-GraphDirectoryRole   {
+function Grant-GraphDirectoryRole       {
     <#
       .synopsis
         Grants a directory role to a user or group
@@ -600,7 +600,7 @@ function Grant-GraphDirectoryRole   {
     }
 }
 
-function Revoke-GraphDirectoryRole  {
+function Revoke-GraphDirectoryRole      {
     <#
      .synopsis
        Removes a user or group from a an Azure AD directory role
@@ -634,7 +634,33 @@ function Revoke-GraphDirectoryRole  {
     }
 }
 
-function Get-GraphDeletedObject     {
+function Get-GraphDirectoryRoleTemplate {
+    <#
+      .SYNOPSIS
+        Gets directory role templates
+    #>
+    param    (
+        [Parameter(ValueFromPipeline=$true,Position=0)]
+        $Template = ""
+    )
+    process {
+        $uri = "$GraphUri/identity/directoryroletemplates"
+        foreach ($t in $Template) {
+            if ($t -match $GUIDRegex) {
+                Invoke-GraphRequest "$uri/$t" -AsType  ([MicrosoftGraphDirectoryRoleTemplate] )
+            }
+            elseif ($t) {
+                $uri += ("?`$filter=startswith(toLower(displayName),'{0}')" -f $t.ToLower())
+                Invoke-GraphRequest  -ValueOnly $uri  -AsType  ([MicrosoftGraphDirectoryRoleTemplate] )
+            }
+            else{
+                Invoke-GraphRequest -ValueOnly $uri -AsType  ([MicrosoftGraphDirectoryRoleTemplate] )
+            }
+        }
+    }
+}
+
+function Get-GraphDeletedObject         {
     <#
       .synopsis
         Returns deleted users or groups from the AAD recycle bin
@@ -654,7 +680,7 @@ function Get-GraphDeletedObject     {
     Invoke-GraphRequest -Uri "$GraphUri/directory/deleteditems/microsoft.graph.$type$u" -AsType ([pscustomobject])  -ValueOnly
 }
 
-function Restore-GraphDeletedObject {
+function Restore-GraphDeletedObject     {
     <#
       .synopsis
         Recovers a user or group from the AAD recycle bin
@@ -678,4 +704,3 @@ function Restore-GraphDeletedObject {
     }
 }
 #  DELETE /directory/deletedItems/{id}                permanent delete
-

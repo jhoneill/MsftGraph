@@ -116,6 +116,7 @@ function Invoke-GraphRequest        {
     }
     process {
         #I try to use "response" when it is an interim thing not the final result.
+        $response = $null
         $response = Microsoft.Graph.Authentication\Invoke-MgGraphRequest @PSBoundParameters
         if ($ValueOnly -or $AllValues) {
             $result = $response.value
@@ -430,13 +431,16 @@ function Show-GraphSession          {
     )
     dynamicparam {
         $paramDictionary     = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
-        if ($PSVersionTable.PSVersion.Major -gt 5 -and $PSVersionTable.Platform -like 'win*') {
+        if ($PSVersionTable.PSVersion.Major -ge 7 -and $PSVersionTable.Platform -like 'win*') {
             $paramDictionary.Add('CachedToken',[RuntimeDefinedParameter]::new("CachedToken", [SwitchParameter],[ParameterAttribute]::new()))
         }
         return $paramDictionary
 
     }
     end {
+        if ($script:SkippedSubmodules) {
+            Write-Host ("Did not load " + ($script:SkippedSubmodules -join ", ") + " because the related Microsoft.Graph module(s) or private.dll file(s) were not be found.")
+        }
         if     (-not       [GraphSession]::Instance.AuthContext) {Write-Host  "Ready for Connect-Graph."; return}
         if     ($Scopes)  {[GraphSession]::Instance.AuthContext.Scopes}
         elseif ($Who)     {[GraphSession]::Instance.AuthContext.Account}
@@ -557,7 +561,3 @@ param (
 
     Write-Verbose ('Scopes: ' + ($script:DefaultGraphScopes -join ', '))
 }
-
-#call a script with calls to Set-GraphConnectionoptions
-if     ($env:MGSettingsPath )                       {. $env:MGSettingsPath}
-elseif (Test-Path "$PSScriptRoot\AuthSettings.ps1") {. "$PSScriptRoot\AuthSettings.ps1"}

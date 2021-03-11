@@ -2,12 +2,12 @@ using namespace System.Management.Automation
 using namespace Microsoft.Graph.PowerShell.Models
 using namespace Microsoft.Graph.PowerShell.Authentication
 
-
 $global:GraphUri                  = 'https://graph.microsoft.com/v1.0'   #May want this outside the module
 $script:GUIDRegex                 = '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$'
 $script:WellKnownMailFolderRegex  = '^[/\\]?(archive|clutter|conflicts|conversationhistory|deleteditems|drafts|inbox|junkemail|localfailures|msgfolderroot|outbox|recoverableitemsdeletions|scheduled|searchfolders|sentitems|serverfailures|syncissues)[/\\]?$'
+$script:SkippedSubmodules         = @()
 
-#region completer, transformer, and validator attributes for parameters
+#region completer, transformer, and validator attributes for parameters **CLASSES NEED TO BE IN PSM1
 class UpperCaseTransformAttribute : ArgumentTransformationAttribute  {
     [object] Transform([System.Management.Automation.EngineIntrinsics]$EngineIntrinsics, [object] $InputData) {
         if ($inputData -is [string]) {return $Inputdata.toUpper()}
@@ -275,6 +275,8 @@ class UPNCompleter                : IArgumentCompleter {
 #endregion
 
 . "$PSScriptRoot\Authentication.ps1"
+
+#Submodules need the class and/or private functions from the SDK module.
 $ImportCmds = [ordered]@{
   'Users'                        = @('Get-MgUser_List1' , 'New-MgUserTodoList_CreateExpanded1',
                                      'New-MgUserTodoListTask_CreateExpanded1', 'Remove-MgUserTodoList_Delete1',
@@ -288,29 +290,43 @@ $ImportCmds = [ordered]@{
   'Reports'                      = @()
   'Applications'                 =('Get-MgServicePrincipal_Get2','Get-MgServicePrincipal_List1')
 }
-#These need the class and/or private functions from the SDK module.
 foreach ($subModule in $ImportCmds.keys) {
     $result = $null
     if (Test-path     (Join-Path $PSScriptRoot -ChildPath "Microsoft.Graph.$subModule.private.dll")) {
-         $result = Import-Module (Join-Path $PSScriptRoot -ChildPath "Microsoft.Graph.$subModule.private.dll") -Cmdlet $ImportCmds[$subModule] -PassThru
+        $result = Import-Module (Join-Path $PSScriptRoot -ChildPath "Microsoft.Graph.$subModule.private.dll") -Cmdlet $ImportCmds[$subModule] -PassThru
     }
     # I do mean get module and assign it to module and if it works then... not "$module -eq"
     elseif ($module = Get-Module -ListAvailable "Microsoft.Graph.$submodule") {
-         $result = Import-Module (Join-Path (Split-Path $module.Path) -ChildPath "bin\Microsoft.Graph.$submodule.private.dll") -Cmdlet $ImportCmds[$subModule]  -PassThru
+        $result = Import-Module (Join-Path (Split-Path $module.Path) -ChildPath "bin\Microsoft.Graph.$submodule.private.dll") -Cmdlet $ImportCmds[$subModule]  -PassThru
     }
-    else {Write-Verbose "Microsoft.Graph.$subModule.private.dll  not found $subModule won't be loaded "}
+    else {
+        Write-Verbose "Microsoft.Graph.$subModule.private.dll  not found $subModule won't be loaded "
+        $script:SkippedSubmodules += $subModule
+    }
     if ($result) {
         .  "$PSScriptRoot\$subModule.ps1"
         foreach ($cmd in $ImportCmds[$subModule]) { (Get-Command $cmd).Visibility = 'Private'  }
     }
 }
 
-#These will work provided we have the users module.
-. "$PSScriptRoot\Groups.ps1"
-. "$PSScriptRoot\Notes.ps1"
-. "$PSScriptRoot\OneDrive.ps1"
-. "$PSScriptRoot\Planner.ps1"
-. "$PSScriptRoot\Sharepoint.ps1"
+if ($script:SkippedSubmodules -contains 'Users') {
+     Write-Verbose "Groups, Notes, OneDrive, Planner, and Sharepoint require the Microsoft.Graph.users module, or Microsoft.Graph.Users.private.dll in the module directory."
+     $script:SkippedSubmodules += @('Groups', 'Notes', 'OneDrive', 'Planner', 'Sharepoint')
+}
+else { #These will work provided we have the users module.
+    . "$PSScriptRoot\Groups.ps1"
+    . "$PSScriptRoot\Notes.ps1"
+    . "$PSScriptRoot\OneDrive.ps1"
+    . "$PSScriptRoot\Planner.ps1"
+    . "$PSScriptRoot\Sharepoint.ps1"
+}
+if ($script:SkippedSubmodules) {
+      Write-Host ("Did not load " + ($script:SkippedSubmodules -join ", ") + " because the related Microsoft.Graph module(s) or private.dll file(s) were not be found.")
+}
+
+#call a script with calls to Set-GraphConnectionOptions
+if     ($env:MGSettingsPath )                       {. $env:MGSettingsPath}
+elseif (Test-Path "$PSScriptRoot\AuthSettings.ps1") {. "$PSScriptRoot\AuthSettings.ps1"}
 
 if ($null -eq [GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
 elseif ([GraphSession]::instance.AuthContext.AppName -and -not [GraphSession]::instance.AuthContext.Account) {

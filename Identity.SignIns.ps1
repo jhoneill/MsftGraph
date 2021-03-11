@@ -51,3 +51,155 @@ function New-GraphInvitation   {
         }
     }
 }
+
+function Get-GraphNamedLocation {
+    <#
+    .synopsis
+        Returns named locations used in conditional access
+    #>
+    param   (
+        #The ID or start of the display-name of a Location
+        [Parameter(ValueFromPipeline=$true,Position=0)]
+        $Location = ""
+    )
+    process {
+        $uri = "$GraphUri/identity/conditionalAccess/namedlocations"
+        foreach ($l in $Location) {
+            if ($l -match $GUIDRegex) {
+                $response = Invoke-GraphRequest "$uri/$l" -PropertyNotMatch '@odata'
+            }
+            elseif ($l) {
+                $response = Invoke-GraphRequest  -ValueOnly  ($uri + "?`$filter=startswith(toLower(displayName),'{0}')" -f $l.ToLower())
+            }
+            else{
+                $response = Invoke-GraphRequest -ValueOnly $uri
+            }
+            foreach ($r in $response) {
+                if ($r.isTrusted -is [bool]) {
+                    $trusted = $r.isTrusted
+                    $null = $r.Remove('isTrusted')
+                }
+                else {$trusted = $null}
+                if ($r.ipRanges) {
+                    $ipranges =   $(foreach ($ipRange in $r.ipRanges) {$ipRange.cidrAddress}) -join ";"
+                    $null = $r.Remove('ipranges')
+                }
+                else {$ipranges = $null}
+                if ($r.countriesAndRegions) {
+                    $countries =   $r.countriesAndRegions -join ";"
+                    $null = $r.Remove('countriesAndRegions')
+                }
+                else {$countries = $null}
+                if ($r.includeUnknownCountriesAndRegions -is [bool]) {
+                    $includeUnknown =   $r.includeUnknownCountriesAndRegions
+                    $null = $r.Remove('includeUnknownCountriesAndRegions')
+                }
+                else {$includeUnknown = $null }
+
+                $null = $r.remove('@odata.type')
+                New-object -TypeName  Microsoft.Graph.PowerShell.Models.MicrosoftGraphNamedLocation -Property $r  |
+                        Add-Member -PassThru -NotePropertyName IsTrusted            -NotePropertyValue $trusted   |
+                        Add-Member -PassThru -NotePropertyName IpRanges             -NotePropertyValue $ipranges  |
+                        Add-Member -PassThru -NotePropertyName CountriesAndRegions  -NotePropertyValue $countries |
+                        Add-Member -PassThru -NotePropertyName IncludeUnknownCountriesAndRegions  -NotePropertyValue $includeUnknown
+            }
+        }
+    }
+}
+
+function Get-GraphConditionalAccessPolicy {
+    param   (
+        #The ID or start of the display-name of a Policy
+        [Parameter(ValueFromPipeline=$true,Position=0)]
+        $Policy = ""
+    )
+    process {
+        #needs beta to work when conditions.devices is set (which is marked as preview in the GUI)
+        $uri = "beta/identity/conditionalAccess/policies"
+        foreach ($p in $Policy) {
+            if ($p -match $GUIDRegex) {
+                    Invoke-GraphRequest "$uri/$p" -AsType ([MicrosoftGraphConditionalAccessPolicy]) -PropertyNotMatch '@odata'
+            }
+            elseif ($P) {
+                   $uri += ("?`$filter=startswith(toLower(displayName),'{0}')" -f $p.ToLower())
+                  Invoke-GraphRequest -ValueOnly $uri            -AsType ([MicrosoftGraphConditionalAccessPolicy])
+            }
+            else{ Invoke-GraphRequest -ValueOnly $uri -AllValues -AsType ([MicrosoftGraphConditionalAccessPolicy]) }
+        }
+    }
+}
+
+function Expand-GraphConditionalAccessPolicy {
+    param (
+        #The ID or start of the display-name of a Policy
+        [Parameter(ValueFromPipeline=$true,Position=0)]
+        $Policy = ""
+    )
+    begin {
+        $locations          = @{}
+        Invoke-GraphRequest "$GraphUri/identity/conditionalAccess/namedlocations" -ValueOnly -AllValues |
+            ForEach-Object {$locations[$_.id]         = $_.DisplayName}
+        $dirRoleTemplates   = @{} ;
+        Invoke-GraphRequest  -Uri "$GraphUri/directoryroletemplates/" -ValueOnly -AllValues  |
+            ForEach-Object {$dirRoleTemplates[$_.id]  = $_.DisplayName}
+        $servicePrincipals  = @{}
+        Invoke-GraphRequest  -Uri "$GraphUri/servicePrincipals/" -ValueOnly -AllValues  |
+            ForEach-Object {$servicePrincipals[$_.id] = $_.Displayname}
+
+        $dirobjs            = @{}
+        $result             = @()
+        function resolveDirObj {
+            param (
+                [Parameter(ValueFromPipeline=$true)] $D
+            )
+            process {
+                if ($D -notmatch $GUIDRegex ) {return $d}
+                elseif (-not $dirobjs.ContainsKey($D)) {
+                    $dirobjs[$d] = (Invoke-GraphRequest "$GraphUri/directoryObjects/$d").displayname
+                }
+                $dirobjs[$d]
+            }
+        }
+        function tranlasteGUID {
+            param (
+                [Parameter(ValueFromPipeline=$true)]$G,
+                [Parameter(Position=0)]$hash
+            )
+            process {if ($g -notmatch $GUIDRegex ) {return $g} else {$hash[$g]}}
+        }
+    }
+    process {
+        Get-GraphConditionalAccessPolicy @PSBoundParameters |
+            Select-Object -Property DisplayName , Description, State,
+                @{n='IncludeUsers';             e={($_.Conditions.Users.IncludeUsers                | resolveDirObj ) -join '; '}},
+                @{n='ExcludeUsers';             e={($_.Conditions.Users.ExcludeUsers                | resolveDirObj ) -join '; '}},
+                @{n='IncludeGroups';            e={($_.Conditions.Users.IncludeGroups               | resolveDirObj ) -join '; '}},
+                @{n='ExcludeGroups';            e={($_.Conditions.Users.ExcludeGroups               | resolveDirObj ) -join '; '}},
+                @{n='IncludeRoles';             e={($_.Conditions.Users.IncludeRoles                | tranlasteGUID $dirRoleTemplates)  -join '; '}},
+                @{n='ExcludeRoles';             e={($_.Conditions.Users.ExcludeRoles                | tranlasteGUID $dirRoleTemplates)  -join '; '}},
+                @{n='IncludeLocations';         e={($_.Conditions.Locations.IncludeLocations        | translateGuid $locations)         -join '; '}},
+                @{n='ExcludeLocations';         e={($_.Conditions.Locations.ExcludeLocations        | translateGuid $locations)         -join "; "}},
+                @{n='IncludeApplications';      e={($_.Conditions.Applications.IncludeApplications  | tranlasteGUID $servicePrincipals) -join '; '}},
+                @{n='ExcludeApplications';      e={($_.Conditions.Applications.ExcludeApplications  | tranlasteGUID $servicePrincipals) -join '; '}},
+                @{n='IncludeUserActions';       e={ $_.Conditions.Applications.IncludeUserActions     -join '; '}},
+                @{n='IncludeDevices';           e={ $_.Conditions.Devices.IncludeDevices              -join '; '}},
+                @{n='ExcludeDevices';           e={ $_.Conditions.Devices.ExcludeDevices              -join '; '}},
+                @{n='ClientAppTypes';           e={ $_.Conditions.ClientAppTypes                      -join '; '}},
+                @{n='IncludePlatforms';         e={ $_.Conditions.Platforms.IncludePlatforms          -join '; '}},
+                @{n='ExcludePlatforms';         e={ $_.Conditions.Platforms.EccludePlatforms          -join '; '}},
+                @{n='AppEnforcedRestrictions';  e={ $_.SessionControls.ApplicationEnforcedRestrictions.IsEnabled}},
+                @{n='PersistentBrowser'; e={
+                                              if   ($_.SessionControls.PersistentBrowser.isenabled) {
+                                                    $_.SessionControls.PersistentBrowser.Mode}
+                                              else {$null}}},
+                @{n='CloudAppSecurity';  e={
+                                              if   ($_.SessionControls.CloudAppSecurity.isenabled)  {
+                                                    $_.SessionControls.CloudAppSecurity.CloudAppSecurityType}
+                                              else {$null}}} ,
+                @{n='SignInFrequency';   e={
+                                              if   ($_.SessionControls.SignInFrequency.isenabled)  {
+                                                    $_.SessionControls.SignInFrequency.Value + " " +
+                                                    $_.SessionControls.SignInFrequency.Type }
+                                            else {$null}}}
+    }
+}

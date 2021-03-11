@@ -262,19 +262,23 @@ function Get-GraphUser            {
         }
         [void]$PSBoundParameters.Remove('UserID')
 
-        foreach ($id in $UserID) {
+        foreach ($u in $UserID) {
             #region set up the user part of the URI that we will call
-            if ($id -is [MicrosoftGraphUser] -and -not  ($PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters})  )) {
-                $id
+            if ($u -is [MicrosoftGraphUser] -and -not  ($PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters})  )) {
+                $u
                 continue
             }
-            if     ($id.id)       { $ID = $id.Id}
-            Write-Progress -Activity 'Getting user information' -CurrentOperation "User = $ID"
+            if     ($u.id)         { $id = $u.Id}
+            else                   { $id = $u   }
+            if ($id -notmatch "^me$|$guidRegex|\w@\w") {
+                Write-Warning "User ID '$id' does not look right"
+            }
+            Write-Progress -Activity 'Getting user information' -CurrentOperation "User = $id"
             if     ($id -eq 'me') { $Uri = "$GraphUri/me"  }
             else                  { $Uri = "$GraphUri/users/$id" }
 
             # -Teams requires a GUID, photo doesn't work for "me"
-            if (  ($Teams -and $id -notmatch $GuidRegex ) -or
+            if (  (($Teams -or $Presence) -and $id -notmatch $GuidRegex ) -or
                   ($Photo -and $id -eq 'me')        ) {
                                     $id  =   (Invoke-GraphRequest -Method GET -Uri $uri).id
                                     $Uri = "$GraphUri/users/$id"
@@ -322,13 +326,22 @@ function Get-GraphUser            {
                 elseif ($Plans             ) {
                     Invoke-GraphRequest -Uri ($uri + '/planner/plans')            -All  -Exclude "@odata.etag"                          -As ([MicrosoftGraphPlannerPlan])}
                 elseif ($Presence          )  {
-                    Invoke-GraphRequest -Uri ($uri + '/presence')                       -Exclude "@odata.context"                       -As ([MicrosoftGraphPresence])}
+                    if ($u.DisplayName)         {$displayName = $u.DisplayName}  else {$displayName=$null}
+                    if ($u.UserPrincipalName)   {$upn = $u.UserPrincipalName}
+                    elseif ($u -match '\w@\w')  {$upn = $u}
+                    else                        {$upn = $null}
+                    #can also use GET https://graph.microsoft.com/v1.0/communications/presences/<<id>>>
+                    #see https://docs.microsoft.com/en-us/graph/api/cloudcommunications-getpresencesbyuserid for getting bulk presence
+                    Invoke-GraphRequest -Uri ($uri + '/presence')                       -Exclude "@odata.context"                       -As ([MicrosoftGraphPresence]) |
+                      Add-Member -PassThru -NotePropertyName DisplayName       -NotePropertyValue $displayName |
+                      Add-Member -PassThru -NotePropertyName UserPrincipalName -NotePropertyValue $upn
+                }
                 elseif ($Teams             ) {
                     Invoke-GraphRequest -Uri ($uri + '/joinedTeams')              -All                                                  -As ([MicrosoftGraphTeam])}
                 elseif ($ToDoLists         ) {
                     Invoke-GraphRequest -Uri ($uri + '/todo/lists')               -All  -Exclude "@odata.etag"                          -As ([MicrosoftGraphTodoTaskList]) |
                       Add-Member -PassThru -NotePropertyName UserId -NotePropertyValue $id
-                    }
+                }
                 # Calendar wants a property added so we can find it again
                 elseif ($Calendars         ) {
                     Invoke-GraphRequest -Uri ($uri + '/Calendars?$orderby=Name' ) -All                                                  -As ([MicrosoftGraphCalendar]) |
