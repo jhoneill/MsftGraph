@@ -272,14 +272,9 @@ function Connect-Graph              {
     }}
 '@  }
     end          {
+        $result = $null
         $bp = @{} + $PSBoundParameters #I do not know why psb doesn't work normally with dynamic params but this works round it....
         $paramsToPass         = @{}
-        if ($script:TenantID) {
-            $paramsToPass['TenantID'] = $script:TenantID
-        }
-        if ($pscmdlet.ParameterSetName -match '^AppCert') {
-            $paramsToPass['ClientId'] = $script:ClientID
-        }
 
         #Sometimes when we want to convert an opaque drive ID (e.g. on a file or folder) to a name; save extra calls to the server by caching the id-->name
         if (-not $bp.refresh)           {$global:DriveCache          = @{}  }
@@ -365,6 +360,12 @@ function Connect-Graph              {
         }
         foreach ($p in [System.Management.Automation.Cmdlet]::CommonParameters.Where({$bp.ContainsKey($_)})) {
             $paramsToPass[$p] = $bp[$p]                      ; Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p])
+        }
+        if ($script:TenantID -and -not $paramsToPass.AccessToken) {
+            $paramsToPass['TenantID'] = $script:TenantID
+        }
+        if ($pscmdlet.ParameterSetName -match '^AppCert') {
+            $paramsToPass['ClientId'] = $script:ClientID
         }
 
         $result = Connect-MgGraph @paramsToPass

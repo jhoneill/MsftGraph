@@ -192,6 +192,42 @@
                         'igr'
   )
 
+  FileList          = @(
+        '.\LICENSE',
+        '.\Microsoft.Graph.PlusPlus.psd1',
+        '.\Microsoft.Graph.PlusPlus.psm1',
+        '.\ActionCard.ps1',
+        '.\Applications.ps1',
+        '.\Authentication.ps1',
+        '.\AuthSettings.ps1',
+        '.\Groups.ps1',
+        '.\Identity.DirectoryManagement.ps1',
+        '.\Identity.SignIns.ps1',
+        '.\Notes.ps1',
+        '.\OneDrive.ps1',
+        '.\Planner.ps1',
+        '.\Reports.ps1',
+        '.\Sharepoint.ps1',
+        '.\Users.Actions.ps1',
+        '.\Users.Functions.ps1',
+        '.\Users.ps1',
+        '.\Microsoft.Graph.PlusPlus.format.ps1xml',
+        '.\Blank.xlsx',
+        '.\docs\Relationships.pdf',
+        '.\docs\Logon options.pdf',
+        '.\Examples\PlannerImportExport',
+        '.\Examples\Data-XLSx-Drive.ps1',
+        '.\Examples\Data-XLSx-Drive-dlChart.ps1',
+        '.\Examples\Demo.ps1',
+        '.\Examples\Link.png',
+        '.\Examples\OneDrive.gif',
+        '.\Examples\Team.gif',
+        '.\Examples\Template_groups.csv',
+        '.\Examples\Template_membership.csv',
+        '.\Examples\Template_users.csv'
+
+    )
+
   PrivateData = @{
        PSData    = @{
            Tags       = @('MicrosoftGraph', 'Microsoft', 'Office365', 'Graph', 'PowerShell', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner', 'MSGraph')

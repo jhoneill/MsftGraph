@@ -10,7 +10,7 @@
 
     The remainder is Copyright 2018-2021 James O'Neill
 #>
-
+using namespace  Microsoft.Graph.PowerShell.Models
 function Get-GraphServicePrincipal {
     <#
       .Synopsis
@@ -45,13 +45,16 @@ function Get-GraphServicePrincipal {
     [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphPermissionScope],ParameterSetName=('AllScopes','FilteredScopes'))]
     [OutputType([Microsoft.Graph.PowerShell.Models.IMicrosoftGraphServicePrincipal],ParameterSetName=('Get2','List1','List2','List3','List4'))]
     param   (
-        [Parameter(ParameterSetName='AllRoles',       Mandatory=$true, Position=0)]
-        [Parameter(ParameterSetName='FilteredRoles',  Mandatory=$true, Position=0)]
-        [Parameter(ParameterSetName='AllScopes',      Mandatory=$true, Position=0)]
-        [Parameter(ParameterSetName='FilteredScopes', Mandatory=$true, Position=0)]
-        [Parameter(ParameterSetName='Get2',           Mandatory=$true, Position=0)]
-        #The GUID(s) for ServicePrincipal(s). If a name is given instead, the command will try to resolve matching Service principals
-        [String[]]$ServicePrincipalId,
+        [Parameter(ParameterSetName='AllRoles',       Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        [Parameter(ParameterSetName='FilteredRoles',  Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        [Parameter(ParameterSetName='AllScopes',      Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        [Parameter(ParameterSetName='FilteredScopes', Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        [Parameter(ParameterSetName='Get2',           Mandatory=$true, Position=0, ValueFromPipeline=$true)]
+        #The GUID(s) for ServicePrincipal(s). Or SP objects. If a name is given instead, the command will try to resolve matching Service principals
+        $ServicePrincipalId,
+
+        [Parameter(ParameterSetName='List5')]
+        [string]$AppId,
 
         #Produces a list filtered to only managed identities
         [Parameter(ParameterSetName='List2')]
@@ -126,7 +129,10 @@ function Get-GraphServicePrincipal {
             elseif     ($Application)           {
                         $PSBoundParameters['Filter']="servicePrincipaltype eq 'Application'"
             }
-            foreach    ($param in @('Application', 'ManagedIdentity', 'O365ServicePrincipals')) {
+            elseif     ($AppId) {
+                        $PSBoundParameters['Filter']="appid eq '$AppId'"
+            }
+            foreach    ($param in @('Application', 'AppId', 'ManagedIdentity', 'O365ServicePrincipals')) {
                   [void]$PSBoundParameters.Remove($param )
             }
             Microsoft.Graph.Applications.private\Get-MgServicePrincipal_List1 @PSBoundParameters -all -ConsistencyLevel Eventual | Sort-Object displayname
@@ -136,8 +142,19 @@ function Get-GraphServicePrincipal {
                   [void]$PSBoundParameters.Remove($param )
             }
             foreach    ($sp in $ServicePrincipalId) {
+                $result = $null
                 if     ($sp -match $GUIDRegex)      {
-                        $result = Microsoft.Graph.Applications.private\Get-MgServicePrincipal_Get2 -ServicePrincipalId $sp @PSBoundParameters
+                    $uri = "$GraphUri/servicePrincipals/$sp"
+                    if ($Property) {$uri += '?$select=' +($property -join ',')}
+                    try {
+                        $result = Invoke-GraphRequest $uri -AsType ([MicrosoftGraphServicePrincipal])
+                    }
+                    catch {
+                        if ($_.Exception.Response.StatusCode.value__  -eq 404) {
+                            Write-Warning "$sp was not found as a service principal ID. It may be an App ID.";  continue
+                        }
+                        else {throw $_.Exception }
+                    }
                 }
                 else   {
                         [void]$PSBoundParameters.Remove('ServicePrincipalId')

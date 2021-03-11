@@ -1,5 +1,9 @@
-﻿#requires -modules msftGraph, importExcel
-
+﻿#requires -modules Microsoft.Graph.PlusPlus, importExcel
+<#
+.synopsis
+    Import tasks from a .xlsx file into a teams plan.
+#>
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification="False positives when initializing variable in begin block")]
 param (
     #File to import from
     $excelPath = '.\planner-Import.xlsx',
@@ -10,11 +14,11 @@ param (
 )
 
 Write-Progress -Activity 'Importing plan' -Status 'Getting information about the plan, its team, and the team members'
-$teamplanner         = Get-GraphTeam -ByName $TeamName -Plans | Where-Object title -eq $PlanName
+$teamplanner         = Get-GraphTeam  $TeamName -Plans | Where-Object title -eq $PlanName
 
 #region ensure team members in the sheet are really in the team
 #Get the members of the team and create two hash tables, one to get Mail from ID and one to get ID from mail
-$existingteamMembers = Get-GraphTeam $myteam -Members | Where-Object {$_.mail}
+$existingteamMembers = Get-GraphTeam $TeamName -Members | Where-Object {$_.mail}
 $existingteamMembers | ForEach-Object -Begin {$memberMailHash = @{}; $memberIDHash = @{} } -Process {
                                               $memberMailHash[$_.mail] = $_.id
                                               if ($_.id) {$memberIDHash[$_.id]  =  $_.mail  }
@@ -29,7 +33,7 @@ $importedTeamMembers.Where({$mail -and -not $_.id -and -not $memberMailHash[$_.M
     $user = Get-GraphUser -UserID $_.mail -ErrorAction SilentlyContinue
     if ($user) {
         $_.id = $user.id
-        Add-GraphGroupMember -Group $myteam -Member $user
+        Add-GraphGroupMember -Group $TeamName -Member $user
     }
     else {Write-Warning "($_.mail) Doesn't Seem to be a valid user"}
 }

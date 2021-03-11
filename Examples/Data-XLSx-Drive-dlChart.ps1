@@ -15,9 +15,10 @@ Remove-Item   C:\temp\graph.png,  $ExcelFile -ea SilentlyContinue
 
 #Get some trivial data - the names and lengths of PowerShell files in this module.
 #Export it to Excel and chart it
-$excel = Get-ChildItem -path (get-module msftgraph).ModuleBase  -Recurse -Include *.ps1 | Select-Object name,length |
-    Export-Excel -PassThru -ChartType BarClustered -AutoNameRange -Path $ExcelFile
-Add-ExcelChart -Worksheet $excel.Sheet1 -ChartType ColumnClustered -XRange "Name" -YRange "Length" -column 4 -SeriesHeader "file size"
+$excel = Get-ChildItem -path (Get-Module 'Microsoft.Graph.PlusPlus').ModuleBase -Recurse  -Include *.ps1 |
+    Select-Object name,length |
+        Export-Excel -PassThru -ChartType BarClustered -AutoNameRange -Path $ExcelFile
+Add-ExcelChart -Worksheet $excel.Sheet1 -ChartType ColumnClustered -XRange "Name" -YRange "Length" -Column 4 -SeriesHeader "file size"
 Close-ExcelPackage $excel
 
 #Upload the file to current users' one drive. Open the file in Excel web app to see it
