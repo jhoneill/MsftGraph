@@ -2685,7 +2685,7 @@ function Get-GraphToDoList        {
         #The ID of the plan or a plan object with an ID property. if omitted the current users planner will be assumed.
         [Parameter( ValueFromPipeline=$true,Position=0)]
         [alias('id')]
-        $TodoTaskListId = 'defaultList',
+        $ToDoList = 'defaultList',
 
         #The User ID (GUID or UPN) of the list owner. Defaults to the current user.
         $UserId,
