@@ -22,6 +22,17 @@ Remove-item Alias:\Invoke-GraphRequest -ErrorAction SilentlyContinue
 Remove-Item Alias:\Connect-Graph       -ErrorAction SilentlyContinue
 Set-Alias   -Value Get-MgContext       -Name "Get-GraphContext"
 
+function Test-GraphSession          {
+    if (-not [GraphSession]::Instance.AuthContext) {Connect-Graph}
+    elseif  ([GraphSession]::Instance.AuthContext.TokenExpires -is [datetime] -and [GraphSession]::Instance.AuthContext.TokenExpires -lt [DateTime]::Now) {
+        if ($script:RefreshParams) {
+            Write-Host -ForegroundColor DarkCyan "Token Expired! Refreshing before executing command."
+            Connect-Graph @script:RefreshParams
+        }
+        else {Write-Warning "Token appears to have expired and no refresh information is available "}
+    }
+}
+
 function Invoke-GraphRequest        {
     <#
       .synopsis
@@ -106,13 +117,7 @@ function Invoke-GraphRequest        {
         [void]$PSBoundParameters.Remove('ExcludeProperty')
         [void]$PSBoundParameters.Remove('PropertyNotMatch')
         [void]$PSBoundParameters.Remove('ValueOnly')
-        if ([GraphSession]::Instance.AuthContext.TokenExpires -is [datetime] -and [GraphSession]::Instance.AuthContext.TokenExpires -lt [DateTime]::Now) {
-            if ($script:RefreshParams) {
-                Write-Host -ForegroundColor DarkCyan "Token Expired! Refreshing before executing command."
-                Connect-Graph @script:RefreshParams
-            }
-            else {Write-Warning "Token appears to have expired and no refresh information is available "}
-        }
+        Test-GraphSession
     }
     process {
         #I try to use "response" when it is an interim thing not the final result.
@@ -422,21 +427,28 @@ function Show-GraphSession          {
     #>
     [CmdletBinding(DefaultParameterSetName='None')]
     [OutputType([String])]
+    [alias('GWhoAmI')]
     param  (
         [Parameter(ParameterSetName='Who')]
         [switch]$Who,
         [Parameter(ParameterSetName='Scopes')]
         [switch]$Scopes,
+        [Parameter(ParameterSetName='Options')]
         [switch]$Options,
+        [Parameter(ParameterSetName='AppName')]
         [switch]$AppName
     )
     dynamicparam {
         $paramDictionary     = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
         if ($PSVersionTable.PSVersion.Major -ge 7 -and $PSVersionTable.Platform -like 'win*') {
-            $paramDictionary.Add('CachedToken',[RuntimeDefinedParameter]::new("CachedToken", [SwitchParameter],[ParameterAttribute]::new()))
+            $cachedTokenParamAttibute = New-Object System.Management.Automation.ParameterAttribute -Property @{ParameterSetName='CachedToken'}
+            $paramDictionary.Add('CachedToken', [RuntimeDefinedParameter]::new("CachedToken",  [SwitchParameter],$cachedTokenParamAttibute))
+        }
+        if ($script:RefreshToken) {
+            $refreshTokenParamAttibute = New-Object System.Management.Automation.ParameterAttribute -Property @{ParameterSetName='RefreshToken'}
+            $paramDictionary.Add('RefreshToken',[RuntimeDefinedParameter]::new("RefreshToken", [SwitchParameter],$refreshTokenParamAttibute))
         }
         return $paramDictionary
-
     }
     end {
         if ($script:SkippedSubmodules) {
@@ -452,6 +464,7 @@ function Show-GraphSession          {
             'ClientSecretSet' = $script:Client_Secret -as [bool]
             'DefaultScopes'   = $script:DefaultGraphScopes -join ', '
         }}
+        elseif (     $PSBoundParameters['RefreshToken']) {return $session:RefreshToken}
         elseif (-not $PSBoundParameters['CachedToken'])  {Get-MgContext}
         else {
             $id               = [GraphSession]::Instance.AuthContext.ClientId
@@ -534,7 +547,9 @@ param (
     #Secret set for the client ID in your $TenantID
     $Client_Secret,
     #Default Scopes to request
-    $DefaultScopes
+    $DefaultScopes,
+    #Allows a saved Refresh Token (e.g. from Show-GraphSession) to be added to the session.
+    $RefreshToken
 )
     if ($TenantID)        {
         if ($TenantID -notmatch $GUIDRegex) {
@@ -557,8 +572,8 @@ param (
         }
         else  {Write-Warning 'Client_secret should be a string or preferably a securestring'  ; break}
     }
-    if ($script:TenantID) {Write-Verbose "TenantID: $script:TenantID , ClientID = $script:ClientID"}
+    if ($script:TenantID) {Write-Verbose "TenantID: '$script:TenantID' , ClientID: '$script:ClientID'"}
     if ($DefaultScopes)   {$script:DefaultGraphScopes = $DefaultScopes}
-
     Write-Verbose ('Scopes: ' + ($script:DefaultGraphScopes -join ', '))
+    if ($RefreshToken)    {$script:RefreshToken = $RefreshToken }
 }

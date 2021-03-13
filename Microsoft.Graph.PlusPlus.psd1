@@ -153,6 +153,7 @@
                         'Set-GraphUser',
                         'Show-GraphFolder',
                         'Show-GraphSession',
+                        'Test-GraphSession',
                         'Update-GraphOneNotePage',
                         'Update-GraphToDoTask'
   )
@@ -189,6 +190,7 @@
                         'TextColumn',
                         'ggg',
                         'ggu',
+                        'GWhoAmI'
                         'igr'
   )
 
