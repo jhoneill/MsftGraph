@@ -23,8 +23,13 @@ Remove-Item Alias:\Connect-Graph       -ErrorAction SilentlyContinue
 Set-Alias   -Value Get-MgContext       -Name "Get-GraphContext"
 
 function Test-GraphSession          {
+<#
+    .synopsis
+        Connect if necessary, catch tokens needing renewal.
+#>
     if (-not [GraphSession]::Instance.AuthContext) {Connect-Graph}
-    elseif  ([GraphSession]::Instance.AuthContext.TokenExpires -is [datetime] -and [GraphSession]::Instance.AuthContext.TokenExpires -lt [DateTime]::Now) {
+    elseif  ([GraphSession]::Instance.AuthContext.TokenExpires -is [datetime] -and
+             [GraphSession]::Instance.AuthContext.TokenExpires -lt [datetime]::Now.AddMinutes(-1)) {
         if ($script:RefreshParams) {
             Write-Host -ForegroundColor DarkCyan "Token Expired! Refreshing before executing command."
             Connect-Graph @script:RefreshParams

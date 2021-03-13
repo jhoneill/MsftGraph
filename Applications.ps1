@@ -99,6 +99,7 @@ function Get-GraphServicePrincipal {
         [string]$ScopeFilter
     )
     begin   {
+        Test-GraphSession
         [String]$managedIdentityFilter = @(
             '00000001-0000-0000-c000-000000000000' #Azure ESTS Service
             '00000007-0000-0000-c000-000000000000' #Common Data Service

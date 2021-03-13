@@ -536,6 +536,24 @@ function Set-GraphUser            {
     begin   {
         #things we don't want to put in the JSON body when we send the changes.
         $excludedParams = [Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters + @('Force', 'PassThru', 'UserID', 'AccountDisabled', 'Photo', 'Manager')
+        $settings = @{}
+        foreach ($p in $PSBoundparameters.Keys.where({$_ -notin $excludedParams})) {
+            #turn "Param" into "param" make dates suitable text, and switches booleans
+            $key   = $p.toLower()[0] + $p.Substring(1)
+            $value = $PSBoundparameters[$p]
+            if ($value -is [datetime]) {$value = $value.ToString("yyyy-MM-ddT00:00:00Z")}  # 'o' for ISO date time may work here
+            if ($value -is [switch])   {$value = $value -as [bool]}
+            $settings[$key] = $value
+        }
+        if ($PSBoundparameters['AccountDisabled']) {$settings['accountEnabled'] = -not $AccountDisabled} #allows -accountDisabled:$false
+        if  ($settings.count -eq 0 -and -not $Photo -and -not $Manager) {
+            Write-Warning -Message "Nothing to set"
+        }
+        else {
+            #Don't put the body into webparams which will be used for multiple things
+            $json = (ConvertTo-Json $settings) -replace '""' , 'null'
+            Write-Debug  $json
+        }
     }
     process {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
@@ -543,41 +561,28 @@ function Set-GraphUser            {
 
         #allow an array of users to be passed.
         foreach ($id in $UserID ) {
-            #region configure the web parameters for changing the user. Allow for user objects with an ID or a UP
+            #region configure the web parameters for changing the user. Allow for filtered objects with an ID or a UPN
             $webparams = @{
                     'Method'            = 'PATCH'
                     'Contenttype'       = 'application/json'
             }
             if     ($id -is [string] -and
-                    $id -match "\w@\w|$GUIDRegex" )
-                                          {$webparams['uri'] = "$GraphUri/users/$id/" }
+                    $id -match "\w@\w|$GUIDRegex" ){
+                                            $webparams['uri'] = "$GraphUri/users/$id/" }
             elseif ($id -eq "me")          {$webparams['uri'] = "$GraphUri/me/"            }
             elseif ($id.id)                {$webparams['uri'] = "$GraphUri/users/$($id.id)/"}
             elseif ($id.UserPrincipalName) {$webparams['uri'] = "$GraphUri/users/$($id.UserPrincipalName)/"}
-            else  {Write-Warning "$id does not look like a valid user"; continue}
+            else                           {Write-Warning "$id does not look like a valid user"; continue}
+
+            if ($id -is [string])          {$promptName = $id}
+            elseif ($id.DisplayName)       {$promptName = $id.DisplayName}
+            elseif ($id.UserPrincipalName) {$promptName = $id.UserPrincipalName}
+            else                           {$promptName = $id.ToString() }
             #endregion
-            #region Convert Settings other than manager and Photo into a block of JSON and send it as a request body
-            $settings = @{}
-            foreach ($p in $PSBoundparameters.Keys.where({$_ -notin $excludedParams})) {
-                #turn "Param" to "param" make dates suitable text, and switches booleans
-                $key   = $p.toLower()[0] + $p.Substring(1)
-                $value = $PSBoundparameters[$p]
-                if ($value -is [datetime]) {$value = $value.ToString("yyyy-MM-ddT00:00:00Z")}  # 'o' for ISO date time may work here
-                if ($value -is [switch])   {$value = $value -as [bool]}
-                $settings[$key] = $value
+            if ($json -and ($Force -or $Pscmdlet.Shouldprocess($promptName ,'Update User'))){
+                $null = Invoke-GraphRequest  @webparams -Body $json
             }
-            if ($PSBoundparameters['AccountDisabled']) {$settings['accountEnabled'] = -not $AccountDisabled} #allows -accountDisabled:$false
-            if     ($settings.count -eq 0 -and -not $Photo -and -not $Manager) {
-                Write-Warning -Message "Nothing to set" ; continue
-            }
-            elseif ($settings.count -gt 0)  {
-                #Don't put the body into webparams it will be used later (ConvertTo-Json $settings) -replace '""' , 'null'
-                $json = (ConvertTo-Json $settings) -replace '""' , 'null'
-                Write-Debug  $json
-                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {$null = Invoke-GraphRequest  @webparams -Body $json }
-            }
-            #endregion
-            if ($Photo)   {
+            if ($Photo)     {
                 if (-not (Test-Path $Photo) -or $photo -notlike "*.jpg" ) {
                     Write-Warning "$photo doesn't look like the path to a .jpg file" ; return
                 }
@@ -587,24 +592,25 @@ function Set-GraphUser            {
                 $webparams['Method']        = 'Put'
                 $webparams['Contenttype']   = 'image/jpeg'
                 Write-Debug "Uploading Photo: '$photoPath'"
-                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {$null = Invoke-GraphRequest  @webparams -InputFilePath $photoPath }
+                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {
+                    $null = Invoke-GraphRequest  @webparams -InputFilePath $photoPath
+                }
                 $webparams['uri'] = $baseUri
             }
-            if ($Manager) {
+            if ($Manager)   {
                 $baseUri                    =  $webparams['uri']
                 $webparams['uri']           =  $webparams['uri'] + 'manager/$ref'
                 $webparams['Method']        = 'Put'
                 $webparams['Contenttype']   = 'application/json'
                 $json = ConvertTo-Json @{ '@odata.id' =  "$GraphUri/users/$manager" }
                 Write-Debug  $json
-                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {$null = Invoke-GraphRequest  @webparams -Body $json}
+                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {
+                    $null = Invoke-GraphRequest  @webparams -Body $json
+                }
                 $webparams['uri'] = $baseUri
             }
             if ($PassThru)  {
-                if($id -is [MicrosoftGraphUser]) {
-                      Get-GraphUser -UserID $id.id -Select $settings.keys
-                }
-                else {Get-GraphUser -UserID $id    -Select $settings.keys}
+               Invoke-GraphRequest $webparams.uri -ExcludeProperty '@odata.context' -AsType ([MicrosoftGraphUser])
             }
         }
     }
@@ -931,6 +937,7 @@ function Import-GraphUser         {
         [String]$ListSeparator = '\s*,\s*|\s*;\s*'
     )
     begin   {
+        Test-GraphSession
         $list = @()
     }
     process {
@@ -949,9 +956,8 @@ function Import-GraphUser         {
                 continue
             }
             else {
-                 $exists = (Microsoft.Graph.Users.private\Get-MgUser_List -Filter "userprincipalName eq '$upn'") -as [bool]
+                 $exists =  (Invoke-GraphRequest "$GraphUri/users?`$Filter=userprincipalName eq '$upn'" -ValueOnly) -as [bool]
             }
-
             if     ($user.Action -eq 'Remove' -and (-not $exists)) {
                 Write-Warning "User '$upn' was marked for removal, but no matching user was found."
                 continue
@@ -1028,18 +1034,23 @@ function Export-GraphUser         {
         #String to insert between parts of multi-part items.
         $ListSeparator = "; "
     )
-    Microsoft.Graph.Users.private\Get-MgUser_List -filter $Filter -ExpandProperty manager -Select 'UserPrincipalName',
-                        'MailNickName','GivenName', 'Surname', 'DisplayName', 'UsageLocation', 'accountEnabled',
-                        'PasswordPolicies', 'Mail',  'MobilePhone', 'BusinessPhones', 'JobTitle',  'Department',
-                        'OfficeLocation', 'CompanyName','StreetAddress', 'City', 'State', 'Country',
-                        'PostalCode' |
-        Select-Object   'UserPrincipalName', 'MailNickName',   'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
-                        @{n='AccountDisabled';e={-not 'accountEnabled'}} , 'PasswordPolicies', 'Mail',  'MobilePhone',
-                        @{n='BusinessPhones';e={$_.'BusinessPhones' -join $ListSeparator }},
-                        @{n='Manager';e={$_.manager.AdditionalProperties.userPrincipalName}},
-                        'JobTitle',  'Department', 'OfficeLocation', 'CompanyName',
-                        'StreetAddress', 'City', 'State', 'Country', 'PostalCode' |
-            Export-Csv -NoTypeInformation -Path $Path
+    $exportFields = @(
+        'UserPrincipalName', 'MailNickName',   'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
+        @{n='AccountDisabled';e={-not $_.accountEnabled}} ,
+        'PasswordPolicies', 'Mail',  'MobilePhone',
+        @{n='BusinessPhones' ;e={$_.'BusinessPhones' -join $ListSeparator }},
+        @{n='Manager';e={$_.manager.AdditionalProperties.userPrincipalName}},
+        'JobTitle',  'Department', 'OfficeLocation', 'CompanyName',
+        'StreetAddress', 'City', 'State', 'Country', 'PostalCode'
+    )
+    $listParams = @{
+        Select         = @('UserPrincipalName', 'MailNickName',  'mail', 'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
+                           'PasswordPolicies',  'MobilePhone',   'BusinessPhones',    'JobTitle', 'Department',  'OfficeLocation',
+                           'CompanyName',       'StreetAddress', 'City', 'State',     'Country',  'PostalCode',  'accountEnabled')
+        ExpandProperty =   'Manager'
+    }
+    if ($Filter) {$listParams['Filter'] = $Filter}
+    Get-GraphUserList @listParams | Select-Object  $exportFields | Export-Csv -Path $Path -NoTypeInformation
 }
 
 #MailBox commands: these only depend on the user module from the SDK so go in the same file as user commands
@@ -2748,6 +2759,7 @@ param   (
     [switch]$Force
 )
     if ($Force -or $pscmdlet.ShouldProcess($Displayname,"Create new To-Do list")){
+        Test-GraphSession
         Microsoft.Graph.Users.private\New-MgUserTodoList_CreateExpanded1 -UserId $UserId -DisplayName $displayname -IsShared:$IsShared -Confirm:$false |
                 Add-Member -PassThru -NotePropertyName UserId -NotePropertyValue $UserId
     }
@@ -2823,6 +2835,7 @@ function New-GraphToDoTask        {
     if ($DueDateTime)       {$Params['DueDateTime']       = (ConvertTo-GraphDateTimeTimeZone $DueDateTime)}
 
     if ($Force -or $PSCmdlet.ShouldProcess($title,"Add NewTask")) {
+        Test-GraphSession
         Microsoft.Graph.Users.private\New-MgUserTodoListTask_CreateExpanded1 @params |
             Add-Member -PassThru -NotePropertyName UserId   -NotePropertyValue $userID |
             Add-Member -PassThru -NotePropertyName ListID   -NotePropertyValue $ToDoList
@@ -2915,6 +2928,7 @@ function Update-GraphToDoTask     {
         if ($CompletedDateTime) {$Params['CompletedDateTime'] = (ConvertTo-GraphDateTimeTimeZone $CompletedDateTime)}
         if ($DueDateTime)       {$Params['DueDateTime']       = (ConvertTo-GraphDateTimeTimeZone $DueDateTime)}
         if ($force -or $pscmdlet.ShouldProcess("Task update")) {
+            Test-GraphSession
             Microsoft.Graph.Users.private\Update-MgUserTodoListTask_UpdateExpanded1 @params
         }
     }
@@ -2948,13 +2962,13 @@ function Remove-GraphToDoTask     {
         if (-not $Task.ListID -and -not $ToDoList) {
             Write-Warning "Could not obtain Task list ID" ; return
         }
-        elseif (-not $ToDoList) {$ToDoList = $task.ListID}
+        elseif (-not $ToDoList) {$ToDoList = $Task.ListID}
 
-        if ((-not $userID)-and -not ($Task.userid -or $ToDoList.userID )) {
+        if ((-not $userID)-and -not ($ToDoList.userID -or $Task.userid)) {
             Write-Warning "Could not obtain Task list ID" ; return
         }
-        elseif ((-not $PSBoundParameters['userID']) -and $Task.userid )     {$userID   = $Task.userId}
-        elseif ((-not $PSBoundParameters['userID']) -and $ToDoList.userid ) {$userID   = $ToDoList.userId}
+        elseif ((-not $PSBoundParameters['userID'])  -and $Task.userid )     {$userID   = $Task.userId}
+        elseif ((-not $PSBoundParameters['userID'])  -and $ToDoList.userid ) {$userID   = $ToDoList.userId}
 
         if ($ToDoList.ID)      {$ToDoList = $ToDoList.Id}
         if ($Task.Title)       {$Title    = $Task.title}
@@ -2966,7 +2980,8 @@ function Remove-GraphToDoTask     {
             TodoTaskListId  = $ToDoList
         }
         if ($force -or $pscmdlet.ShouldProcess($Title,'Task deletion')) {
-                Microsoft.Graph.Users.private\Remove-MgUserTodoListTask_Delete1 @Params
+            Test-GraphSession
+            Microsoft.Graph.Users.private\Remove-MgUserTodoListTask_Delete1 @Params
         }
     }
 }

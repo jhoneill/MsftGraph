@@ -30,7 +30,7 @@ function Get-GraphDomain                {
         [parameter(ParameterSetName='NameRef',Mandatory=$true)]
         [switch]$NameReferenceList
     )
-
+    Test-GraphSession
     if (-not $Domain) {Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgDomain_List1 @PSBoundParameters}
     else {
         #Allow an orgnaization object to be piped in.
@@ -90,7 +90,7 @@ function Get-GraphOrganization          {
         # Use the default credentials for the proxy
         $ProxyUseDefaultCredentials
     )
-
+    Test-GraphSession
     Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgOrganization_List1 @PSBoundParameters
 }
 
@@ -128,6 +128,7 @@ function Get-GraphSKU                   {
         $ProxyUseDefaultCredentials
     )
     begin   {
+        Test-GraphSession
         $result = @()
     }
     process {
@@ -191,6 +192,7 @@ function Grant-GraphLicense             {
         [Switch]$Force
     )
     begin   {
+        Test-GraphSession
         $request        = @{'addLicenses' = @() ; 'removeLicenses' = @()}
         $SkuPartNumbers = @()
         foreach  ($s in $SKUID) {
@@ -359,6 +361,7 @@ function Revoke-GraphLicense            {
         $ProxyUseDefaultCredentials
     )
     begin   {
+        Test-GraphSession
         $request        = @{'addLicenses' = @() ; 'removeLicenses' = @()}
         foreach ($s in $SKUID) {
             if  ($s.skuid) {$s = ($s.skuid) }
@@ -462,6 +465,7 @@ function Get-GraphLicense               {
         [switch]$GroupsOnly
     )
     begin   {
+        Test-GraphSession
         $result = @()
         $idToPartNo = @{}
         $partNoToID = @{}
