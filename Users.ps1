@@ -1,5 +1,4 @@
 ﻿using namespace Microsoft.Graph.PowerShell.Models
-$script:WellKnownMailFolderRegex = '^[/\\]?(archive|clutter|conflicts|conversationhistory|deleteditems|drafts|inbox|junkemail|localfailures|msgfolderroot|outbox|recoverableitemsdeletions|scheduled|searchfolders|sentitems|serverfailures|syncissues)[/\\]?$'
 
 function ConvertTo-GraphDateTimeTimeZone {
     <#
@@ -12,6 +11,43 @@ function ConvertTo-GraphDateTimeTimeZone {
     New-object MicrosoftGraphDateTimeZone -Property @{
                 Datetime = $d.ToString('yyyy-MM-ddTHH:mm:ss')
                 Timezone = (Get-TimeZone).id
+    }
+}
+
+function ConvertTo-GraphUser      {
+    <#
+      .Synopsis
+        Helper function (not exported) to expand users' manager or direct reports when converting results to userObjects
+    #>
+    param (
+        #The dictionary /hash table object returned by the REST API
+        [Parameter(ValueFromPipeline=$true,Mandatory=$true,Position=0)]
+        $RawUser
+    )
+    process {
+        foreach ($r in $RawUser) {
+            #We expand manager by default, or might be told to expand direct reports. Make either into users.
+            if (-not $r.manager) { $mgr = $null}
+            else {
+                    $null = $r.manager.remove('@odata.type')
+                    $mgr  = New-Object -TypeName MicrosoftGraphUser -Property $r.manager
+                    $null = $r.remove('manager')
+            }
+            if (-not $r.directReports) {$directs = $null}
+            else {
+                $directs = @()
+                foreach ($d in $r.directReports) {
+                    $null = $d.remove('@odata.type')
+                    $directs += New-Object -TypeName MicrosoftGraphUser -Property $d
+                }
+                $null = $r.remove('directReports')
+            }
+            $null = $r.Remove('@odata.type'), $r.Remove('@odata.context')
+            $user =  New-Object -TypeName MicrosoftGraphUser -Property $r
+            if ($mgr)      {$user.manager      = $mgr}
+            if ($directs)  {$user.DirectReports= $directs}
+            $user
+        }
     }
 }
 
@@ -32,11 +68,13 @@ function Get-GraphUserList        {
         [ArgumentCompleter([UPNCompleter])]
         [string[]]$Name,
 
-        #Names of the fields to return for each user.
+        #Names of the fields to return for each user.Note that some properties - aboutMe, Birthday etc, are only available when getting a single user, not a list.
+        #The  API defaults to :  businessPhones, displayName, givenName, id, jobTitle, mail, mobilePhone, officeLocation, preferredLanguage, surname, userPrincipalName
+        #The module adds to this set - the exactlist can be set with Set-GraphOption -DefaultUserProperties
         [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones', 'city',
                     'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'department',
                     'displayName', 'givenName', 'id', 'imAddresses', 'jobTitle', 'legalAgeGroupClassification',
-                    'mail','mailboxSettings', 'mailNickname', 'mobilePhone', 'officeLocation',
+                    'mail', 'mailNickname', 'mobilePhone', 'officeLocation',
                     'onPremisesDomainName', 'onPremisesExtensionAttributes', 'onPremisesImmutableId',
                     'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName',
                     'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
@@ -44,13 +82,10 @@ function Get-GraphUserList        {
                     'preferredLanguage', 'provisionedPlans', 'proxyAddresses', 'state', 'streetAddress',
                     'surname', 'usageLocation', 'userPrincipalName', 'userType')]
         [Alias('Property')]
-        [string[]]$Select,
+        [string[]]$Select = $Script:DefaultUserProperties  ,
 
-        #number of users to get
-        $Top=100,
-
-        #If Specified the value of Top is ignored and all users are retrieved.
-        [switch]$All,
+        #The default is to get all
+        $Top ,
 
         #Order by clause for the query - most fields result in an error and it can't be combined with some other query values.
         [parameter(Mandatory=$true, parameterSetName='Sorted')]
@@ -62,8 +97,16 @@ function Get-GraphUserList        {
         [parameter(Mandatory=$true, parameterSetName='FilterByString')]
         [string]$Filter,
 
+        #Adds a filter clause "userType eq 'Member'"
+        [parameter(Mandatory=$true, parameterSetName='FilterToMembers')]
+        [switch]$MembersOnly,
+
+        #Adds a filter clause "userType eq 'Guest'"
+        [parameter(Mandatory=$true, parameterSetName='FilterToGuests')]
+        [switch]$GuestsOnly,
+
         [validateSet('directReports', 'manager', 'memberOf', 'ownedDevices', 'ownedObjects', 'registeredDevices', 'transitiveMemberOf',  'extensions')]
-        [string]$ExpandProperty,
+        [string]$ExpandProperty = 'manager',
 
         # The URI for the proxy server to use
         [Parameter(DontShow)]
@@ -80,32 +123,41 @@ function Get-GraphUserList        {
         [Switch]$ProxyUseDefaultCredentials
     )
     process {
-        Write-Progress "Getting the List of users"
-        $webParameters =  @{
-            AsType = ([MicrosoftGraphUser])
-            AllValues = $All -as [bool]
-            ValueOnly = $true
+        Write-Progress "Getting the list of Users"
+        $webParams =  @{ValueOnly = $true }
+
+        if     ($MembersOnly) {$Filter = "userType eq 'Member'"}
+        elseif ($GuestsOnly)  {$Filter = "userType eq 'Guest'"}
+
+        if     ($Filter -or $Sort -or $Name) {
+                $webParams['Headers'] = @{'ConsistencyLevel'='eventual'}
         }
-        if ($search -or $Filter -or $orderby -or $name) {
-            $webParameters['Headers'] = @{'ConsistencyLevel'='eventual'}
+        #Ensure at least ID, UPN and displayname are selected - and we always have something in $select
+        foreach ($s in @('ID', 'userPrincipalName', 'displayName')){
+             if ($s -notin $Select) {$Select += $s }
         }
-        $uri = "$GraphUri/users?`$top=$top"
-        if ($Select) {
-                     foreach ($s in @('ID', 'userPrincipalName', 'displayName')){if ($s -notin $Select) {$Select += $s }}
-                     $uri = $uri + '&$select='  + ($Select -join ',')
-        }
-        if ($Filter)  {$uri = $uri + '&$Filter='  + $Filter }
-        if ($OrderBy) {$uri = $uri + '&$orderby=' + $orderby}
-        if (-not $Name) {
-                Invoke-GraphRequest -Uri $uri @webParameters
-        }
+        $uri = "$GraphUri/users?`$select="  + ($Select -join ',')
+
+        if (-not $Top)       {$webParams['AllValues'] = $true               }
+        else                 {$uri = $uri + '&$top='     + $Top             }
+        if ($Filter)         {$uri = $uri + '&$Filter='  + $Filter          }
+        if ($Sort)           {$uri = $uri + '&$orderby=' + $Sort            }
+        if ($ExpandProperty) {$uri = $uri + '&expand='   + $ExpandProperty  }
+
+        if (-not $Name)      {$result = Invoke-GraphRequest -Uri $uri @webParams }
         else {
+            $result = @()
             foreach ($n in $Name) {
-                $filter = "&`$Filter=startswith(displayName,'{0}') or startswith(givenName,'{0}') or startswith(surname,'{0}') or startswith(mail,'{0}') or startswith(userPrincipalName,'{0}')" -f ($n -replace "'","''")
-                Invoke-GraphRequest -Uri ($uri + $filter) @webParameters
+                $filter = "&`$Filter=startswith(userPrincipalName,'{0}') or " +
+                                    "startswith(displayName,'{0}') or "       +
+                                    "startswith(givenName,'{0}') or "         +
+                                    "startswith(surname,'{0}') or "           +
+                                    "startswith(mail,'{0}')"          -f ($n -replace "'","''")
+                 $result += Invoke-GraphRequest -Uri ($uri + $filter) @webParams
             }
         }
-        Write-Progress "Getting the List of users" -Completed
+        Write-Progress "Getting the list of Users" -Completed
+        $result  | ConvertTo-GraphUser
     }
 }
 
@@ -202,24 +254,27 @@ function Get-GraphUser            {
         [parameter(Mandatory=$true, parameterSetName="ToDoLists")]
         [switch]$ToDoLists,
 
-        #specifies which properties of the user object should be returned ( aboutMe, birthday, deviceEnrollmentLimit, hireDate,interests,mailboxSettings,mySite,pastProjects,preferredName,responsibilities,schools and skills are not available)
+        #specifies which properties of the user object should be returned Additional options are available when selecting individual users
+        #The API documents list deviceEnrollmentLimit, deviceManagementTroubleshootingEvents , mailboxSettings which cause errors
         [parameter(Mandatory=$true,parameterSetName="Select")]
-        [ValidateSet  (
-        'accountEnabled', 'activities', 'ageGroup', 'appRoleAssignments', 'assignedLicenses', 'assignedPlans',  'businessPhones',
-        'calendar', 'calendarGroups', 'calendars', 'calendarView', 'city', 'companyName', 'consentProvidedForMinor', 'contactFolders', 'contacts', 'country', 'createdDateTime', 'createdObjects', 'creationType', 'department',
-        'deviceManagementTroubleshootingEvents', 'directReports',
-        'displayName', 'drive', 'drives', 'employeeHireDate', 'employeeId', 'employeeOrgData', 'employeeType', 'events', 'extensions', 'externalUserState',
-        'externalUserStateChangeDateTime', 'faxNumber', 'followedSites', 'givenName',  'ID', 'identities', 'imAddresses', 'inferenceClassification',
-        'insights', 'isResourceAccount', 'jobTitle', 'joinedTeams', 'lastPasswordChangeDateTime', 'legalAgeGroupClassification', 'licenseAssignmentStates',
-        'licenseDetails', 'mail', 'mailFolders', 'mailNickname', 'managedAppRegistrations', 'managedDevices', 'manager', 'memberOf', 'messages',
-        'mobilePhone', 'oauth2PermissionGrants', 'officeLocation', 'onenote', 'onlineMeetings', 'onPremisesDistinguishedName',
-        'onPremisesDomainName', 'onPremisesExtensionAttributes', 'onPremisesImmutableId', 'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors',
-        'onPremisesSamAccountName', 'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName', 'otherMails', 'outlook',
-        'ownedDevices', 'ownedObjects', 'passwordPolicies', 'passwordProfile',  'people', 'photo', 'photos', 'planner', 'postalCode',
-        'preferredLanguage', 'presence', 'provisionedPlans', 'proxyAddresses', 'registeredDevices', 'scopedRoleMemberOf', 'settings', 'showInAddressList',
-        'signInSessionsValidFromDateTime',   'state', 'streetAddress', 'surname',
-         'teamwork', 'todo', 'transitiveMemberOf', 'usageLocation', 'userPrincipalName', 'userType')]
-        [String[]]$Select,
+        [ValidateSet  ('aboutMe', 'accountEnabled' , 'activities', 'ageGroup', 'agreementAcceptances' , 'appRoleAssignments',
+                       'assignedLicenses', 'assignedPlans', 'authentication', 'birthday', 'businessPhones',
+                       'calendar', 'calendarGroups', 'calendars', 'calendarView', 'city', 'companyName', 'consentProvidedForMinor',
+                       'contactFolders', 'contacts', 'country', 'createdDateTime', 'createdObjects', 'creationType' ,
+                       'deletedDateTime', 'department', 'directReports', 'displayName', 'drive', 'drives',
+                       'employeeHireDate', 'employeeId', 'employeeOrgData', 'employeeType', 'events', 'extensions',
+                       'externalUserState', 'externalUserStateChangeDateTime', 'faxNumber', 'followedSites', 'givenName', 'hireDate',
+                       'identities', 'imAddresses', 'inferenceClassification', 'insights', 'interests', 'isResourceAccount', 'jobTitle', 'joinedTeams',
+                       'lastPasswordChangeDateTime', 'legalAgeGroupClassification', 'licenseAssignmentStates', 'licenseDetails' ,
+                       'mail' , 'mailFolders' , 'mailNickname', 'managedAppRegistrations', 'managedDevices', 'manager' , 'memberOf' , 'messages', 'mobilePhone', 'mySite',
+                       'oauth2PermissionGrants' ,  'officeLocation', 'onenote', 'onlineMeetings' , 'onPremisesDistinguishedName', 'onPremisesDomainName',
+                       'onPremisesExtensionAttributes', 'onPremisesImmutableId', 'onPremisesLastSyncDateTime',   'onPremisesProvisioningErrors', 'onPremisesSamAccountName',
+                       'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName', 'otherMails', 'outlook', 'ownedDevices', 'ownedObjects',
+                       'passwordPolicies', 'passwordProfile', 'pastProjects', 'people', 'photo', 'photos', 'planner', 'postalCode', 'preferredLanguage',
+                       'preferredName', 'presence', 'provisionedPlans', 'proxyAddresses',  'registeredDevices', 'responsibilities',
+                       'schools', 'scopedRoleMemberOf', 'settings', 'showInAddressList', 'signInSessionsValidFromDateTime', 'skills', 'state', 'streetAddress', 'surname',
+                       'teamwork', 'todo', 'transitiveMemberOf', 'usageLocation', 'userPrincipalName', 'userType')]
+        [String[]]$Select =  $Script:DefaultUserProperties ,
 
         #Used to explicitly say "Current user" and will over-ride UserID if one is given.
         [switch]$Current
@@ -306,26 +361,23 @@ function Get-GraphUser            {
             #>
             try   {
                 if     ($Drive -and (ContextHas -WorkOrSchoolAccount)) {
-                    Invoke-GraphRequest -Uri (
-                                         $uri + '/Drive?$expand=root($expand=children)') -Exclude '@odata.context','root@odata.context' -As ([MicrosoftGraphDrive])|
-                    Add-Member  -PassThru -MemberType AliasProperty  -Name Drive -Value 'id'                                                                           }
-                elseif ($Drive             ) {
-                    Invoke-GraphRequest -Uri ($uri + '/Drive')                           -Exclude '@odata.context','root@odata.context' -As ([MicrosoftGraphDrive]) |
-                    Add-Member  -PassThru -MemberType AliasProperty  -Name Drive -Value 'id'                                                                           }
-                elseif ($LicenseDetails    ) {
+                    Invoke-GraphRequest -Uri ($uri + '/Drive?$expand=root($expand=children)') -PropertyNotMatch '@odata'                -As ([MicrosoftGraphDrive])    }
+                elseif ($Drive              ) {
+                    Invoke-GraphRequest -Uri ($uri + '/Drive')                                                                          -As ([MicrosoftGraphDrive])    }
+                elseif ($LicenseDetails     ) {
                     Invoke-GraphRequest -Uri ($uri + '/licenseDetails')           -All                                                  -As ([MicrosoftGraphLicenseDetails]) }
-                elseif ($MailboxSettings   ) {
+                elseif ($MailboxSettings    ) {
                     Invoke-GraphRequest -Uri ($uri + '/MailboxSettings')                -Exclude '@odata.context'                       -As ([MicrosoftGraphMailboxSettings])}
-                elseif ($OutlookCategories ) {
+                elseif ($OutlookCategories  ) {
                     Invoke-GraphRequest -Uri ($uri + '/Outlook/MasterCategories') -All                                                  -As ([MicrosoftGraphOutlookCategory]) }
-                elseif ($Photo             ) {
+                elseif ($Photo              ) {
                     Invoke-GraphRequest -Uri ($uri + '/Photo')                          -Exclude '@odata.mediaEtag', '@odata.context',
                                                                                                               '@odata.mediaContentType' -As ([MicrosoftGraphProfilePhoto])}
-                elseif ($PlannerTasks      ) {
+                elseif ($PlannerTasks       ) {
                     Invoke-GraphRequest -Uri ($uri + '/planner/tasks')            -All  -Exclude '@odata.etag'                          -As ([MicrosoftGraphPlannerTask])}
-                elseif ($Plans             ) {
+                elseif ($Plans              ) {
                     Invoke-GraphRequest -Uri ($uri + '/planner/plans')            -All  -Exclude "@odata.etag"                          -As ([MicrosoftGraphPlannerPlan])}
-                elseif ($Presence          )  {
+                elseif ($Presence           ) {
                     if ($u.DisplayName)         {$displayName = $u.DisplayName}  else {$displayName=$null}
                     if ($u.UserPrincipalName)   {$upn = $u.UserPrincipalName}
                     elseif ($u -match '\w@\w')  {$upn = $u}
@@ -336,25 +388,24 @@ function Get-GraphUser            {
                       Add-Member -PassThru -NotePropertyName DisplayName       -NotePropertyValue $displayName |
                       Add-Member -PassThru -NotePropertyName UserPrincipalName -NotePropertyValue $upn
                 }
-                elseif ($Teams             ) {
+                elseif ($Teams              ) {
                     Invoke-GraphRequest -Uri ($uri + '/joinedTeams')              -All                                                  -As ([MicrosoftGraphTeam])}
-                elseif ($ToDoLists         ) {
+                elseif ($ToDoLists          ) {
                     Invoke-GraphRequest -Uri ($uri + '/todo/lists')               -All  -Exclude "@odata.etag"                          -As ([MicrosoftGraphTodoTaskList]) |
                       Add-Member -PassThru -NotePropertyName UserId -NotePropertyValue $id
                 }
                 # Calendar wants a property added so we can find it again
-                elseif ($Calendars         ) {
+                elseif ($Calendars          ) {
                     Invoke-GraphRequest -Uri ($uri + '/Calendars?$orderby=Name' ) -All                                                  -As ([MicrosoftGraphCalendar]) |
                         ForEach-Object {
                             if ($id -eq 'me') {$calpath = "me/Calendars/$($_.id)"}
                             else              {$calpath = "users/$id/calendars/$($_.id)"
                                                Add-Member -InputObject $_ -NotePropertyName User -NotePropertyValue $id
                             }
-                            Add-Member -PassThru -InputObject $_ -NotePropertyName CalendarPath -NotePropertyValue $calpath |
-                            Add-Member -PassThru -MemberType AliasProperty -Name   Calendar -Value ID
+                            Add-Member -PassThru -InputObject $_ -NotePropertyName CalendarPath -NotePropertyValue $calpath
                         }
                 }
-                elseif ($Notebooks         ) {
+                elseif ($Notebooks          ) {
                     $response = Invoke-GraphRequest -Uri ($uri +
                                           '/onenote/notebooks?$expand=sections' ) -All  -Exclude 'sections@odata.context'               -As ([MicrosoftGraphNotebook])
                     #Section fetched this way won't have parentNotebook, so make sure it is available when needed
@@ -364,19 +415,18 @@ function Get-GraphUser            {
                     }
                 }
                 # for site, get the user's MySite. Convert it into a graph URL and get that, expand drives subSites and lists, and add formatting types
-                elseif ($Site              ) {
+                elseif ($Site               ) {
                         $response  = Invoke-GraphRequest -Uri ($uri + '?$select=mysite')
                         $uri       = $GraphUri + ($response.mysite -replace '^https://(.*?)/(.*)$', '/sites/$1:/$2?expand=drives,lists,sites')
                         $siteObj    = Invoke-GraphRequest $Uri                          -Exclude '@odata.context', 'drives@odata.context',
                                                                                            'lists@odata.context', 'sites@odata.context' -As ([MicrosoftGraphSite])
                         foreach ($l in $siteObj.lists) {
                             Add-Member -InputObject $l -MemberType NoteProperty   -Name SiteID   -Value  $siteObj.id
-                            Add-Member -InputObject $l -MemberType ScriptProperty -Name Template -Value {$this.list.template}
                         }
                         $siteObj
                     }
                 elseif ($Groups -or
-                        $SecurityGroups   ) {
+                        $SecurityGroups     ) {
                     if  ($SecurityGroups)   {$body = '{  "securityEnabledOnly": true  }'}
                     else                    {$body = '{  "securityEnabledOnly": false }'}
                     $response         = Invoke-GraphRequest -Uri ($uri  + '/getMemberGroups') -Method POST  -Body $body -ContentType 'application/json'
@@ -384,18 +434,18 @@ function Get-GraphUser            {
                         $result     += Invoke-GraphRequest  -Uri "$GraphUri/directoryObjects/$r"
                     }
                 }
-                elseif ($Manager                  ) {
+                elseif ($Manager            ) {
                     $result += Invoke-GraphRequest -Uri ($uri + '/Manager') }
-                elseif ($DirectReports            ) {
+                elseif ($DirectReports      ) {
                     $result += Invoke-GraphRequest -Uri ($uri + '/directReports')       -All}
-                elseif ($MemberOf                 ) {
+                elseif ($MemberOf           ) {
                     $result += Invoke-GraphRequest -Uri ($uri + '/MemberOf')            -All}
-                elseif ($TransitiveMemberOf       ) {
+                elseif ($TransitiveMemberOf ) {
                     $result += Invoke-GraphRequest -Uri ($uri + '/TransitiveMemberOf')  -All}
-                elseif ($Select                   ) {
-                    $result += Invoke-GraphRequest -Uri ($uri + '?$select=' + ($Select -join ','))}
-                else                                {
-                    $result += Invoke-GraphRequest -Uri $uri  }
+                else                          {
+                    foreach ($s in @('ID', 'userPrincipalName', 'displayName')){if ($s -notin $Select) {$Select += $s }}
+                    $result += Invoke-GraphRequest -Uri ($uri + '?$expand=manager&$select=' + ($Select -join ','))
+                }
             }
             #if we get a not found error that's propably OK - bail for any other error.
             catch {
@@ -428,9 +478,7 @@ function Get-GraphUser            {
                     New-Object -Property $r -TypeName ([MicrosoftGraphGroup])
             }
             elseif ($r.'@odata.type' -match 'user$' -or $PSCmdlet.parameterSetName -eq 'None' -or $Select) {
-                    [void]$r.Remove('@odata.type')
-                    [void]$r.Remove('@odata.context')
-                    New-Object -Property $r -TypeName ([MicrosoftGraphUser])
+                    ConvertTo-GraphUser -RawUser $r
             }
             else    {$r}
         }
@@ -460,7 +508,7 @@ function Set-GraphUser            {
         $UserID = "me",
         #A freeform text entry field for the user to describe themselves.
         [String]$AboutMe,
-        #The SMTP address for the user, for example, 'jeff@contoso.onmicrosoft.com'
+        #The SMTP address for the user, for example, 'Alex@contoso.onmicrosoft.com'
         [String]$Mail,
         #A list of additional email addresses for the user; for example: ['bob@contoso.com', 'Robert@fabrikam.com'].
         [String[]]$OtherMails,
@@ -537,15 +585,20 @@ function Set-GraphUser            {
         #things we don't want to put in the JSON body when we send the changes.
         $excludedParams = [Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters + @('Force', 'PassThru', 'UserID', 'AccountDisabled', 'Photo', 'Manager')
         $settings = @{}
+        $returnProps = $Script:DefaultUserProperties
         foreach ($p in $PSBoundparameters.Keys.where({$_ -notin $excludedParams})) {
             #turn "Param" into "param" make dates suitable text, and switches booleans
             $key   = $p.toLower()[0] + $p.Substring(1)
+            if ($key -notin $returnProps) {$returnProps += $key}
             $value = $PSBoundparameters[$p]
             if ($value -is [datetime]) {$value = $value.ToString("yyyy-MM-ddT00:00:00Z")}  # 'o' for ISO date time may work here
             if ($value -is [switch])   {$value = $value -as [bool]}
             $settings[$key] = $value
         }
-        if ($PSBoundparameters['AccountDisabled']) {$settings['accountEnabled'] = -not $AccountDisabled} #allows -accountDisabled:$false
+        if ($PSBoundparameters['AccountDisabled']) {#allows -accountDisabled:$false
+            $settings['accountEnabled'] = -not $AccountDisabled
+            if ($returnProps -notcontains 'accountEnabled') {$returnProps += 'accountEnabled'}
+        }
         if  ($settings.count -eq 0 -and -not $Photo -and -not $Manager) {
             Write-Warning -Message "Nothing to set"
         }
@@ -610,7 +663,7 @@ function Set-GraphUser            {
                 $webparams['uri'] = $baseUri
             }
             if ($PassThru)  {
-               Invoke-GraphRequest $webparams.uri -ExcludeProperty '@odata.context' -AsType ([MicrosoftGraphUser])
+               Invoke-GraphRequest ($webparams.uri + '?$expand=manager&$select=' + ($returnProps -join ',')) | ConvertTo-GraphUser
             }
         }
     }
@@ -685,7 +738,7 @@ function New-GraphUser            {
         [ValidateNotNullOrEmpty()]
         [UpperCaseTransformAttribute()]
         [ValidateCountryAttribute()]
-        [string]$UsageLocation = 'GB',
+        [string]$UsageLocation = $Script:DefaultUsageLocation,
 
         #The initial password for the user. If none is specified one will be generated and output by the command
         [string]$Initialpassword,
@@ -906,11 +959,7 @@ function Find-GraphPeople         {
             $uri = $GraphUri + '/me/people?$search="{0}"&$top={1}' -f $SearchTerm, $First
         }
 
-        Invoke-GraphRequest $uri -ValueOnly -As ([MicrosoftGraphPerson]) |
-            Add-Member -PassThru -MemberType ScriptProperty -Name mobilephone    -Value {$This.phones.where({$_.type -eq 'mobile'}).number -join ', '} |
-            Add-Member -PassThru -MemberType ScriptProperty -Name businessphones -Value {$This.phones.where({$_.type -eq 'business'}).number }         |
-            Add-Member -PassThru -MemberType ScriptProperty -Name Score          -Value {$This.scoredEmailAddresses[0].relevanceScore }                |
-            Add-Member -PassThru -MemberType AliasProperty  -Name emailaddresses -Value scoredEmailAddresses
+        Invoke-GraphRequest $uri -ValueOnly -As ([MicrosoftGraphPerson])
     }
 }
 
@@ -1241,35 +1290,6 @@ function New-GraphRecurrence      {
     }
 }
 
-function Expand-GraphEvent        {
-    param   (
-        [Parameter(Position=0,ValueFromPipeline=$true)]
-        $Event,
-        $CalendarPath
-
-    )
-    begin   {
-        $whensb = {
-            $s = [convert]::ToDateTime($this.Start.datetime)
-            $e = [convert]::ToDateTime($this.end.datetime)
-            if ($s.AddDays(1) -eq $e -and
-                $s.hour -eq 0 -and $s.minute -eq 0 ) {
-                $s.ToShortDateString() + ' All day'
-            }
-            else {$s.ToString("g") + ' to ' +  $e.ToString("g") + $this.End.timezone}
-        }
-    }
-    process {
-        if ($CalendarPath) {
-            Add-Member -NotePropertyName CalendarPath   -NotePropertyValue $CalendarPath    -InputObject $Event
-        }
-        Add-Member -PassThru -MemberType ScriptProperty -Name When          -Value $whenSB  -InputObject $Event |
-        Add-Member -PassThru -MemberType ScriptProperty -Name StartDateTime -Value {[convert]::ToDateTime($this.start.dateTime)}       |
-        Add-Member -PassThru -MemberType ScriptProperty -Name EndDateTime   -Value {[convert]::ToDateTime($this.end.dateTime)}         |
-        Add-Member -PassThru -MemberType ScriptProperty -Name Where         -Value {$this.location.displayname}
-    }
-}
-
 function Get-GraphCalendarPath    {
     param   (
         $Calendar,
@@ -1531,21 +1551,10 @@ function Get-GraphMailItem        {
                         $a = New-Object MicrosoftGraphAttachment -Property $a
             }
             $newMsg = New-object MicrosoftGraphMessage -Property $msg |
-                Add-Member -PassThru -NotePropertyName Path -NotePropertyValue $msgpath   |
-                Add-Member -PassThru -MemberType ScriptProperty -Name FromName    -Value {$this.from.emailAddress.name}    |
-                Add-Member -PassThru -MemberType ScriptProperty -Name FromAddress -Value {$this.from.emailAddress.address} |
-                Add-Member -PassThru -MemberType ScriptProperty -Name BodyText    -Value {$this.body.content}              |
-                Add-Member -PassThru -MemberType ScriptMethod   -Name Move        -Value {
-                    param($Destination)
-                    Move-GraphMailItem -Item $this @PSBoundParameters
-                }
+                Add-Member -PassThru -NotePropertyName Path -NotePropertyValue $msgpath
             #Converting a message to to an object will strip extra members off the attachments, so do attachments in 2 parts
             foreach ($a in $newMsg.Attachments) {
                 Add-Member -InputObject $a -NotePropertyName Path -NotePropertyValue "$msgpath/attachments/$($a.id)"
-                Add-Member -InputObject $a -MemberType ScriptMethod -Name Download  -Value {
-                    param($Destination)
-                    Save-GraphMailAttachment -Attachment $this @PSBoundParameters
-                }
             }
             $newMsg
         }
@@ -1931,16 +1940,7 @@ function Get-GraphContact         {
     if ($Top)     { $uri = $uri + $JoinChar + '$top='     + $top}
     #endregion
 
-    #region get the data - cope with it being paged - add a type for fomatting, and return it
-    $defaultProperties = @('displayname','jobtitle','companyname','mail','mobile','business','home')
-    $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultProperties)
-    $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
-    Invoke-GraphRequest -Uri  $uri -ValueOnly -AllValues -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact]) -ExcludeProperty "@odata.etag" |
-        Add-Member -PassThru -MemberType MemberSet      -Name PSStandardMembers -Value $PSStandardMembers        |
-        Add-Member -PassThru -MemberType AliasProperty  -Name mobile            -Value 'mobilephone'             |
-        Add-Member -PassThru -MemberType ScriptProperty -Name business          -Value {$this.businessPhones[0]} |
-        Add-Member -PassThru -MemberType ScriptProperty -Name home              -Value {$this.HomePhones[0]}
-    #endregion
+    Invoke-GraphRequest -Uri  $uri -ValueOnly -AllValues -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact]) -ExcludeProperty "@odata.etag"
 }
 
 function New-GraphContact         {
@@ -2138,9 +2138,6 @@ function Set-GraphContact         {
             'AsType'          =  ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact])
             'ExcludeProperty' = @('@odata.etag', '@odata.context' )
         }
-        $defaultProperties = @('displayname','jobtitle','companyname','mail','mobile','business','home')
-        $defaultDisplayPropertySet = New-Object System.Management.Automation.PSPropertySet('DefaultDisplayPropertySet',[string[]]$defaultProperties)
-        $psStandardMembers = [System.Management.Automation.PSMemberInfo[]]@($defaultDisplayPropertySet)
     }
     process {
         $contactSettings = @{  }
@@ -2187,22 +2184,14 @@ function Set-GraphContact         {
         Write-Debug $json
         if ($IsNew) {
             if ($force -or $PSCmdlet.ShouldProcess($DisplayName,'Create Contact')) {
-                Invoke-GraphRequest @webParams -method Post  -Body $json  |
-                    Add-Member -PassThru -MemberType MemberSet      -Name PSStandardMembers -Value $PSStandardMembers        |
-                    Add-Member -PassThru -MemberType AliasProperty  -Name mobile            -Value 'mobilephone'             |
-                    Add-Member -PassThru -MemberType ScriptProperty -Name business          -Value {$this.businessPhones[0]} |
-                    Add-Member -PassThru -MemberType ScriptProperty -Name home              -Value {$this.HomePhones[0]}
+                Invoke-GraphRequest @webParams -method Post  -Body $json
             }
         }
         else {#if ContactPassed
             if ($force -or $PSCmdlet.ShouldProcess($Contact.DisplayName,'Update Contact')) {
                 if ($Contact.id) {$webParams.uri += '/' + $Contact.ID}
                 else             {$webParams.uri += '/' + $Contact }
-                Invoke-GraphRequest @webParams -method Patch -Body $json |
-                    Add-Member -PassThru -MemberType MemberSet      -Name PSStandardMembers -Value $PSStandardMembers        |
-                    Add-Member -PassThru -MemberType AliasProperty  -Name mobile            -Value 'mobilephone'             |
-                    Add-Member -PassThru -MemberType ScriptProperty -Name business          -Value {$this.businessPhones[0]} |
-                    Add-Member -PassThru -MemberType ScriptProperty -Name home              -Value {$this.HomePhones[0]}
+                Invoke-GraphRequest @webParams -method Patch -Body $json
             }
         }
     }
@@ -2375,7 +2364,8 @@ function Get-GraphEvent           {
         if ($Top)        { $uri  +=  '&$top='     + $top  }
         #endregion
         #region get the data.
-        Invoke-GraphRequest @webParams -Uri $uri | Expand-GraphEvent -CalendarPath $CalendarPath
+        Invoke-GraphRequest @webParams -Uri $uri |
+            Add-Member -PassThru -NotePropertyName CalendarPath -NotePropertyValue $CalendarPath
         #endregion
     }
 }
@@ -2514,7 +2504,7 @@ function Add-GraphEvent           {
         #endregion
 
         $result = Invoke-GraphRequest @webParams -Body $json
-        if ($PassThru) {$result | Expand-GraphEvent -CalendarPath $CalendarPath }
+        if ($PassThru) {$result | Add-Member -PassThru -NotePropertyName CalendarPath -NotePropertyValue $CalendarPath}
     }
 }
 
@@ -2637,7 +2627,7 @@ function Set-GraphEvent           {
 
     if ($Force -or $PSCmdlet.ShouldProcess($Event.subject,'Update calendar event')) {
         $result = Invoke-GraphRequest @webParams -Body $json
-        if ($PassThru) {$result |  Expand-GraphEvent -CalendarPath $CalendarPath}
+        if ($PassThru) {$result | Add-Member -PassThru -NotePropertyName CalendarPath -NotePropertyValue $CalendarPath }
      }
 }
 

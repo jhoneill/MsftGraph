@@ -2,10 +2,13 @@ using namespace System.Management.Automation
 using namespace Microsoft.Graph.PowerShell.Models
 using namespace Microsoft.Graph.PowerShell.Authentication
 
-$global:GraphUri                  = 'https://graph.microsoft.com/v1.0'   #May want this outside the module
-$script:GUIDRegex                 = '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$'
-$script:WellKnownMailFolderRegex  = '^[/\\]?(archive|clutter|conflicts|conversationhistory|deleteditems|drafts|inbox|junkemail|localfailures|msgfolderroot|outbox|recoverableitemsdeletions|scheduled|searchfolders|sentitems|serverfailures|syncissues)[/\\]?$'
-$script:SkippedSubmodules         = @()
+$Global:GraphUri                  = 'https://graph.microsoft.com/v1.0'   #May want this outside the module
+$Script:GUIDRegex                 = '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$'
+$Script:WellKnownMailFolderRegex  = '^[/\\]?(archive|clutter|conflicts|conversationhistory|deleteditems|drafts|inbox|junkemail|localfailures|msgfolderroot|outbox|recoverableitemsdeletions|scheduled|searchfolders|sentitems|serverfailures|syncissues)[/\\]?$'
+$Script:DefaultUserProperties     = @('businessPhones', 'displayName', 'givenName', 'id', 'jobTitle', 'mail', 'mobilePhone', 'officeLocation', 'preferredLanguage', 'surname', 'userPrincipalName',
+                                      'assignedLicenses', 'department', 'usageLocation', 'userType')
+$Script:DefaultUsageLocation      = 'GB'
+$Script:SkippedSubmodules         = @()
 
 #region completer, transformer, and validator attributes for parameters **CLASSES NEED TO BE IN PSM1
 class UpperCaseTransformAttribute : ArgumentTransformationAttribute  {
@@ -33,7 +36,7 @@ class DomainCompleter             : IArgumentCompleter {
     )
     {
         $result = [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
-        if (-not $this.Domains)  {$this.Domains = Invoke-GraphRequest "$global:GraphUri/domains?`$select=id" -ValueOnly |
+        if (-not $this.Domains)  {$this.Domains = Invoke-GraphRequest "$Global:GraphUri/domains?`$select=id" -ValueOnly |
                                                          ForEach-Object id | Sort-Object
         }
         $wildcard          = ('*' + ($wordToComplete  -replace '[''"]','' )+ '*')
@@ -53,8 +56,8 @@ class GroupCompleter              : IArgumentCompleter {
         #strip quotes from word to complete - replace " or ' with nothing
         $wordToComplete = $wordToComplete -replace '"|''', ''
 
-        if ($wordToComplete) {$uri =  $global:GraphUri +  ("/Groups/?`$filter=startswith(displayName,'{0}') or startswith(mail,'{0}')" -f $wordToComplete)}
-        else                 {$uri = "$global:GraphUri/Groups/?`$Top=20"}
+        if ($wordToComplete) {$uri =  $Global:GraphUri +  ("/Groups/?`$filter=startswith(displayName,'{0}') or startswith(mail,'{0}')" -f $wordToComplete)}
+        else                 {$uri = "$Global:GraphUri/Groups/?`$Top=20"}
 
         Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
                 $result.Add([System.Management.Automation.CompletionResult]::new("'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
@@ -229,7 +232,7 @@ class RoleCompleter               : IArgumentCompleter {
         #strip quotes from word to complete - replace " or ' with nothing
         if (-not $wordToComplete) {$wordToComplete = '*'}
         else                      {$wordToComplete = "$wordToComplete*" -replace '"|''', '' }
-        Invoke-GraphRequest  -Uri "$global:GraphUri/directoryroles?`$select=displayname" -ValueOnly |
+        Invoke-GraphRequest  -Uri "$Global:GraphUri/directoryroles?`$select=displayname" -ValueOnly |
             Where-Object displayname -like $wordToComplete | Sort-Object -Property displayname | ForEach-Object {
                 $result.Add([System.Management.Automation.CompletionResult]::new("'$($_.displayname)'", $_.displayname, ([CompletionResultType]::ParameterValue) , $_.displayname) )
         }
@@ -246,8 +249,8 @@ class TeamCompleter               : IArgumentCompleter {
 
         #strip quotes from word to complete - replace " or ' with nothing
         $wordToComplete = $wordToComplete -replace '"|''', ''
-        if ($wordToComplete) {$uri =  $global:GraphUri +  ("/groups?`$filter=startswith(displayname,'{0}')')" -f $wordToComplete)}
-        else                 {$uri = "$global:GraphUri/Groups/?`$Top=20"}
+        if ($wordToComplete) {$uri =  $Global:GraphUri +  ("/groups?`$filter=startswith(displayname,'{0}')')" -f $wordToComplete)}
+        else                 {$uri = "$Global:GraphUri/Groups/?`$Top=20"}
         #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams so this is just completing groups for now
         Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
                 $result.Add([System.Management.Automation.CompletionResult]::new("'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
@@ -266,7 +269,7 @@ class UPNCompleter                : IArgumentCompleter {
         #strip quotes from word to complete - replace " or ' with nothing
         $wordToComplete = $wordToComplete -replace '"|''', ''
         if ($wordToComplete) {
-            Invoke-GraphRequest -ValueOnly -headers @{'ConsistencyLevel'='eventual'} -uri "$global:GraphUri/users?`$filter=startswith(userprincipalname,'$wordToComplete')&top=10&select=userprincipalName" |
+            Invoke-GraphRequest -ValueOnly -headers @{'ConsistencyLevel'='eventual'} -uri "$Global:GraphUri/users?`$filter=startswith(userprincipalname,'$wordToComplete')&top=10&select=userprincipalName" |
                 ForEach-Object userPrincipalName | sort-object | ForEach-Object {$result.Add([System.Management.Automation.CompletionResult]::new("'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )}
         }
         return $result
@@ -276,7 +279,7 @@ class UPNCompleter                : IArgumentCompleter {
 
 . "$PSScriptRoot\Authentication.ps1"
 
-#Submodules need the class and/or private functions from the SDK module.
+#Submodules which need the class and/or private functions from the SDK module.
 $ImportCmds = [ordered]@{
   'Users'                        = @('Get-MgUser_List1' , 'New-MgUserTodoList_CreateExpanded1',
                                      'New-MgUserTodoListTask_CreateExpanded1', 'Remove-MgUserTodoList_Delete1',
@@ -301,7 +304,7 @@ foreach ($subModule in $ImportCmds.keys) {
     }
     else {
         Write-Verbose "Microsoft.Graph.$subModule.private.dll  not found $subModule won't be loaded "
-        $script:SkippedSubmodules += $subModule
+        $Script:SkippedSubmodules += $subModule
     }
     if ($result) {
         .  "$PSScriptRoot\$subModule.ps1"
@@ -309,24 +312,90 @@ foreach ($subModule in $ImportCmds.keys) {
     }
 }
 
-if ($script:SkippedSubmodules -contains 'Users') {
+if ($Script:SkippedSubmodules -contains 'Users') {
      Write-Verbose "Groups, Notes, OneDrive, Planner, and Sharepoint require the Microsoft.Graph.users module, or Microsoft.Graph.Users.private.dll in the module directory."
-     $script:SkippedSubmodules += @('Groups', 'Notes', 'OneDrive', 'Planner', 'Sharepoint')
+     $Script:SkippedSubmodules += @('Groups', 'Notes', 'OneDrive', 'Planner', 'Sharepoint')
 }
-else { #These will work provided we have the users module.
+else { #These submodules will work with just the users module.
     . "$PSScriptRoot\Groups.ps1"
     . "$PSScriptRoot\Notes.ps1"
     . "$PSScriptRoot\OneDrive.ps1"
     . "$PSScriptRoot\Planner.ps1"
     . "$PSScriptRoot\Sharepoint.ps1"
 }
-if ($script:SkippedSubmodules) {
-      Write-Host ("Did not load " + ($script:SkippedSubmodules -join ", ") + " because the related Microsoft.Graph module(s) or private.dll file(s) were not be found.")
+if ($Script:SkippedSubmodules) {
+      Write-Host -ForegroundColor DarkGray ("Skipped " + ($Script:SkippedSubmodules -join ", ") + " because their Microsoft.Graph module(s) or private.dll file(s) were not be found.")
 }
 
-#call a script with calls to Set-GraphConnectionOptions
-if     ($env:MGSettingsPath )                       {. $env:MGSettingsPath}
-elseif (Test-Path "$PSScriptRoot\AuthSettings.ps1") {. "$PSScriptRoot\AuthSettings.ps1"}
+function Set-GraphOptions {
+    <#
+        .synopsis
+            Sets defaults and the tenant client ID & Client Secret used when logging on without a web dialog
+    #>
+    [cmdletbinding()]
+    param (
+        #Your Tennant ID
+        $TenantID,
+        #Client ID if not using the SDK default of 14d82eec-204b-4c2f-b7e8-296a70dab67e. Must be known to your tennant
+        $ClientID,
+        #Secret set for the client ID in your $TenantID
+        $Client_Secret,
+        #Default Scopes to request
+        $DefaultScopes,
+        #Allows a saved Refresh Token (e.g. from Show-GraphSession) to be added to the session.
+        $RefreshToken,
+        #Changes the dafault properties returned by Get-GraphUser and Get-GraphUserList
+        [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones', 'city',
+                    'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'department',
+                    'displayName', 'givenName', 'id', 'imAddresses', 'jobTitle', 'legalAgeGroupClassification',
+                    'mail', 'mailNickname', 'mobilePhone', 'officeLocation',
+                    'onPremisesDomainName', 'onPremisesExtensionAttributes', 'onPremisesImmutableId',
+                    'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName',
+                    'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
+                    'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
+                    'preferredLanguage', 'provisionedPlans', 'proxyAddresses', 'state', 'streetAddress',
+                    'surname', 'usageLocation', 'userPrincipalName', 'userType')]
+        [string[]]$DefaultUserProperties,
+
+        #Changes the default two letter (ISO  3166) country code - for new users so they can be assigned licenses.  Examples include: 'US', 'JP', and 'GB'
+        [ValidateNotNullOrEmpty()]
+        [UpperCaseTransformAttribute()]
+        [ValidateCountryAttribute()]
+        $DefaultUsageLocation
+    )
+
+    if ($TenantID)              {
+        if ($TenantID -notmatch $GUIDRegex) {
+              Write-Warning 'TenantID should be a GUID'  ; break
+        }
+        else {$Script:TenantID           = $TenantID}
+    }
+    if ($ClientID)              {
+        if ($Clientid -notmatch $GUIDRegex) {
+            Write-Warning 'ClientID should be a GUID'  ; break
+        }
+        else {$Script:ClientID           = $ClientID}
+    }
+    if ($Client_Secret)         {
+        if     ($Client_Secret -is [string]) {
+               $Script:Client_Secret      = $Client_Secret
+        }
+        elseif ($Client_Secret -is [securestring]) {
+               $Script:Client_Secret =  (new-object pscredential -ArgumentList "NoName", $Client_Secret).GetNetworkCredential().Password
+        }
+        else  {Write-Warning 'Client_secret should be a string or preferably a securestring'  ; break}
+    }
+    if ($Script:TenantID)       {Write-Verbose "TenantID: '$Script:TenantID' , ClientID: '$Script:ClientID'"}
+    if ($DefaultScopes)         {$Script:DefaultGraphScopes     = $DefaultScopes}
+    Write-Verbose ('Scopes: ' + ($Script:DefaultGraphScopes -join ', '))
+    if ($RefreshToken)          {$Script:RefreshToken           = $RefreshToken }
+    if ($DefaultUserProperties) {$Script:DefaultUserProperties  = $DefaultUserProperties}
+    if ($DefaultUsageLocation)  {$Script:DefaultUsageLocation   = $DefaultUsageLocation}
+}
+
+#call a script with calls to Set-GraphOptions
+if     ($env:GraphSettingsPath )                       {. $env:GraphSettingsPath}
+elseif (Test-Path "$PSScriptRoot\Microsoft.Graph.PlusPlus.settings.ps1") {. "$PSScriptRoot\Microsoft.Graph.PlusPlus.settings.ps1"}
 
 if ($null -eq [GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
 elseif ([GraphSession]::instance.AuthContext.AppName -and -not [GraphSession]::instance.AuthContext.Account) {

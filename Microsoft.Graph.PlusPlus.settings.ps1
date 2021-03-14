@@ -1,16 +1,20 @@
 <#
   .description
-    Executed (by Authentication.ps1) when the module loads to set
+    Executed when the module loads to set defaults for
     the scopes and information needed to support additional logon types.
     Environment Variable MGSettingsPath is set the information will be read from there.
     This file IS considered safe to edit. If it is deleted the module will
     user the default scopes provided by the PowerShell-graph-sdk.
 #>
+Set-GraphOptions -DefaultUsageLocation GB
+Set-GraphOptions -DefaultUserProperties  @('businessPhones', 'displayName', 'givenName', 'id', 'jobTitle', 'mail', 'mobilePhone',
+                                           'officeLocation', 'preferredLanguage', 'surname', 'userPrincipalName', #The preceeding fields are the APIs defaults.
+                                           'assignedLicenses', 'department', 'usageLocation', 'userType')
 
 #The scopes requested. You can shorten this of you don't need all things provided in the module
-if ($env:GraphScopes) {
-        Set-GraphConnectionOptions -DefaultScopes ( $env:GraphScopes -split ',\s*')}
-else  { Set-GraphConnectionOptions -DefaultScopes @(
+if    ($env:GraphScopes) {
+        Set-GraphOptions -DefaultScopes ( $env:GraphScopes -split ',\s*')}
+else  { Set-GraphOptions -DefaultScopes @(
                 'AuditLog.Read.All',
                 'Directory.AccessAsUser.All', #Grant same rights to the directory as the user has
                 'Calendars.ReadWrite',
@@ -37,7 +41,6 @@ else  { Set-GraphConnectionOptions -DefaultScopes @(
                 'openid',
                 'profile'#,        'offline_access'
 )}
-
 <#
     If you want to logon by providing a name and password or as the app you need to provide
     1 your tenant ID (a GUID)
@@ -64,18 +67,18 @@ else  { Set-GraphConnectionOptions -DefaultScopes @(
     12. I had to click the enterprise apps link and click "Grant admin Consent" from (this is where a GA admin is needed)
     13. You now have admin consent granted for your tenant, so users can authenticate without a consent dialog.
     14. Navigate back to Overview
-    15. Copy the Application (client) ID    Paste it into this script as the value for ClientID in Set-GraphConnectionOptions;
-    16. Also copy the tenant ID paste it into this script as the value for TenantID in Set-GraphConnectionOptions
+    15. Copy the Application (client) ID    Paste it into this script as the value for ClientID in Set-GraphOptions;
+    16. Also copy the tenant ID paste it into this script as the value for TenantID in Set-GraphOptions
     17. Click Certificates and Secrets, add a secret and chose never expires (unless you want to update the script later), click add
-    18. Copy the secret and EITHER (the dirty but portable way) paste into this script as the value for client_Secret in set-GraphConnectionOptions
+    18. Copy the secret and EITHER (the dirty but portable way) paste into this script as the value for client_Secret in Set-GraphOptions
                             OR (clean but not portable) Convert it to a securestring & export: ConvertTo-SecureString -Force -AsPlainText (Get-Clipboard) | Export-Clixml myclientSecret.xml
-                               Get the contents of the file as for setting client_secret in set-GraphConnectionOptions
+                               Get the contents of the file as for setting client_secret in Set-GraphOptions
 #>
 
 #YOUR tenant ID
-# Set-GraphConnectionOptions -TenantID GUID-FOR-YOUR-TENNANT
+# Set-GraphOptions -TenantID GUID-FOR-YOUR-TENNANT
 
 #A client APP ID known to your tenant
-Set-GraphConnectionOptions -ClientID "14d82eec-204b-4c2f-b7e8-296a70dab67e" #the Graph-Powershell SDK GUID. You can create your own. "1950a258-227b-4e31-a9cf-717495945fc2" is known client ID for PowerShell
+Set-GraphOptions -ClientID "14d82eec-204b-4c2f-b7e8-296a70dab67e" #the Graph-Powershell SDK GUID. You can create your own. "1950a258-227b-4e31-a9cf-717495945fc2" is known client ID for PowerShell
 #Secret Associated with the  Really this should be saved somewhere else as a secure string but you can put plain text OR a secure string here.
-#Set-GraphConnectionOptions  -Client_Secret (Import-Clixml "$PSScriptRoot\myclientSecret.xml")
+#Set-GraphOptions  -Client_Secret (Import-Clixml "$PSScriptRoot\myclientSecret.xml")

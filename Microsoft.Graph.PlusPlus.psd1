@@ -19,6 +19,7 @@
   rootModule        =   '.\Microsoft.Graph.PlusPlus.psm1'
   RequiredModules   = @(@{ModuleName = 'Microsoft.Graph.Authentication'; ModuleVersion = '1.4.0'; })
   FormatsToProcess  =   'Microsoft.Graph.PlusPlus.format.ps1xml'
+  TypesToProcess    = @('Microsoft.Graph.PlusPlus.types.ps1xml')
   FunctionsToExport = @('Add-FileToGraphOneNote',
                         'Add-GraphEvent',
                         'Add-GraphGroupMember',
@@ -139,12 +140,12 @@
                         'Send-GraphMailForward',
                         'Send-GraphMailMessage',
                         'Send-GraphMailReply',
-                        'Set-GraphConnectionOptions',
                         'Set-GraphContact',
                         'Set-GraphEvent',
                         'Set-GraphGroup',
                         'Set-GraphHomeDrive',
                         'Set-GraphOneNoteHome',
+                        'Set-GraphOptions',
                         'Set-GraphListItem',
                         'Set-GraphPlanDetails',
                         'Set-GraphPlanTask',
@@ -201,7 +202,6 @@
         '.\ActionCard.ps1',
         '.\Applications.ps1',
         '.\Authentication.ps1',
-        '.\AuthSettings.ps1',
         '.\Groups.ps1',
         '.\Identity.DirectoryManagement.ps1',
         '.\Identity.SignIns.ps1',
@@ -213,7 +213,9 @@
         '.\Users.Actions.ps1',
         '.\Users.Functions.ps1',
         '.\Users.ps1',
+        '.\Microsoft.Graph.PlusPlus.settings.ps1',
         '.\Microsoft.Graph.PlusPlus.format.ps1xml',
+        '.\Microsoft.Graph.PlusPlus.types.ps1xml',
         '.\Blank.xlsx',
         '.\docs\Relationships.pdf',
         '.\docs\Logon options.pdf',
@@ -247,9 +249,6 @@
 
   # Minimum version of the common language runtime (CLR) required by this module. This prerequisite is valid for the PowerShell Desktop edition only.
   # CLRVersion = ''
-
-  # Type files (.ps1xml) to be loaded when importing this module
-  # TypesToProcess = @()
 
   # HelpInfo URI of this module
   # HelpInfoURI = ''

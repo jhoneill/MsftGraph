@@ -164,9 +164,9 @@ function Get-AccessToken            {
     * Username and password            'Password'
     * Refresh_token                    'Referesh_token'
     * None (logon as the app itself)   'client_credentials'
-    The Set-GraphConnectionOptions command sets the tenant ID, a client ID and a client secret
-    for the session.  By default, when the module loads it looks at $env:MGSettingsPath or for
-     AuthSettings.ps1  in the module folder, and executes it to set these values)
+    The Set-GraphOptions command sets the tenant ID, a client ID and a client secret
+    for the session.  By default, when the module loads it looks at $env:GraphSettingsPath or for
+    Microsoft.Graph.PlusPlus.settings.ps1  in the module folder, and executes it to set these values)
     Get-AccessToken relies on these if they are not set Connect-Graph removes the parameters
     which support non-intereactive logons and calling it seperately will fail
 
@@ -178,7 +178,7 @@ function Get-AccessToken            {
         [hashtable]$BodyParts = @{}
     )
     if (-not ($script:TenantID -and $script:ClientID)) {
-        [UnauthorizedAccessException]::new('The tenant, and ClientID need to be set with Set-GraphConnectionOptions before calling this command.')
+        [UnauthorizedAccessException]::new('The tenant, and ClientID need to be set with Set-GraphOptions before calling this command.')
     }
     $tokenUri  = "https://login.microsoft.com/$script:TenantID/oauth2/token"
     $body      = $BodyParts + @{
@@ -536,49 +536,4 @@ function ContextHas                 {
     }
     #otherwise return true or false
     else  {return ( $state -xor $not )}
-}
-
-function Set-GraphConnectionOptions {
-<#
-    .synopsis
-        Sets the tenant client ID & Client Secret used when logging on without a web dialog or the the scopes requested when logging on with one.
-#>
-[cmdletbinding()]
-param (
-    #Your Tennant ID
-    $TenantID,
-    #Client ID if not using the SDK default of 14d82eec-204b-4c2f-b7e8-296a70dab67e. Must be known to your tennant
-    $ClientID,
-    #Secret set for the client ID in your $TenantID
-    $Client_Secret,
-    #Default Scopes to request
-    $DefaultScopes,
-    #Allows a saved Refresh Token (e.g. from Show-GraphSession) to be added to the session.
-    $RefreshToken
-)
-    if ($TenantID)        {
-        if ($TenantID -notmatch $GUIDRegex) {
-              Write-Warning 'TenantID should be a GUID'  ; break
-        }
-        else {$script:TenantID           = $TenantID}
-    }
-    if ($ClientID)        {
-        if ($Clientid -notmatch $GUIDRegex) {
-            Write-Warning 'ClientID should be a GUID'  ; break
-        }
-        else {$script:ClientID           = $ClientID}
-    }
-    if ($Client_Secret)   {
-        if     ($Client_Secret -is [string]) {
-               $script:Client_Secret      = $Client_Secret
-        }
-        elseif ($Client_Secret -is [securestring]) {
-               $script:Client_Secret =  (new-object pscredential -ArgumentList "NoName", $Client_Secret).GetNetworkCredential().Password
-        }
-        else  {Write-Warning 'Client_secret should be a string or preferably a securestring'  ; break}
-    }
-    if ($script:TenantID) {Write-Verbose "TenantID: '$script:TenantID' , ClientID: '$script:ClientID'"}
-    if ($DefaultScopes)   {$script:DefaultGraphScopes = $DefaultScopes}
-    Write-Verbose ('Scopes: ' + ($script:DefaultGraphScopes -join ', '))
-    if ($RefreshToken)    {$script:RefreshToken = $RefreshToken }
 }

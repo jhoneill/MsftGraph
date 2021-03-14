@@ -262,8 +262,8 @@
                     <TableColumnHeader><Label>Job Title</Label><Alignment>Left</Alignment></TableColumnHeader>
                     <TableColumnHeader><Label>Office Location</Label><Alignment>Left</Alignment></TableColumnHeader>
                     <TableColumnHeader><Label>Mail</Label><Alignment>Left</Alignment></TableColumnHeader>
-                    <TableColumnHeader><Label>Business Phones</Label><Alignment>Left</Alignment></TableColumnHeader>
-                    <TableColumnHeader><Label>Mobile Phones</Label><Alignment>Left</Alignment></TableColumnHeader>
+                    <TableColumnHeader><Label>Business Phone(s)</Label><Alignment>Left</Alignment></TableColumnHeader>
+                    <TableColumnHeader><Label>Mobile Phone</Label><Alignment>Left</Alignment></TableColumnHeader>
                     <TableColumnHeader><Label>UPN</Label><Alignment>Left</Alignment></TableColumnHeader>
                 </TableHeaders>
                 <TableRowEntries><TableRowEntry>

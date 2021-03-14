@@ -1,0 +1,109 @@
+<Types>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser</Name><Members>
+       <PropertySet><Name>Organization</Name><ReferencedProperties>
+            <Name>UserPrincipalName</Name>
+            <Name>DisplayName</Name>
+            <Name>JobTitle</Name>
+            <Name>Department</Name>
+            <Name>ManagerName</Name>
+            <Name>Usagelocation</Name>
+            <Name>Licensed</Name>
+        </ReferencedProperties></PropertySet>
+        <ScriptProperty><Name>Score</Name><GetScriptBlock>
+            $This.scoredEmailAddresses[0].relevanceScore
+        </GetScriptBlock></ScriptProperty>
+        <AliasProperty><Name>emailaddresses</Name>
+            <ReferencedMemberName>scoredEmailAddresses</ReferencedMemberName>
+        </AliasProperty>
+        <ScriptProperty><Name>ManagerName</Name><GetScriptBlock>
+            $This.Manager.displayName
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>ManagerMail</Name><GetScriptBlock>
+            $This.Manager.Mail
+        </GetScriptBlock></ScriptProperty>
+
+        <ScriptProperty><Name>Licensed</Name><GetScriptBlock>
+            if ($This.AssignedLicenses) {$true} else {$null}
+        </GetScriptBlock></ScriptProperty>
+
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent</Name><Members>
+        <ScriptProperty><Name>When</Name><GetScriptBlock>
+            $s = [convert]::ToDateTime($this.Start.datetime)
+            $e = [convert]::ToDateTime($this.end.datetime)
+            if ($s.AddDays(1) -eq $e -and
+                $s.hour -eq 0 -and $s.minute -eq 0 ) {
+                $s.ToShortDateString() + ' All day'
+            }
+            else {$s.ToString("g") + ' to ' +  $e.ToString("g") + $this.End.timezone}
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>StartDateTime</Name><GetScriptBlock>
+            [convert]::ToDateTime($this.start.dateTime)
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>EndDateTime</Name><GetScriptBlock>
+            [convert]::ToDateTime($this.end.dateTime)
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Where</Name>
+            <GetScriptBlock>$this.location.displayname
+        </GetScriptBlock></ScriptProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDrive</Name><Members>
+        <AliasProperty><Name>Drive</Name>
+            <ReferencedMemberName>id</ReferencedMemberName>
+        </AliasProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphSite</Name><Members>
+        <ScriptProperty><Name>Template</Name><GetScriptBlock>
+            $this.list.template
+        </GetScriptBlock></ScriptProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphCalendar</Name><Members>
+        <AliasProperty><Name>Calendar</Name>
+            <ReferencedMemberName>id</ReferencedMemberName>
+        </AliasProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphSite</Name><Members>
+        <ScriptProperty><Name>FromName</Name><GetScriptBlock>
+            $this.from.emailAddress.name
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>FromAddress</Name><GetScriptBlock>
+            $this.from.emailAddress.address
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>BodyText</Name><GetScriptBlock>
+            $this.body.content
+        </GetScriptBlock></ScriptProperty>
+        <ScriptMethod><Name>Move</Name><Script>
+            param($Destination)
+            Move-GraphMailItem -Item $this @PSBoundParameters
+        </Script></ScriptMethod>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphAttachment</Name><Members>
+        <ScriptMethod><Name>Move</Name><Script>
+            param($Destination)
+            Save-GraphMailAttachment -Attachment $this @PSBoundParameters
+        </Script></ScriptMethod>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact</Name><Members>
+        <MemberSet><Name>PSStandardMembers</Name><Members>
+            <PropertySet><Name>DefaultDisplayPropertySet</Name><ReferencedProperties>
+                <Name>displayname</Name>
+                <Name>jobtitle</Name>
+                <Name>companyname</Name>
+                <Name>mail</Name>
+                <Name>mobile</Name>
+                <Name>business</Name>
+                <Name>home</Name>
+            </ReferencedProperties></PropertySet>
+        </Members></MemberSet>
+        <AliasProperty><Name>mobile</Name>
+            <ReferencedMemberName>mobilephone</ReferencedMemberName>
+        </AliasProperty>
+        <ScriptProperty><Name>business</Name><GetScriptBlock>
+            $this.businessPhones[0]
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>home</Name><GetScriptBlock>
+            this.HomePhones[0]
+        </GetScriptBlock></ScriptProperty>
+
+    </Members></Type>
+</Types>
