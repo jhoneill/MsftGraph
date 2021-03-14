@@ -2,7 +2,7 @@
 using namespace Microsoft.Graph.PowerShell.Models
 
 #To do allow Copy-GraphOneNotePage to specify a destination-section by name (with a completer - which requires a destination notebook parameter which may cause a conflict with page which doesn't have the notebook)
-function Set-GraphOneNoteHome   {
+function Set-GraphOneNoteHome    {
     <#
       .synopsis
         Sets a default notebook (and optionally section). Set to $Null to clear the setting
@@ -43,7 +43,7 @@ function Set-GraphOneNoteHome   {
    }
 }
 
-function Get-GraphOneNoteBook   {
+function Get-GraphOneNoteBook    {
     <#
       .Synopsis
         Gets notebook objects or sections of notebooks
@@ -241,23 +241,31 @@ function New-GraphOneNoteSection {
         [switch]$Force
     )
     begin   {
-        $webParams = @{'Method'           = 'Post'
-                       'ContentType'      = 'application/json'
-                       'AsType'           =  [MicrosoftGraphOnenoteSection]
-                       'ExcludeProperty' = @('parentSectionGroup@odata.context',  'parentNotebook@odata.context', '@odata.context')
+        if     ($Notebook -is [String] -and
+             $Notebook -match "$GraphUri/.*/notebooks/[-\w+]+" ) {
+             $Notebook = Invoke-GraphRequest $Matches[0] -ExcludeProperty '@odata.context' -AsType ([MicrosoftGraphNotebook])
         }
-        if     ($Notebook.sectionsUrl)            {$webparams['uri'] = $Notebook.sectionsUrl}
-        elseif ($Notebook.self)                   {$webparams['uri'] = $Notebook.self + "/sections"}
-        elseif ($Notebook -isnot [String])        {Write-Warning -Message 'Could not process the Notebook parameter'; Return }
-        elseif ($notebook -notmatch "/sections$") {$webparams['uri'] = $Notebook + "/sections"}
-        else                                      {$webparams['uri'] = $Notebook }
+        elseif ($Notebook.self -and $Notebook -isnot [MicrosoftGraphNotebook] ) {
+                $Notebook = Invoke-GraphRequest $Notebook.Self -ExcludeProperty '@odata.context' -AsType ([MicrosoftGraphNotebook])
+        }
+
+        if     ($Notebook -isnot [MicrosoftGraphNotebook] ){
+                Write-Warning -Message 'Could not process the Notebook parameter'; Return
+        }
+        $webParams = @{
+            'uri'              =  $Notebook.sectionsUrl
+            'Method'           = 'Post'
+            'ContentType'      = 'application/json'
+            'AsType'           = [MicrosoftGraphOnenoteSection]
+            'PropertyNotMatch' = '@odata.context'
+        }
     }
     process {
-        $webparams['body']  = ConvertTo-Json @{"displayName" = $sectionName}
+        $webparams['body']  = ConvertTo-Json @{"displayName" = $SectionName}
         Write-Debug $webparams['body']
         if ($Force -or $PSCmdlet.ShouldProcess($SectionName,"Add section to Notebook $($Notebook.displayname)")) {
             $sectionobj = Invoke-GraphRequest @webParams
-            if ($Notebook -is [MicrosoftGraphNotebook]) {$sectionobj.parentNotebook = $Notebook}
+            $sectionobj.parentNotebook = $Notebook
             return $sectionobj
         }
     }

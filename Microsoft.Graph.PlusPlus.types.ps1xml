@@ -52,6 +52,14 @@
             <ReferencedMemberName>id</ReferencedMemberName>
         </AliasProperty>
     </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDriveItem</Name><Members>
+        <AliasProperty><Name>ItemID</Name>
+            <ReferencedMemberName>id</ReferencedMemberName>
+        </AliasProperty>
+        <ScriptProperty><Name>Drive</Name><GetScriptBlock>
+            $this.ParentReference.DriveID
+        </GetScriptBlock></ScriptProperty>
+    </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphSite</Name><Members>
         <ScriptProperty><Name>Template</Name><GetScriptBlock>
             $this.list.template
@@ -104,6 +112,99 @@
         <ScriptProperty><Name>home</Name><GetScriptBlock>
             this.HomePhones[0]
         </GetScriptBlock></ScriptProperty>
-
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphReminder</Name><Members>
+        <AliasProperty><Name>Subject</Name>
+            <ReferencedMemberName>eventSubject</ReferencedMemberName>
+        </AliasProperty>
+        <AliasProperty><Name>Location</Name>
+            <ReferencedMemberName>eventLocation</ReferencedMemberName>
+        </AliasProperty>
+        <ScriptProperty><Name>When</Name><GetScriptBlock>
+            if (  [System.Convert]::ToDateTime($this.eventStartTime.datetime).AddDays(1) -eq
+                  [System.Convert]::ToDateTime($this.eventEndTime.datetime )) {
+                    $this.eventStartTime.datetime -replace '(\d{2}:\d{2}):00$','$1' -replace '00:00$','All day'
+            }
+            else { ($this.eventStartTime.datetime -replace '(\d{2}:\d{2}):00$','$1') + ' to ' +
+                   ($this.eventEndTime.datetime   -replace '(\d{2}:\d{2}):00$','$1') + $this.eventEndTime.timezone }
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Start</Name><GetScriptBlock>
+            [System.Convert]::ToDateTime($this.eventStartTime.datetime )
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>End</Name><GetScriptBlock>
+            [System.Convert]::ToDateTime($this.eventEndTime.datetime )
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Reminder</Name><GetScriptBlock>
+            [System.Convert]::ToDateTime($this.reminderFireTime.datetime)
+        </GetScriptBlock></ScriptProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphMailTips</Name><Members>
+        <ScriptProperty><Name>Address</Name><GetScriptBlock>
+            $this.EmailAddress.Address
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>MessageText</Name><GetScriptBlock>
+            $this.AutomaticReplies.Message
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>MessageStart</Name><GetScriptBlock>
+            $this.AutomaticReplies.scheduledStartTime.DateTime
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>MessageEnd</Name><GetScriptBlock>
+            $this.AutomaticReplies.scheduledEndTime.DateTime
+        </GetScriptBlock></ScriptProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphList</Name><Members>
+        <ScriptProperty><Name>Template</Name><GetScriptBlock>
+            $this.list.template
+        </GetScriptBlock></ScriptProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphChatMessage</Name><Members>
+        <ScriptProperty><Name>Team</Name><GetScriptBlock>
+            $this.ChannelIdentity.TeamID
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Channel</Name><GetScriptBlock>
+            $this.ChannelIdentity.ChannelId
+        </GetScriptBlock></ScriptProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphTeamsTab</Name><Members>
+        <ScriptProperty><Name>TeamsAppName</Name><GetScriptBlock>
+            $this.teamsApp.displayName
+        </GetScriptBlock></ScriptProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphSignIn</Name><Members>
+        <ScriptProperty><Name>City</Name><GetScriptBlock>
+             $this.location.City
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>State</Name><GetScriptBlock>
+             $this.location.State
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Country</Name><GetScriptBlock>
+            $this.location.countryOrRegion
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Lat</Name><GetScriptBlock>
+            $this.location.geoCoordinates.latitude
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Long</Name><GetScriptBlock>
+            $this.location.geoCoordinates.longitude
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Browser</Name><GetScriptBlock>
+            $this.deviceDetail.browser
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Device</Name><GetScriptBlock>
+            $this.deviceDetail.displayName
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>OperatingSystem</Name><GetScriptBlock>
+            $this.deviceDetail.OperatingSystem
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>Date</Name><GetScriptBlock>
+            [datetime]$this.createdDateTime
+        </GetScriptBlock></ScriptProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDirectoryAudit</Name><Members>
+        <ScriptProperty><Name>User</Name><GetScriptBlock>
+            $this.initiatedBy.user.userPrincipalName
+        </GetScriptBlock></ScriptProperty>
+        <ScriptProperty><Name>App</Name><GetScriptBlock>
+            $this.initiatedBy.App.DisplayName
+        </GetScriptBlock></ScriptProperty>
     </Members></Type>
 </Types>

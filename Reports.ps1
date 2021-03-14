@@ -93,7 +93,7 @@ function Get-GraphSignInLog    {
     $i = 1
     Write-Progress -Activity 'Getting Sign-in Auditlog'
 
-    $result  = Invoke-GraphRequest  -Method get -Uri "$GraphUri/auditLogs/signIns" -SkipHttpErrorCheck -StatusCodeVariable status
+    $result  = Invoke-GraphRequest  -Method get -Uri "$GraphUri/auditLogs/signIns?`$top=$top" -SkipHttpErrorCheck -StatusCodeVariable status
     if ($result.error)              {
             Write-Progress -Activity 'Getting Sign-in Auditlog' -Completed
             Write-Warning "An error was returned: '$($result.error.message)' code: $($result.error.code) "
@@ -112,15 +112,7 @@ function Get-GraphSignInLog    {
         $r.pstypenames.add('GraphSigninLog')
         $r['RiskEventTypesV2'] = $r['RiskEventTypes_V2'] ;
         [void]$r.Remove('RiskEventTypes_V2');
-        New-Object -TypeName MicrosoftGraphSignIn -Property $r |
-            Add-Member -PassThru -MemberType ScriptProperty -Name City    -Value {$this.location.city}    |
-            Add-Member -PassThru -MemberType ScriptProperty -Name State   -Value {$this.location.state}   |
-            Add-Member -PassThru -MemberType ScriptProperty -Name Country -Value {$this.location.countryOrRegion}          |
-            Add-Member -PassThru -MemberType ScriptProperty -Name Lat     -Value {$this.location.geoCoordinates.latitude}  |
-            Add-Member -PassThru -MemberType ScriptProperty -Name Long    -Value {$this.location.geoCoordinates.longitude} |
-            Add-Member -PassThru -MemberType ScriptProperty -Name Browser -Value {$this.deviceDetail.browser}              |
-            Add-Member -PassThru -MemberType ScriptProperty -Name Device  -Value {$this.deviceDetail.displayName;}         |
-            Add-Member -PassThru -MemberType ScriptProperty -Name Date    -Value {[datetime]$this.createdDateTime}
+        New-Object -TypeName MicrosoftGraphSignIn -Property $r
     }
     Write-Progress -Activity 'Getting Sign-in Auditlog'-Completed
 
@@ -157,9 +149,7 @@ function Get-GraphDirectoryLog {
         $records += $result.value
     }
     foreach ($r in $records) {
-        New-Object -TypeName MicrosoftGraphDirectoryAudit -Property $r |
-            Add-Member -PassThru -MemberType ScriptProperty -Name User -Value {$this.initiatedBy.user.userPrincipalName} |
-                  Add-Member -PassThru -MemberType ScriptProperty -Name App  -Value {$this.initiatedBy.App.DisplayName}
+        New-Object -TypeName MicrosoftGraphDirectoryAudit -Property $r
     }
     Write-Progress -Activity 'Getting Directory Audits log' -Completed
 }

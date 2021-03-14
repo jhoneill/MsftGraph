@@ -30,6 +30,7 @@
                         'Add-GraphPlanBucket',
                         'Add-GraphPlannerTab',
                         'Add-GraphPlanTask',
+                        'Add-GraphSharePointTab',
                         'Add-GraphWikiTab',
                         'Connect-Graph',
                         'ConvertTo-GraphDateTimeTimeZone',
@@ -92,7 +93,7 @@
                         'Move-GraphMailItem',
                         'New-ContactAddress',
                         'New-EventAttendee',
-                        'New-GraphAttendee,'
+                        'New-GraphAttendee',
                         'New-GraphChannel',
                         'New-GraphChannelMessage',
                         'New-GraphChannelReply'    #All the different column types together!

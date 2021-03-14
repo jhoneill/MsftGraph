@@ -24,9 +24,5 @@ function Get-GraphMailTips       {
                     }
      }
 
-    Invoke-GraphRequest @webparams -ValueOnly -AsType ([MicrosoftGraphMailTips]) |
-        Add-Member -PassThru -MemberType ScriptProperty -Name 'Address'          -Value {$this.EmailAddress.Address} |
-        Add-Member -PassThru -MemberType ScriptProperty -Name 'MessageText'      -Value {$this.AutomaticReplies.Message} |
-        Add-Member -PassThru -MemberType ScriptProperty -Name 'MessageStart'     -Value {$this.AutomaticReplies.scheduledStartTime.DateTime} |
-        Add-Member -PassThru -MemberType ScriptProperty -Name 'MessageEnd'       -Value {$this.AutomaticReplies.scheduledEndTime.DateTime}
+    Invoke-GraphRequest @webparams -ValueOnly -AsType ([MicrosoftGraphMailTips])
 }

@@ -239,9 +239,8 @@ function Get-GraphGroup             {
                             Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
                     foreach ($siteObj in $result) {
                         foreach ($l in $siteObj.lists) {
-                            Add-Member -InputObject $l -NotePropertyName SiteID    -NotePropertyValue  $r.id
-                            Add-Member -InputObject $l -NotePropertyName ParentUrl -NotePropertyValue  $r.weburl
-                            Add-Member -InputObject $l -MemberType ScriptProperty -Name Template -Value {$this.list.template}
+                            Add-Member -InputObject $l -NotePropertyName SiteID    -NotePropertyValue  $siteObj.id
+                            Add-Member -InputObject $l -NotePropertyName ParentUrl -NotePropertyValue  $siteObj.weburl
                         }
                         $siteobj
                     }
@@ -257,8 +256,7 @@ function Get-GraphGroup             {
                 elseif ($Drive)              {
                     $uri = ("$groupURI/drive" + '?$expand=root($expand=children)' )
                     Invoke-GraphRequest  -Uri $uri -ExcludeProperty "@odata.context", "root@odata.context" -AsType ([MicrosoftGraphDrive]) |
-                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname |
-                        Add-Member -PassThru -MemberType AliasProperty     -Name Drive -Value 'id'
+                        Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
                     continue
                 }
                 elseif ($Members)            { #can do group ?$expand=Memebers, the others don't expand
@@ -516,9 +514,24 @@ function New-GraphGroup             {
             $webparams.Uri   +=  "/$($group.id)/team"
             $webparams.Method = 'Put'
             $webparams.Body   = '{ }'
-
-            $team             = Invoke-GraphRequest @webparams -Exclude '@odata.context' -As ([MicrosoftGraphTeam]) |
+            $TimeToStop = [datetime]::Now.AddMinutes(2)
+            $retries = 0
+            do {
+                try {
+                    $team      = Invoke-GraphRequest @webparams -Exclude '@odata.context' -As ([MicrosoftGraphTeam]) |
                                     Add-Member -PassThru -NotePropertyName Mail -NotePropertyValue $group.Mail
+                }
+                catch {
+                    $retries ++
+                    Write-Progress -Activity 'Creating Group/Team' -CurrentOperation "Team-enabling Group $Name" -status "Retries $retries"
+                    Start-Sleep -Seconds 5
+                }
+            }
+            until ($team -or [datetime]::now -gt $TimeToStop)
+            if (-not $team ) {
+                Write-Warning "Group was created, but could not elevate it to a team."
+                return $group
+            }
             $team.Description = $group.description
             $team.Members     = $group.members
             $team.visibility  = $group.visibility
@@ -807,7 +820,7 @@ function Add-GraphGroupMember       {
             foreach ($m in $member) {
                 #if we weren't passed as a user as a an object, resolve what we did get ...
                 if   (-not $m.id)  {
-                    try   {$m     = Get-GraphUser -User $m -Select id,displayname}
+                    try   {$m     = Get-GraphUser -User $m -Select displayname}
                     catch {throw "Could not get a user matching $m"; return }
                     if (-not $m) {throw "Could not get a member ID"; return }
                 }
@@ -1480,9 +1493,7 @@ function Get-ChannelMessagesByURI   {
         }
         $msgList |
             ForEach-Object {New-Object -TypeName MicrosoftGraphChatMessage -Property $_ } |
-                Sort-Object -Property createdDateTime -Descending| Select-Object -First $top |
-                Add-Member -PassThru -MemberType ScriptProperty -name Team     -Value {$this.ChannelIdentity.TeamID} |
-                Add-Member -PassThru -MemberType ScriptProperty -name Channel  -Value {$this.ChannelIdentity.ChannelId}
+                Sort-Object -Property createdDateTime -Descending| Select-Object -First $top
        <# $userHash = @{}
         Write-Progress -Activity 'Getting messages' -Status "Expanding User information"
         $msglist.from.user.id | Sort-Object -Unique | foreach-object {
@@ -1493,8 +1504,6 @@ function Get-ChannelMessagesByURI   {
             if ($msg.from.user.id) {
                 Add-Member -InputObject $msg -NotePropertyName FromUserName -NotePropertyValue $userHash[$msg.from.user.id]
             }
-            Add-Member -PassThru -MemberType ScriptProperty -name Team     -Value {$this.ChannelIdentity.TeamID} -InputObject $msg |
-            Add-Member -PassThru -MemberType ScriptProperty -name Channel  -Value {$this.ChannelIdentity.ChannelId}
         }#>
     }
 }
@@ -1556,6 +1565,11 @@ function Get-GraphChannel           {
     )
     process {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
+        #We want team to tab complete on an empty line, but than can mean if channel is the only thing on the command line it goes into $team
+        if ($Team -is [MicrosoftGraphChannel]) {
+            $Channel = $Team
+            $Team    = $Null
+        }
         if ($Channel -is [string] -and $Channel -notmatch '@thread') {
             $Channel = Get-GraphTeam -Team $Team -Channels -ChannelName $channel
         }
@@ -1582,25 +1596,22 @@ function Get-GraphChannel           {
                 if ($ch.DisplayName) {Write-Progress -Activity 'Getting Tab information' -CurrentOperation $ch.DisplayName}
                 else                 {Write-Progress -Activity 'Getting Tab information' }
                 $uri = "$GraphUri/teams/$teamID/channels/$channelID/tabs?`$expand=teamsApp"
-                Invoke-GraphRequest -Uri $uri  -ValueOnly -astype ([MicrosoftGraphTeamsTab]) | #newly created tabs have a teamsAppId property. Existing apps have to look at the teamsApp and its ID. Make them the same!
-                    Add-Member -PassThru -MemberType ScriptProperty -Name TeamsAppName -Value {$this.teamsApp.displayName}
-                    #Add-Member -PassThru -MemberType ScriptProperty -Name teamsAppId   -Value {$this.teamsApp.ID}
+                Invoke-GraphRequest -Uri $uri  -ValueOnly -astype ([MicrosoftGraphTeamsTab]) |
+                    ForEach-Object { #newly created tabs have a teamsAppId property. Existing apps have to look at the teamsApp and its ID. Make them the same!
+                        $_.TeamsAppID = $_.TeamsApp.ID
+                        $_
+                    }
                 Write-Progress -Activity 'Getting Tab information' -Completed
             }
             elseif   ($Folder -or $Files)              {
                 if ($ch.DisplayName) {Write-Progress -Activity 'Getting Folder information' -CurrentOperation $ch.DisplayName}
                 else                 {Write-Progress -Activity 'Getting Folder information' }
                 $uri = "$GraphUri/teams/$teamID/channels/$channelID//filesFolder"
-                $f = Invoke-GraphRequest -Uri $uri -AsType  ([MicrosoftGraphDriveItem]) -ExcludeProperty '@odata.context'  |
-                        Add-Member  -PassThru -MemberType AliasProperty  -Name ItemID -Value 'id'                          |
-                        Add-Member  -PassThru -MemberType ScriptProperty -Name Drive  -Value {$this.ParentReference.DriveID}
+                $f = Invoke-GraphRequest -Uri $uri -AsType  ([MicrosoftGraphDriveItem]) -ExcludeProperty '@odata.context'
                 if ($folder) {$f}
                 else         {
                     $uri = "$GraphUri/drives/$($f.ParentReference.DriveId)/items/$($f.id)/children"
-                    Invoke-GraphRequest -Uri $uri -ValueOnly -ExcludePropert '@odata.etag', '@microsoft.graph.downloadUrl' -AsType ([MicrosoftGraphDriveItem]) |
-                        Add-Member  -PassThru -MemberType AliasProperty  -Name ItemID -Value 'id'                          |
-                        Add-Member  -PassThru -MemberType ScriptProperty -Name Drive  -Value {$this.ParentReference.DriveID}
-
+                    Invoke-GraphRequest -Uri $uri -ValueOnly -ExcludePropert '@odata.etag', '@microsoft.graph.downloadUrl' -AsType ([MicrosoftGraphDriveItem])
                 }
                 Write-Progress -Activity 'Getting Folder information' -Completed
             }
@@ -1796,8 +1807,7 @@ function New-GraphChannelMessage    {
             $result = Invoke-GraphRequest @webparams
             $result.channelIdentity.TeamID = $teamID
             $result.channelIdentity.ChannelId = $channelID
-            Add-Member -PassThru -MemberType ScriptProperty -name Team  -Value {$this.ChannelIdentity.TeamID} -InputObject $result |
-            Add-Member -PassThru -MemberType ScriptProperty -name Channel  -Value {$this.ChannelIdentity.ChannelId}
+            $result
         }
     }
 }
@@ -1998,10 +2008,7 @@ function Add-GraphWikiTab           {
     )
 
     Write-Debug $webparams.body
-    if ($Force -or $PSCmdlet.Shouldprocess($TabLabel,"Create wiki tab")) {
-       Invoke-GraphRequest @webparams | #newly created tabs have a teamsAppId property. Existing apps have to look at the teamsApp and its ID. Make them the same!
-                    Add-Member -PassThru -MemberType ScriptProperty -Name teamsAppName -Value {$this.teamsApp.displayName}
-    }
+    if ($Force -or $PSCmdlet.Shouldprocess($TabLabel,"Create wiki tab")) {Invoke-GraphRequest @webparams}
 }
 # Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
 # https://products.office.com/en-us/microsoft-teams/appDefinitions.xml
@@ -2041,33 +2048,32 @@ function Add-GraphPlannerTab        {
     )
     #region get IDs needed
     ContextHas -WorkOrSchoolAccount -BreakIfNot
-    if     ($Channel.Team)            {$teamID  = $Channel.Team }
-    elseif ($Team.id)                 {$teamID  = $Team.id      }
-    elseif ($Team -is [string] -and
+    if       ($Channel.Team)            {$teamID    = $Channel.Team }
+    elseif   ($Team.id)                 {$teamID    = $Team.id      }
+    elseif   ($Team -is [string] -and
             $Team -match $GUIDRegex)  {$teamID    = $Team}
-    elseif ($Team -is [string])       {
+    elseif   ($Team -is [string])       {
             $teamID = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
     } #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
-    if     ($Channel.id)           {$channelID = $Channel.id }
-    elseif ($Channel -is [string] -and $Channel -notmatch '@thread') {
+    if       ($Channel.id)              {$channelID = $Channel.id }
+    elseif   ($Channel   -is [string] -and $Channel -notmatch '@thread') {
                 $Channelid = (Get-GraphTeam -Team $teamID -Channels -ChannelName $channel).id
     }
-    elseif ($Channel -is [string]) {$channelID = $channel  }
+    elseif   ($Channel   -is [string])  {$channelID = $channel  }
 
     if (-not ($teamID    -is [string] -and $teamId    -match $GUIDRegex -and
-                $channelID -is [string] -and $channelID -match '@thread'))  {
+              $channelID -is [string] -and $channelID -match '@thread'))  {
         #we got zero matches or more than one for a team/channel name, or we got an object without an ID, or an object where the ID wasn't a guid
         Write-Warning -Message 'Could not determine the team and channel IDs'; return
     }
+    if       ($Plan.id)                 {$Plan      = $Plan.id}
     #endregion
     if ((-not $TabLabel) -and $Plan.Title) {
         Write-Verbose -Message "ADD-GRAPHPLANNERTAB: No Tab label was specified, using the Plan title '$($Plan.Title)'"
         $TabLabel = $Plan.Title
     }
-    #If Plan and/or channel were objects with IDs use the ID
-    if       ($Channel.id) {$Channel = $Channel.id}
-    if       ($Plan.id)    {$Plan    = $Plan.id}
-    $tabURI = "https://tasks.office.com/{0}/Home/PlannerFrame?page=7&planId={1}" -f $global:GraphUser  , $Plan
+
+    $tabURI = "https://tasks.office.com/{0}/Home/PlannerFrame?page=7&planId={1}" -f $Global:GraphUser, $Plan
 
     $webparams = @{'Method'          = 'Post'
                    'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
@@ -2087,10 +2093,7 @@ function Add-GraphPlannerTab        {
         }
     })
     Write-Debug $webparams.body
-    if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {
-       Invoke-GraphRequest @webparams | #newly created tabs have a teamsAppId property. Existing apps have to look at the teamsApp and its ID. Make them the same!
-                    Add-Member -PassThru -MemberType ScriptProperty -Name teamsAppName -Value {$this.teamsApp.displayName}
-    }
+    if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {Invoke-GraphRequest @webparams}
 }
 
 function Add-GraphOneNoteTab        {
@@ -2118,7 +2121,7 @@ function Add-GraphOneNoteTab        {
     [CmdletBinding(SupportsShouldProcess)]
     param   (
         #The Notebook or Section to associate with the tab
-        [Parameter(Mandatory=$true,Position=0)]
+        [Parameter(Mandatory=$true, Position=0, ValueFromPipeline=$true)]
         [Alias('Section')]
         $Notebook,
         #An ID or Channel object which may contain the team ID; the tab will be created in this channel
@@ -2134,65 +2137,75 @@ function Add-GraphOneNoteTab        {
         #If Specified the tab will be added without pausing for confirmation, this is the default unless $ConfirmPreference has been set.
         $Force
     )
-    ContextHas -scopes 'Group.ReadWrite.All' -BreakIfNot
-    if     ($Channel.Team)           {$teamID     = $Channel.Team }
-    elseif ($Team -is [string] -and
-            $Team -match $GUIDRegex)  {$teamID    = $Team}
-    elseif ($Team -is [string])       {
-            $teamID = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
-    }       #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
-    if     ($Channel.id)           {$channelID = $Channel.id }
-    elseif ($Channel -is [string] -and
-            $Channel -match '@thread') {$channelID = $channel  }
-    elseif ($Channel -is [string])    {
-            $Channelid = (Get-GraphTeam -Team $teamID -Channels -ChannelName $channel).id
-    }
-    if (-not ($teamID    -is [string] -and $teamId    -match $GUIDRegex -and
-              $channelID -is [string] -and $channelID -match '@thread'))  {
-        #we got zero matches or more than one for a team/channel name, or we got an object without an ID, or an object where the ID wasn't a guid
-        Write-Warning -Message 'Could not determine the team and channel IDs'; return
-    }
-    if       (-not $TabLabel -and
-                $notebook.displayName) {$TabLabel = $Notebook.displayName}
-    elseif   (-not $TabLabel)          {Write-warning 'Unable to determin a name for the tab, please specify one explicitly'; return}
+    process {
+        ContextHas -scopes 'Group.ReadWrite.All' -BreakIfNot
+        #region ensure we have the team , channel and notebook IDs, and a label for the tab
+        if       ($Channel.Team)              {$teamID    = $Channel.Team }
+        elseif   ($Team    -is [string] -and
+                  $Team    -match $GUIDRegex) {$teamID    = $Team}
+        elseif   ($Team    -is [string])      {
+                  $teamID = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
+        }         #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
 
-    $webparams = @{'Method'          = 'Post'
-                   'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
-                   'ContentType'     = 'application/json'
-                   'AsType'          =  ([MicrosoftGraphTeamsTab])
-                   'ExcludeProperty' = '@odata.context'
-    }
-    #This bit had to be reverse engineered, from a beta version of the API, so if it works past next week, be happy.
-    #If the "Notebook" object is actually a section, and it was fetched by one of the module commands (get-GraphTeam -notebook, or get-graphNotebook -section)
-    #then $Notebook it will have a a parentNotebook ID. This IF..Else is to make sure we have the real notebook ID, and catch a sectionID if there is one.
-    if   ($Notebook.parentNotebook.id) {
-                    $ParamsPt2    = '&notebookSource=PickSection&sectionId='+ $Notebook.id
-                    $NotebookID   = $Notebook.parentNotebook.id
-          }
-    else  {         $ParamsPt2    = '&notebookSource=New'
-                    $NotebookID   = $Notebook.id }
+        if       ($Channel.id)                {$channelID = $Channel.id }
+        elseif   ($Channel -is [string] -and
+                $Channel -match '@thread') {$channelID = $channel  }
+        elseif   ($Channel -is [string])      {
+                $Channelid = (Get-GraphTeam -Team $teamID -Channels -ChannelName $channel).id
+        }
+        if (-not ($teamID  -is [string] -and   $teamId    -match $GUIDRegex -and
+                $channelID -is [string] -and $channelID -match '@thread'))  {
+            #we got zero matches or more than one for a team/channel name, or we got an object without an ID, or an object where the ID wasn't a guid
+            Write-Warning -Message 'Could not determine the team and channel IDs'; return
+        }
+        if       (-not $TabLabel -and
+                       $Notebook.displayName) {$TabLabel = $Notebook.displayName}
+        elseif   (-not $TabLabel)             {
+            Write-warning 'Unable to determin a name for the tab, please specify one explicitly'; return
+        }
+        #endregion
+        if       (-not $Notebook.Id -or
+                      ($Notebook -is [MicrosoftGraphOnenoteSection] -and -not
+                       $Notebook.ParentNotebook.Id  )) {
+            Write-Warning 'Could not determine the notebook ID.'; return
+        }
+        $webparams = @{
+            'Method'          = 'Post'
+            'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
+            'ContentType'     = 'application/json'
+            'AsType'          =  ([MicrosoftGraphTeamsTab])
+            'ExcludeProperty' = '@odata.context'
+        }
+        #This had to be reverse engineered, from a beta version of the API, so if it works past next week, be happy.
+        #If the "Notebook" object is actually a section, and it was fetched by one of the module commands (get-GraphTeam -notebook, or get-graphNotebook -section)
+        #then $Notebook it will have a a parentNotebook ID. This IF..Else is to make sure we have the real notebook ID, and catch a sectionID if there is one.
+        if       ($Notebook.parentNotebook.id) {
+                  $ParamsPt2     = '&notebookSource=PickSection&sectionId='+ $Notebook.id
+                  $NotebookID    = $Notebook.parentNotebook.id
+        }
+        else  {   $ParamsPt2     = '&notebookSource=New'
+                  $NotebookID    = $Notebook.id }
 
-    #if $Notebook is a section its url will end ?wd=(something). We need to split this off the URL and re-use it. The () need to be unescapted too,
-    if ($Notebook.links.oneNoteWebUrl.href -match '\?(wd=.*$)') {
-                $ParamsPt2       += '&' + ( $Matches[1] -replace '%28','(' -replace '%29',')' )
-                $OnenoteWebUrl    = $Notebook.links.oneNoteWebUrl.href  -replace  '\?wd=.*$', ''
-    }
-    else      { $OnenoteWebUrl    = $Notebook.links.oneNoteWebUrl.href}
+        #if $Notebook is a section its url will end ?wd=(something). We need to split this off the URL and re-use it. The () need to be unescapted too,
+        if       ($Notebook.links.oneNoteWebUrl.href -match '\?(wd=.*$)') {
+                  $ParamsPt2    += '&' + ( $Matches[1] -replace '%28','(' -replace '%29',')' )
+                  $OnenoteWebUrl = $Notebook.links.oneNoteWebUrl.href  -replace  '\?wd=.*$', ''
+        }
+        else     {$OnenoteWebUrl = $Notebook.links.oneNoteWebUrl.href}
 
-    #We need the teamsite URL for the team who owns this channel, and the URL to the the Notebook. Both need to be escaped.
-    $OnenoteWebUrl  = $OnenoteWebUrl                             -replace "%", "%25" -replace '/','%2F' -replace ':','%3A'
-    $siteUrl        = (Get-GraphTeam -Team $Teamid -Site).webUrl -replace "%", "%25" -replace '/','%2F' -replace ':','%3A'
+        #We need the teamsite URL for the team who owns this channel, and the URL to the the Notebook. Both need to be escaped.
+        $OnenoteWebUrl  = $OnenoteWebUrl                             -replace "%", "%25" -replace '/','%2F' -replace ':','%3A'
+        $siteUrl        = (Get-GraphTeam -Team $Teamid -Site).webUrl -replace "%", "%25" -replace '/','%2F' -replace ':','%3A'
 
-    #Now we need to build up the mother and father of all URIs It contains the ID and URL for the notebook (not section). The Name, the teamsite. And Section specifics if applicable.
-    $URIParams      = "?entityid=%7BentityId%7D&subentityid=%7BsubEntityId%7D&auth_upn=%7Bupn%7D&ui={locale}&tenantId={tid}"+
-                      "&notebookSelfUrl=https%3A%2F%2Fwww.onenote.com%2Fapi%2Fv1.0%2FmyOrganization%2Fgroups%2F$Team%2Fnotes%2Fnotebooks%2F"+ $NotebookID   +
-                      "&oneNoteWebUrl=" + $oneNoteWebUrl +
-                      "&notebookName="  + [uri]::EscapeDataString( $notebook.displayName ) +
-                      "&siteUrl="       + $SiteUrl +
-                      $ParamsPt2
+        #Now we need to build up the mother and father of all URIs It contains the ID and URL for the notebook (not section). The Name, the teamsite. And Section specifics if applicable.
+        $URIParams      = "?entityid=%7BentityId%7D&subentityid=%7BsubEntityId%7D&auth_upn=%7Bupn%7D&ui={locale}&tenantId={tid}"+
+                          "&notebookSelfUrl=https%3A%2F%2Fwww.onenote.com%2Fapi%2Fv1.0%2FmyOrganization%2Fgroups%2F$TeamID%2Fnotes%2Fnotebooks%2F"+ $NotebookID   +
+                          "&oneNoteWebUrl=" + $oneNoteWebUrl +
+                          "&notebookName="  + [uri]::EscapeDataString( $notebook.displayName ) +
+                          "&siteUrl="       + $SiteUrl + $ParamsPt2
 
-    #Now we can create the JSON. Such information as there is can be found at https://docs.microsoft.com/en-us/graph/teams-configuring-builtin-tabs
-    $json = ConvertTo-Json ([ordered]@{
+        #Now we can create the JSON. Such information as there is can be found at https://docs.microsoft.com/en-us/graph/teams-configuring-builtin-tabs
+        $json = ConvertTo-Json ([ordered]@{
                 'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/0d820ecd-def2-4297-adad-78056cde7c78"
                 'displayname'         = $TabLabel
                 'configuration'       = [ordered]@{
@@ -2201,10 +2214,103 @@ function Add-GraphOneNoteTab        {
                     'removeUrl'       = "https://www.onenote.com/teams/TabRemove"  + $URIParams
                     'websiteUrl'      = "https://www.onenote.com/teams/TabRedirect?redirectUrl=$oneNoteWebUrl"
                 }})
-    $webparams['body']= $json  -replace "\\u0026","&"
-    Write-Debug $webparams.body
-    if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {
-         Invoke-GraphRequest @webparams | #newly created tabs have a teamsAppId property. Existing apps have to look at the teamsApp and its ID. Make them the same!
-                    Add-Member -PassThru -MemberType ScriptProperty -Name teamsAppName -Value {$this.teamsApp.displayName}
+        $webparams['body'] = $json  -replace "\\u0026","&"
+        Write-Debug $webparams.body
+        if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {Invoke-GraphRequest @webparams }
     }
 }
+
+function Add-GraphSharePointTab     {
+    <#
+      .Synopsis
+        Adds a planner tab to a team-channel for sharepoint deurl
+      .Description
+        This posts to https://graph.microsoft.com/v1.0/teams/{id}/channels/{id}/tabs
+        which requires consent to use the Group.ReadWrite.All scope.
+      .Example
+
+    #>
+    [CmdletBinding(SupportsShouldProcess=$true)]
+    param   (
+        #An ID or Plan object for a plan within the team
+        [Parameter(Mandatory=$true,Position=0,ValueFromPipelineByPropertyName=$true)]
+        $WebUrl,
+        #The label for the tab by default the displayname for of the list
+        [Parameter(Mandatory=$true,Position=1,ValueFromPipelineByPropertyName=$true)]
+        [Alias('DisplayName')]
+        $TabLabel,
+        #The label for the tab.
+        [Parameter(Position=2,ValueFromPipelineByPropertyName=$true)]
+        #Either a genericList (default) or a documentLibrary
+        $Template = 'genericList',
+        #An ID or Channel object for a channel (which may contain the team ID)
+        [Parameter(Mandatory=$true,Position=3)]
+        $Channel,
+        #A team ID, or a team object, if not specified as part of the channel
+        $Team,
+        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
+        $PassThru,
+        #If Specified the tab will be added without confirming
+        $Force
+    )
+    process {
+        ContextHas -WorkOrSchoolAccount -BreakIfNot
+        #region get IDs needed
+        if       ($Channel.Team)                {$teamID  = $Channel.Team }
+        elseif   ($Team.id)                     {$teamID  = $Team.id      }
+        elseif   ($Team      -is [string] -and
+                  $Team   -match $GUIDRegex)    {$teamID    = $Team}
+        elseif   ($Team      -is [string])      {
+                  $teamID   = (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=startswith(displayname,'$Team')" -ValueOnly).id
+        } #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams
+        if       ($Channel.id)                  {$channelID = $Channel.id }
+        elseif   ($Channel   -is [string] -and
+                  $Channel -notmatch '@thread') {$channelID = (Get-GraphTeam -Team $teamID -Channels -ChannelName $channel).id}
+        elseif   ($Channel   -is [string])      {$channelID = $Channel  }
+
+        if (-not ($teamID    -is [string] -and $teamId    -match $GUIDRegex -and
+                  $channelID -is [string] -and $channelID -match '@thread'))  {
+            #we got zero matches or more than one for a team/channel name, or we got an object without an ID, or an object where the ID wasn't a guid
+            Write-Warning -Message 'Could not determine the team and channel IDs'; return
+        }
+        #endregion
+
+        $webparams = @{
+            'Method'          = 'Post'
+            'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
+            'ContentType'     = 'application/json'
+            'AsType'          =  ([MicrosoftGraphTeamsTab])
+            'ExcludeProperty' = '@odata.context'
+        }
+        if ($Template = 'genericList') {
+            $webparams['body'] = ConvertTo-Json ([ordered]@{
+                'displayname'         = $TabLabel
+                'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/2a527703-1f6f-4559-a332-d8a7d288cd88"
+                'configuration'       = [ordered]@{
+                            'entityId'   = ""
+                            'contentUrl' =  ($WebUrl -replace '(.*/sites/[^/]+/).*$','$1_layouts/15/teamslogon.aspx?spfx=true&dest=') + [uri]::EscapeDataString($WebUrl)
+                            'websiteUrl' = $WebUrl
+                            'removeUrl'  = $null
+                }
+            })
+        }
+        elseif ($Template = 'genericList') {
+            $webparams['body'] = ConvertTo-Json ([ordered]@{
+                'displayname'         = $TabLabel
+                'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/com.microsoft.teamspace.tab.files.sharepoint"
+                'configuration'       = [ordered]@{
+                            'entityId'   = ""
+                            'contentUrl' = $WebUrl
+                            'websiteUrl' = $null
+                            'removeUrl'  = $null
+                }
+            })
+        }
+        else {
+            Write-Warning "Cannot handle the template type of '$Template'." ; return
+        }
+        Write-Debug $webparams.body
+        if ($Force -or $PSCmdlet.ShouldProcess($TabLabel,"Add Tab")) {Invoke-GraphRequest @webparams}
+    }
+}
+

@@ -324,74 +324,9 @@ else { #These submodules will work with just the users module.
     . "$PSScriptRoot\Sharepoint.ps1"
 }
 if ($Script:SkippedSubmodules) {
-      Write-Host -ForegroundColor DarkGray ("Skipped " + ($Script:SkippedSubmodules -join ", ") + " because their Microsoft.Graph module(s) or private.dll file(s) were not be found.")
+      Write-Host -ForegroundColor DarkGray ("Skipped " + ($Script:SkippedSubmodules -join ", ") + " because their Microsoft.Graph module(s) or private.dll file(s) were not found.")
 }
 
-function Set-GraphOptions {
-    <#
-        .synopsis
-            Sets defaults and the tenant client ID & Client Secret used when logging on without a web dialog
-    #>
-    [cmdletbinding()]
-    param (
-        #Your Tennant ID
-        $TenantID,
-        #Client ID if not using the SDK default of 14d82eec-204b-4c2f-b7e8-296a70dab67e. Must be known to your tennant
-        $ClientID,
-        #Secret set for the client ID in your $TenantID
-        $Client_Secret,
-        #Default Scopes to request
-        $DefaultScopes,
-        #Allows a saved Refresh Token (e.g. from Show-GraphSession) to be added to the session.
-        $RefreshToken,
-        #Changes the dafault properties returned by Get-GraphUser and Get-GraphUserList
-        [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones', 'city',
-                    'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'department',
-                    'displayName', 'givenName', 'id', 'imAddresses', 'jobTitle', 'legalAgeGroupClassification',
-                    'mail', 'mailNickname', 'mobilePhone', 'officeLocation',
-                    'onPremisesDomainName', 'onPremisesExtensionAttributes', 'onPremisesImmutableId',
-                    'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName',
-                    'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
-                    'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
-                    'preferredLanguage', 'provisionedPlans', 'proxyAddresses', 'state', 'streetAddress',
-                    'surname', 'usageLocation', 'userPrincipalName', 'userType')]
-        [string[]]$DefaultUserProperties,
-
-        #Changes the default two letter (ISO  3166) country code - for new users so they can be assigned licenses.  Examples include: 'US', 'JP', and 'GB'
-        [ValidateNotNullOrEmpty()]
-        [UpperCaseTransformAttribute()]
-        [ValidateCountryAttribute()]
-        $DefaultUsageLocation
-    )
-
-    if ($TenantID)              {
-        if ($TenantID -notmatch $GUIDRegex) {
-              Write-Warning 'TenantID should be a GUID'  ; break
-        }
-        else {$Script:TenantID           = $TenantID}
-    }
-    if ($ClientID)              {
-        if ($Clientid -notmatch $GUIDRegex) {
-            Write-Warning 'ClientID should be a GUID'  ; break
-        }
-        else {$Script:ClientID           = $ClientID}
-    }
-    if ($Client_Secret)         {
-        if     ($Client_Secret -is [string]) {
-               $Script:Client_Secret      = $Client_Secret
-        }
-        elseif ($Client_Secret -is [securestring]) {
-               $Script:Client_Secret =  (new-object pscredential -ArgumentList "NoName", $Client_Secret).GetNetworkCredential().Password
-        }
-        else  {Write-Warning 'Client_secret should be a string or preferably a securestring'  ; break}
-    }
-    if ($Script:TenantID)       {Write-Verbose "TenantID: '$Script:TenantID' , ClientID: '$Script:ClientID'"}
-    if ($DefaultScopes)         {$Script:DefaultGraphScopes     = $DefaultScopes}
-    Write-Verbose ('Scopes: ' + ($Script:DefaultGraphScopes -join ', '))
-    if ($RefreshToken)          {$Script:RefreshToken           = $RefreshToken }
-    if ($DefaultUserProperties) {$Script:DefaultUserProperties  = $DefaultUserProperties}
-    if ($DefaultUsageLocation)  {$Script:DefaultUsageLocation   = $DefaultUsageLocation}
-}
 
 #call a script with calls to Set-GraphOptions
 if     ($env:GraphSettingsPath )                       {. $env:GraphSettingsPath}

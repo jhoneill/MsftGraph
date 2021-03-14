@@ -83,8 +83,8 @@ function Get-GraphSite                {
             else                 {
                 $uri = "$GraphUri/sites/$siteID`?expand=drives,lists,sites"
                 $siteobj = Invoke-GraphRequest -Uri $uri -PropertyNotMatch '@odata' -AsType ([MicrosoftGraphSite])
-                $siteobj.lists  | Add-Member -MemberType NoteProperty   -Name SiteID   -Value  $site.id
-                $siteobj.lists  | Add-Member -MemberType ScriptProperty -Name Template -Value {$this.list.template}
+                $siteobj.lists  | Add-Member -MemberType NoteProperty   -Name SiteID    -Value  $siteobj.id
+                $siteobj.lists  | Add-Member -MemberType NoteProperty   -Name ParentUrl -Value  $siteobj.WebUrl
                 $siteobj
             }
         }
@@ -929,12 +929,14 @@ function Get-GraphSiteColumn          {
     <#Get-GraphSiteColumn is intended to return one column to used when creating a new list, so
     if multiple columns are returned that would be an error (i.e. two columns have the
     same name and group wasn't given.) If -allowMultiple is specified it is *not* treated as an error #>
-    [switch]$AllowMultiple
+    [switch]$AllowMultiple,
+    [switch]$Raw
     )
     begin {
-        if (-not $script:RootSiteColumns) {
+        # $filter doesn't work on /sites/root/columnd
+        if (-not $Script:RootSiteColumns) {
             Write-Progress -Activity "Getting list of columns for the root site"
-            $script:RootSiteColumns = Invoke-GraphRequest -Method Get -Uri "$GraphUri/sites/root/columns" -valueOnly -astype ([MicrosoftGraphColumnDefinition])
+            $Script:RootSiteColumns = Invoke-GraphRequest -Method Get -Uri "$GraphUri/sites/root/columns" -valueOnly
             Write-Progress -Activity "Getting list of columns for the root site" -Completed
         }
     }
@@ -947,9 +949,14 @@ function Get-GraphSiteColumn          {
                 $wheretext = $whereText -replace ' -and$',''
                 $where     = [scriptblock]::Create("$whereText")
         }
-        $result = $script:RootSiteColumns.where($where)
+        $result = $Script:RootSiteColumns.where($where)
         if ($result.count -gt 1 -and -not $AllowMultiple) {throw 'More than one result was found and -AllowMultiple was not specified'}
-        else {return $result}
+        elseif ($raw) {return $result}
+        else          {
+            $result | ForEach-Object{
+                New-Object -TypeName MicrosoftGraphColumnDefinition -Property $_
+            }
+        }
     }
 }
 

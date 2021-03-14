@@ -23,17 +23,11 @@ function Get-GraphReminderView   {
         $webParams =  @{ Method    = 'Get'
                          ValueOnly = $true
                          AsType    = ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphReminder])
+                                     #MicrosoftGraphReminder uses strings where there should be dates. Types.ps1xml adds fields for true dates
+
         }
         if ($TimeZone) {$webParams['Headers'] = @{'Prefer' = "Outlook.timezone=""$TimeZone"""}}
-        #MicrosoftGraphReminder uses strings where there should be dates.
-        $whensb = {
-            if (  [System.Convert]::ToDateTime($this.eventStartTime.datetime).AddDays(1) -eq
-                  [System.Convert]::ToDateTime($this.eventEndTime.datetime )) {
-                    $this.eventStartTime.datetime -replace '(\d{2}:\d{2}):00$','$1' -replace '00:00$','All day'
-            }
-            else { ($this.eventStartTime.datetime -replace '(\d{2}:\d{2}):00$','$1') + ' to ' +
-                   ($this.eventEndTime.datetime   -replace '(\d{2}:\d{2}):00$','$1') + $this.eventEndTime.timezone }
-        }
+
     }
     process {
         foreach ($u in $User) {
@@ -43,13 +37,7 @@ function Get-GraphReminderView   {
             $uri = "$GraphUri/users/$u/reminderView(startDateTime='{0:yyyy-MM-ddTHH:mm:ss}',endDateTime='{1:yyyy-MM-ddTHH:mm:ss}')"
 
             $webParams['uri'] =  $uri -f [datetime]::Today, [datetime]::Today.AddDays($days)
-            Invoke-GraphRequest @webParams  |
-                Add-Member -PassThru -MemberType AliasProperty  -Name 'Subject'           -Value eventSubject  |
-                Add-Member -PassThru -MemberType AliasProperty  -Name 'Location'          -Value eventLocation |
-                Add-Member -PassThru -MemberType ScriptProperty -Name 'When'              -Value $whenSB       |
-                Add-Member -PassThru -MemberType ScriptProperty -Name 'Start'             -Value {[System.Convert]::ToDateTime($this.eventStartTime.datetime )} |
-                Add-Member -PassThru -MemberType ScriptProperty -Name 'End'               -Value {[System.Convert]::ToDateTime($this.eventEndTime.datetime )}   |
-                Add-Member -PassThru -MemberType ScriptProperty -Name 'Reminder'          -Value {[System.Convert]::ToDateTime($this.reminderFireTime.datetime)}
+            Invoke-GraphRequest @webParams
         }
     }
 }

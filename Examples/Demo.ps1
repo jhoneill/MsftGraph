@@ -1,69 +1,69 @@
-﻿#select some users and put them in a new team.
+﻿#select some users and put them in a new team. For my demoa pre-set value of department => group membership
 $GroupName        = 'Accounts'
 $newProjectName   = "Mccaw"
-$users            = Get-GraphUserList -Filter "Department eq '$GroupName'"
-$users
-$newTeam          = New-GraphTeam -Name $GroupName  -Description "The $GroupName Department" -Visibility public -Members $users
-$newTeam
-#Teams have a drive, a calendar a notebook and a default channel - let's see them, we'll use them all ...
-$teamDrive        = Get-GraphTeam $newTeam -Drive
-$teamDrive
-$teamCalendar     = Get-GraphTeam $newTeam -Calendar
-$teamCalendar
-$teamNotebook     = Get-GraphTeam $newTeam -Notebooks
-$teamNotebook
-$teamFirstChannel = Get-GraphTeam $newTeam -Channels
-$teamFirstChannel
+Get-GraphUserList -Filter "Department eq '$GroupName'" -OutVariable users  | Format-Table Organization
+New-GraphTeam -Name $GroupName  -Description "The $GroupName Department" -Visibility public -Members $users -OutVariable newTeam
 
+#Teams have a drive, a calendar a notebook and a default channel - let's start with the drive
+Get-GraphTeam $newTeam -Drive -OutVariable teamdrive |  Set-GraphHomeDrive ; $teamDrive
+#later we will add a tab in teams for this drive
 
-#Groups have a drive - add some files to it
-Get-GraphDrive -Drive $teamdrive -FolderPath /
-Get-GraphDrive -Drive $teamdrive -SpecialFolder Documents
-Get-GraphDrive -Drive $teamdrive -FolderPath /
+#special folder tab completes
+Get-GraphDrive -SpecialFolder Documents
+Get-GraphDrive /
 
-dir *.xlsx |  Copy-ToGraphFolder -Drive $teamdrive -Destination 'root:/Documents'
+#Send a local file to one drive, and open it -use it for exporting in a moment.
+Get-ChildItem test*.xlsx -OutVariable files
+#Destination tab completes - use General for preference
+$files  |  Copy-ToGraphFolder  -OutVariable item  -Destination 'root:/General'
 
-Get-GraphDrive -Drive $teamdrive -SpecialFolder Documents
-Start-Process $teamdrive.webUrl
+Start-Process $item.webUrl
+
+#Leave the window open to see export happen -  itempath  tab completes - use the file from the previous -
+$users | Select-Object Organization | Export-GraphWorkSheet -SheetName users -ItemPath 'root:/Documents/test.xlsx'
+
+#groups upgraded to teams have channels for the teams App
+Get-GraphTeam $newTeam -Channels -OutVariable teamFirstChannel
+
+$null = New-GraphChannelMessage -Channel $teamFirstChannel -Content "Please keep posts in 'General' to admin and questions about using the group. Use the wiki or OneNote for shared notes."
+
+#create a New channel - with its own notebook section and a planner with 3 buckets & an initial task. Make them tabs in teams.
+$newChannel     = New-GraphChannel  -Team $newTeam -Name      $newProjectName -Description "For anything about project $newProjectName"
+#The next commnd will fail - want to make a point about that!
+$newTeamplan    = New-GraphTeamPlan -Team $newTeam -PlanName  $newProjectName
+#The point to make: when you create a team yoy aren't added as a member and that stops you creating the planner so add (current user is in globalVar) and go again
+Add-GraphTeamMember -Group $Newteam -Member $GraphUser
+$newTeamplan    = New-GraphTeamPlan -Team $newTeam -PlanName  $newProjectName
+Add-GraphPlanBucket -Plan    $NewTeamplan -Name 'Backlog', 'To-Do','Not Doing'
+Add-GraphPlanTask   -Plan    $newTeamplan -Title "Project $newProjectName Objectives" -Bucket "To-Do" -DueDate ([datetime]::Today.AddDays(7)) -AssignTo $users[-1].Mail
+
+#Add Planner and one note to teams.
+Add-GraphPlannerTab -TabLabel 'Planner' -Channel $newChannel  -Plan $NewTeamplan | Out-Null
+
 
 #Groups have a calendar - add a meeting and invite members
-$Pattern   = New-RecurrencePattern -Weekly -Days Wednesday -Occurrences 52
-$attendees = ((Get-GraphTeam -Team $newTeam -Members) + (Get-GraphTeam -Team $newTeam -Owners ) )| New-EventAttendee -AttendeeType optional
+$teamCalendar     = Get-GraphTeam $newTeam -Calendar
+$teamCalendar
+$pattern          = New-GraphRecurrence -Type weekly -DaysOfWeek wednesday -NumberOfOccurrences 52
+$attendees        = ((Get-GraphTeam -Team $newTeam -Members) + (Get-GraphTeam -Team $newTeam -Owners ) )| New-GraphAttendee -AttendeeType optional
 Add-GraphEvent -Calendar $teamCalendar  -Subject "Midweek team lunch" -Attendees $attendees -Start ([datetime]::Today.AddHours(12)) -End ([datetime]::Today.AddHours(12)) -Recurrence $Pattern
 
+Get-GraphTeam $newTeam -Notebooks -OutVariable teamnotebook
+New-GraphOneNoteSection -Notebook $teamNotebook -SectionName $newProjectName -OutVariable NewSection
+$NewSection | Set-GraphOneNoteHome
+Add-GraphOneNotePage -HTMLPage "<html><head><title>Project $newProjectName</Title></head><body><p>A default home for your notes.</p></body></html>"
+Add-GraphOneNoteTab -TabLabel 'Project Notebook' -Channel $newChannel  -Notebook $Newsection
 
-#Groups have a note book - add a section and a page.
-$firstChannelSection = New-GraphOneNoteSection -Notebook $teamNotebook -SectionName $teamFirstChannel.displayName
-$firstChannelSection
-Add-GraphOneNotePage -Section $firstChannelSection -HTMLPage '<html><head><title>$($teamFirstChannel.displayName) Section</Title></head><body><p>A default home for your notes.</p></body></html>'
+$teamDrive | Add-GraphSharePointTab -TabLabel "Team Drive" -Channel $NewChannel
 
-#Groups start with one channel - add a wiki, and general section of the notebook to it.
-Add-GraphWikiTab       -Channel $teamFirstChannel -TabLabel Wiki
-Add-GraphOneNoteTab    -Channel $teamFirstChannel -Notebook $firstChannelSection -TabLabel Notes
-Add-GraphChannelThread -Channel $teamFirstChannel -Content "Please keep posts in 'General' to admin and questions about using the group. Use the wiki or OneNote for shared notes."
-
-#New channel - add a notebook section and a planner ,with 3 buckets and an initial task
-
-$Newsection     = New-GraphOneNoteSection -Notebook $teamNotebook -SectionName $newProjectName
-Add-GraphOneNotePage -Section $Newsection -HTMLPage "<html><head><title>Project $newProjectName</Title></head><body><p>A default home for your notes.</p></body></html>"
-
-$newChannel     = New-GraphChannel  -Team $newTeam -Name      $newProjectName -Description "For anything about project $newProjectName"
-$newTeamplan    = New-GraphTeamPlan -Team $newTeam -PlanName  $newProjectName
-Add-GraphTeamMember -Group $Newteam -Member j@mobulaconsulting.com
-
-$newTeamplan    = New-GraphTeamPlan -Team $newTeam -PlanName  $newProjectName
-Add-GraphOneNoteTab -Channel $newChannel  -Notebook $Newsection -TabLabel 'Project Notebook'
-Add-GraphPlannerTab -Channel $newChannel  -Plan $NewTeamplan    -TabLabel "Planner"
-Add-GraphPlanBucket -Plan    $NewTeamplan -Name 'Backlog', 'To-Do','Not Doing'
-Add-GraphPlanTask   -Plan    $newTeamplan -Title "Project Objectives" -Bucket "To-Do" -DueDate ([datetime]::Today.AddDays(7)) -AssignTo jacob@mobulaconsulting.com
-
-$cols    = 'AssignedTo', 'IssueStatus',  'TaskDueDate',   'V3Comments' | ForEach-Object {Get-GraphSiteColumn -name $_}
-$cols   += Get-GraphSiteColumn -Name 'priority' -ColumnGroup 'Core Task and Issue Columns'
+$cols    = 'AssignedTo', 'IssueStatus',  'TaskDueDate',   'V3Comments' | ForEach-Object {Get-GraphSiteColumn -Raw -name $_}
+$cols   += Get-GraphSiteColumn -Raw -Name 'priority' -ColumnGroup 'Core Task and Issue Columns'
 $newlist = New-GraphList -Name "$newProjectName Issue Tracking" -Columns $cols  -Site $site -Template genericList
 
 Add-GraphListItem  -List $newlist -Fields @{Title='Demo Item';IssueStatus='Active';Priority='(2) Normal';}
 
-Add-GraphChannelThread -Channel $teamFirstChannel -Content "A new channel has been added for Project $newProjectName with its own planner, one note section and issues list on the team site. Take a look "
+$newlist | Add-GraphSharePointTab -Channel $NewChannel
+
+New-GraphChannelMessage    -Channel $teamFirstChannel -Content "A new channel has been added for Project $newProjectName with its own planner, one note section and issues list on the team site. Take a look "
 
 Start-Process $newlist.webUrl
-

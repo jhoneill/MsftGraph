@@ -264,7 +264,7 @@ function Get-GraphUser            {
                        'deletedDateTime', 'department', 'directReports', 'displayName', 'drive', 'drives',
                        'employeeHireDate', 'employeeId', 'employeeOrgData', 'employeeType', 'events', 'extensions',
                        'externalUserState', 'externalUserStateChangeDateTime', 'faxNumber', 'followedSites', 'givenName', 'hireDate',
-                       'identities', 'imAddresses', 'inferenceClassification', 'insights', 'interests', 'isResourceAccount', 'jobTitle', 'joinedTeams',
+                       'id', 'identities', 'imAddresses', 'inferenceClassification', 'insights', 'interests', 'isResourceAccount', 'jobTitle', 'joinedTeams',
                        'lastPasswordChangeDateTime', 'legalAgeGroupClassification', 'licenseAssignmentStates', 'licenseDetails' ,
                        'mail' , 'mailFolders' , 'mailNickname', 'managedAppRegistrations', 'managedDevices', 'manager' , 'memberOf' , 'messages', 'mobilePhone', 'mySite',
                        'oauth2PermissionGrants' ,  'officeLocation', 'onenote', 'onlineMeetings' , 'onPremisesDistinguishedName', 'onPremisesDomainName',
@@ -1159,10 +1159,14 @@ function New-GraphAttendee        {
         [Parameter(ValueFromPipeline=$true,ParameterSetName='PipedStrings',Mandatory=$true)]
         $InputObject
     )
-    #$EmailAddress = New-GraphMailAddress -Address $Address -DisplayName $DisplayName
+    #$EmailAddress = New-GraphMailAddress -Address $Address -DisplayName $Name
     # New-Object -TypeName MicrosoftGraphAttendee -Property @{emailaddress=$EmailAddress ; Type=$AttendeeType}
-
-    @{ 'type'= $AttendeeType ; 'emailAddress' =  @{'address'=$mail; name=$DisplayName }}
+    process {
+        if ($Address) {
+            if (-not $Name) {$Name = $Address}
+            @{ 'type'= $AttendeeType ; 'emailAddress' =  @{'address'=$Address; name=$Name }}
+        }
+    }
 }
 
 function New-GraphPhysicalAddress {
@@ -1254,7 +1258,7 @@ function New-GraphRecurrence      {
         [string]$RecurrenceTimeZone
     )
     if ($endDate) {
-        $range =  New-Object -TypeName MicrosoftGraphRecurrenceRange -Property @{
+        $range =   @{
             numberOfOccurrences = $numberOfOccurrences
             startDate           = ($startDate.ToString('yyyy-MM-dd') )
             endDate             = ($EndDate.ToString(  'yyyy-MM-dd') )
@@ -1263,19 +1267,19 @@ function New-GraphRecurrence      {
         }
     }
     elseif ($numberOfOccurrences) {
-        $range =  New-Object -TypeName MicrosoftGraphRecurrenceRange -Property @{
+        $range =  @{
             numberOfOccurrences = $numberOfOccurrences
             startDate           = ($startDate.ToString('yyyy-MM-dd') )
             type                = 'numbered'
         }
     }
     else {
-        $range =  New-Object -TypeName MicrosoftGraphRecurrenceRange -Property @{
+        $range =  @{
             startDate           = ($startDate.ToString('yyyy-MM-dd') )
             type                = 'noEnd'
         }
     }
-    $pattern = New-Object -TypeName MicrosoftGraphRecurrencePattern -Property @{
+    $pattern =  @{
         dayOfMonth     = $DayOfMonth
         daysOfWeek     = $DaysOfWeek
         firstDayOfWeek = $FirstDayOfWeek
@@ -1284,7 +1288,7 @@ function New-GraphRecurrence      {
         month          = $month
         type           = $type
     }
-    New-object -TypeName MicrosoftGraphPatternedRecurrence -Property @{
+    return @{
             pattern   = $pattern
             range     = $range
     }
@@ -1297,7 +1301,7 @@ function Get-GraphCalendarPath    {
         $User
     )
     if     ($Calendar -and $Calendar.CalendarPath) {
-        retrun $Calendar.CalendarPath
+            return $Calendar.CalendarPath
     }
     elseif ($Calendar -and  $User)      { #get a specific calendar for a specific user
         if ($User.ID)     {$user = $User.ID}
@@ -2475,7 +2479,7 @@ function Add-GraphEvent           {
     }
     process {
         $CalendarPath     = Get-GraphCalendarPath -Calendar $Calendar -Group $Group -User $User
-        $webParams['uri'] = $GraphUri + $CalendarPath + '/events'
+        $webParams['uri'] = $GraphUri + "/" + $CalendarPath + '/events'
 
         #region assemble the body needed to create the event
         $settings = @{      'subject'=  $Subject;     'isReminderOn' = [bool]$ReminderOn}
@@ -2698,7 +2702,7 @@ function Get-GraphToDoList        {
         contexthas -WorkOrSchoolAccount -BreakIfNot
         if ($UserId) {$uri    = "$GraphUri/users/$userid/todo/lists"}
         else         {$uri    = "$GraphUri/me/todo/lists"
-                      $UserId =  $global:GraphUser
+                      $UserId =  $Global:GraphUser
         }
         if ( $ToDoList -is [string] -and  $ToDoList -match "\w{100}" ) {
             try {
@@ -2719,7 +2723,7 @@ function Get-GraphToDoList        {
         }
         if     (-not $Tasks) {return $ToDoList}
         else  {
-            if (-not $UserId) {$UserId = $global:GraphUser }
+            if (-not $UserId) {$UserId = $Global:GraphUser }
             Invoke-GraphRequest  -Method get  -uri "$uri/$($ToDoList.id)/tasks" -ValueOnly -ExcludeProperty "@odata.etag" -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphTodoTask]) |
                 Add-Member -PassThru -NotePropertyName UserId   -NotePropertyValue $userID |
                 Add-Member -PassThru -NotePropertyName ListID   -NotePropertyValue $ToDoList.Id |
@@ -2740,7 +2744,7 @@ param   (
     [string]$Displayname    ,
 
     #The User ID (GUID or UPN) of the list owner. Defaults to the current user,
-    $UserId =  $global:GraphUser,
+    $UserId =  $Global:GraphUser,
 
     #If specified the the list will be created as a shared list
     [switch]$IsShared,
@@ -2767,7 +2771,7 @@ function New-GraphToDoTask        {
         #The User ID (GUID or UPN) of the list owner. Defaults to the current user, and may be found on theToDo list object
         [Parameter()]
         [string]
-        $UserId =  $global:GraphUser,
+        $UserId =  $Global:GraphUser,
 
         # A brief description of the task.
         [Parameter(mandatory=$true, position=0)]
@@ -2847,7 +2851,7 @@ function Update-GraphToDoTask     {
 
     #The User ID (GUID or UPN) of the list owner. Defaults to the current user, and may be found on the task or the ToDo list object
     [Parameter(ValueFromPipelineByPropertyName=$true)]
-    [string]$UserId =  $global:GraphUser,
+    [string]$UserId =  $Global:GraphUser,
 
     # A brief description of the task.
     [Parameter(position=0)]
@@ -2943,7 +2947,7 @@ function Remove-GraphToDoTask     {
 
     #The User ID (GUID or UPN) of the list owner. Defaults to the current user, and may be found on the task or the ToDo list object
     [Parameter(ValueFromPipelineByPropertyName=$true)]
-    [string]$UserId =  $global:GraphUser,
+    [string]$UserId =  $Global:GraphUser,
 
     #If specified, no confirmation will be displayed before deleting the task
     [switch]$Force
@@ -2990,7 +2994,7 @@ function Remove-GraphToDoList     {
 
     #The User ID (GUID or UPN) of the list owner. Defaults to the current user, and may be found on the ToDo list object
     [Parameter(ValueFromPipelineByPropertyName=$true)]
-    [string]$UserId =  $global:GraphUser,
+    [string]$UserId =  $Global:GraphUser,
 
     #If specified, no confirmation will be displayed before deleting the list
     [switch]$Force
