@@ -25,7 +25,6 @@
         <ScriptProperty><Name>Licensed</Name><GetScriptBlock>
             if ($This.AssignedLicenses) {$true} else {$null}
         </GetScriptBlock></ScriptProperty>
-
     </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent</Name><Members>
         <ScriptProperty><Name>When</Name><GetScriptBlock>

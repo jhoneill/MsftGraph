@@ -281,9 +281,8 @@ class UPNCompleter                : IArgumentCompleter {
 
 #Submodules which need the class and/or private functions from the SDK module.
 $ImportCmds = [ordered]@{
-  'Users'                        = @('Get-MgUser_List1' , 'New-MgUserTodoList_CreateExpanded1',
-                                     'New-MgUserTodoListTask_CreateExpanded1', 'Remove-MgUserTodoList_Delete1',
-                                     'Remove-MgUserTodoListTask_Delete1', 'Update-MgUserTodoListTask_UpdateExpanded1')
+  'Users'                        = @('New-MgUserTodoList_CreateExpanded1','New-MgUserTodoListTask_CreateExpanded1', 'Remove-MgUserTodoList_Delete1',
+                                     'Remove-MgUserTodoListTask_Delete1', 'Update-MgUserTodoListTask_UpdateExpanded1') #'Get-MgUser_List1' ,
   'Identity.DirectoryManagement' = @('Get-MgDomain_Get1', 'Get-MgDomain_List1', 'Get-MgDomainNameerenceByRef_List1',
                                      'Get-MgDomainServiceConfigurationRecord_List1' , 'Get-MgDomainVerificationDnsRecord_List1',
                                      'Get-MgOrganization_List1', 'Get-MgSubscribedSku_Get1', 'Get-MgSubscribedSku_List1')
@@ -291,16 +290,16 @@ $ImportCmds = [ordered]@{
   'Users.Actions'                = @()
   'Identity.SignIns'             = @()
   'Reports'                      = @()
-  'Applications'                 =('Get-MgServicePrincipal_Get2','Get-MgServicePrincipal_List1')
+  'Applications'                 =('Get-MgServicePrincipal_List1') #Get-MgServicePrincipal_Get2
 }
 foreach ($subModule in $ImportCmds.keys) {
     $result = $null
     if (Test-path     (Join-Path $PSScriptRoot -ChildPath "Microsoft.Graph.$subModule.private.dll")) {
-        $result = Import-Module (Join-Path $PSScriptRoot -ChildPath "Microsoft.Graph.$subModule.private.dll") -Cmdlet $ImportCmds[$subModule] -PassThru
+        $result = Import-Module -Scope Local (Join-Path $PSScriptRoot -ChildPath "Microsoft.Graph.$subModule.private.dll") -Cmdlet $ImportCmds[$subModule] -PassThru
     }
     # I do mean get module and assign it to module and if it works then... not "$module -eq"
     elseif ($module = Get-Module -ListAvailable "Microsoft.Graph.$submodule" | Sort-Object -Property Version | Select-Object -Last 1) {
-        $result = Import-Module (Join-Path (Split-Path $module.Path) -ChildPath "bin\Microsoft.Graph.$submodule.private.dll") -Cmdlet $ImportCmds[$subModule]  -PassThru
+        $result = Import-Module -Scope Local (Join-Path (Split-Path $module.Path) -ChildPath "bin\Microsoft.Graph.$submodule.private.dll") -Cmdlet $ImportCmds[$subModule]  -PassThru
     }
     else {
         Write-Verbose "Microsoft.Graph.$subModule.private.dll  not found $subModule won't be loaded "
@@ -308,7 +307,7 @@ foreach ($subModule in $ImportCmds.keys) {
     }
     if ($result) {
         .  "$PSScriptRoot\$subModule.ps1"
-        foreach ($cmd in $ImportCmds[$subModule]) { (Get-Command $cmd).Visibility = 'Private'  }
+        foreach ($cmd in $ImportCmds[$subModule]) { $c = Get-Command $cmd; $c.set_visibility('Private')  }
     }
 }
 
@@ -327,12 +326,77 @@ if ($Script:SkippedSubmodules) {
       Write-Host -ForegroundColor DarkGray ("Skipped " + ($Script:SkippedSubmodules -join ", ") + " because their Microsoft.Graph module(s) or private.dll file(s) were not found.")
 }
 
+function Set-GraphOptions {
+    <#
+        .synopsis
+            Sets defaults and the tenant client ID & Client Secret used when logging on without a web dialog
+    #>
+    [cmdletbinding()]
+    param (
+        #Your Tennant ID
+        $TenantID,
+        #Client ID if not using the SDK default of 14d82eec-204b-4c2f-b7e8-296a70dab67e. Must be known to your tennant
+        $ClientID,
+        #Secret set for the client ID in your $TenantID
+        [Alias('Client_Secret,')]
+        $ClientSecret,
+        #Default Scopes to request
+        $DefaultScopes,
+        #Allows a saved Refresh Token (e.g. from Show-GraphSession) to be added to the session.
+        $RefreshToken,
+        #Changes the dafault properties returned by Get-GraphUser and Get-GraphUserList
+        [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones', 'city',
+                    'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'department',
+                    'displayName', 'givenName', 'id', 'imAddresses', 'jobTitle', 'legalAgeGroupClassification',
+                    'mail', 'mailNickname', 'mobilePhone', 'officeLocation',
+                    'onPremisesDomainName', 'onPremisesExtensionAttributes', 'onPremisesImmutableId',
+                    'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName',
+                    'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
+                    'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
+                    'preferredLanguage', 'provisionedPlans', 'proxyAddresses', 'state', 'streetAddress',
+                    'surname', 'usageLocation', 'userPrincipalName', 'userType')]
+        [string[]]$DefaultUserProperties,
+
+        #Changes the default two letter (ISO  3166) country code - for new users so they can be assigned licenses.  Examples include: 'US', 'JP', and 'GB'
+        [ValidateNotNullOrEmpty()]
+        [ValidateCountryAttribute()]
+        [string]$DefaultUsageLocation
+    )
+
+    if ($TenantID)              {
+        if ($TenantID -notmatch $GUIDRegex) {
+              Write-Warning 'TenantID should be a GUID'  ; break
+        }
+        else {$Script:TenantID           = $TenantID}
+    }
+    if ($ClientID)              {
+        if ($Clientid -notmatch $GUIDRegex) {
+            Write-Warning 'ClientID should be a GUID'  ; break
+        }
+        else {$Script:ClientID           = $ClientID}
+    }
+    if ($ClientSecret)         {
+        if     ($ClientSecret -is [string]) {
+               $Script:ClientSecret      = $ClientSecret
+        }
+        elseif ($ClientSecret -is [securestring]) {
+               $Script:ClientSecret =  (new-object pscredential -ArgumentList "NoName", $ClientSecret).GetNetworkCredential().Password
+        }
+        else  {Write-Warning 'ClientSecret should be a string or preferably a securestring'  ; break}
+    }
+    if ($Script:TenantID)       {Write-Verbose "TenantID: '$Script:TenantID' , ClientID: '$Script:ClientID'"}
+    if ($DefaultScopes)         {$Script:DefaultGraphScopes     = $DefaultScopes}
+    Write-Verbose ('Scopes: ' + ($Script:DefaultGraphScopes -join ', '))
+    if ($RefreshToken)          {$Script:RefreshToken           = $RefreshToken }
+    if ($DefaultUserProperties) {$Script:DefaultUserProperties  = $DefaultUserProperties}
+    if ($DefaultUsageLocation)  {$Script:DefaultUsageLocation   = $DefaultUsageLocation.ToUpper()}
+}
 
 #call a script with calls to Set-GraphOptions
 if     ($env:GraphSettingsPath )                       {. $env:GraphSettingsPath}
 elseif (Test-Path "$PSScriptRoot\Microsoft.Graph.PlusPlus.settings.ps1") {. "$PSScriptRoot\Microsoft.Graph.PlusPlus.settings.ps1"}
 
-if ($null -eq [GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
+if      ($null -eq [GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
 elseif ([GraphSession]::instance.AuthContext.AppName -and -not [GraphSession]::instance.AuthContext.Account) {
       Write-Host ("Already logged on as the app '$([GraphSession]::instance.AuthContext.AppName)'." )}
 else {Write-Host ("Already logged on as '$([GraphSession]::instance.AuthContext.Account)'." )}

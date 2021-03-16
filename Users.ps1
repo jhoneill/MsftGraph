@@ -188,6 +188,7 @@ function Get-GraphUser            {
     #>
     [cmdletbinding(DefaultparameterSetName="None")]
     [Alias('ggu')]
+    [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser])]
     param   (
         #UserID as a guid or User Principal name. If not specified, it will assume "Current user" if other paraneters are given, or "All users" otherwise.
         [parameter(Position=0,valueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
@@ -541,6 +542,7 @@ function Set-GraphUser            {
         # The company name which the user is associated. This property can be useful for describing the company that an external user comes from. The maximum length of the company name is 64 chararcters.
         $CompanyName,
         #ID or UserPrincipalName of the user's manager
+        [ArgumentCompleter([UPNCompleter])]
         [string]$Manager,
         #The employee identifier assigned to the user by the organization
         [string]$EmployeeID,

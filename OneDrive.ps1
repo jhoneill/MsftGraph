@@ -577,12 +577,18 @@ function Copy-FromGraphFolder  {
 function Set-GraphHomeDrive    {
     param    (
         [Parameter(Mandatory=$true,ValueFromPipeline=$true,Position=0)]
+        [allownull()]
         [Microsoft.Graph.PowerShell.Models.MicrosoftGraphDrive]$Drive
     )
-    $Global:PSDefaultParameterValues["*GraphFolder:Drive"]    = $Drive
-    $Global:PSDefaultParameterValues["*GraphWorkBook:Drive"]  = $Drive
-    $Global:PSDefaultParameterValues["*GraphWorksheet:Drive"] = $Drive
-    $Global:PSDefaultParameterValues["Get-GraphDrive:Drive"]  = $Drive
+    @("*GraphFolder:Drive", "*GraphWorkBook:Drive", "*GraphWorksheet:Drive", "Get-GraphDrive:Drive") | ForEach-Object {
+       $null = $Global:PSDefaultParameterValues.Remove($_)
+    }
+    if ($Drive){
+        $Global:PSDefaultParameterValues["*GraphFolder:Drive"]    = $Drive
+        $Global:PSDefaultParameterValues["*GraphWorkBook:Drive"]  = $Drive
+        $Global:PSDefaultParameterValues["*GraphWorksheet:Drive"] = $Drive
+        $Global:PSDefaultParameterValues["Get-GraphDrive:Drive"]  = $Drive
+    }
 }
 
 Function Get-GraphWorkBook     {

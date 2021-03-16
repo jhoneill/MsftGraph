@@ -245,7 +245,7 @@ function Grant-GraphLicense             {
             #region Add the user to web parameters: allow for mulitple users - potentially with an ID or a UPN
             if ($u -eq "me") {
                     $baseUri  = "$GraphUri/me/"
-                    $userDisplayName    =  $global:GraphUser
+                    $userDisplayName    =  $Global:GraphUser
             }
             elseif ($u.id)  {
                     $baseUri  = "$GraphUri/users/$($u.id)/"
@@ -391,7 +391,7 @@ function Revoke-GraphLicense            {
             #region Add the user to web parameters: allow for mulitple users - potentially with an ID or a UPN
             if ($u -eq "me") {
                     $webparams['uri']   = "$GraphUri/me/assignLicense"
-                    $userDisplayName    =  $global:GraphUser
+                    $userDisplayName    =  $Global:GraphUser
             }
             elseif ($u.id)  {
                     $webparams['uri']   = "$GraphUri/users/$($u.id)/assignLicense"

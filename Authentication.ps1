@@ -254,7 +254,8 @@ function Connect-Graph              {
             #An x509 Certificate supplied during invocation - see https://docs.microsoft.com/en-us/graph/powershell/app-only? for configuring the host side.
             $paramDictionary.Add('Certificate',[RuntimeDefinedParameter]::new('Certificate',  [System.Security.Cryptography.X509Certificates.X509Certificate2],   $CertParamAttribute))
         }
-        if (Get-command Get-AzAccessToken -ErrorAction SilentlyContinue) {
+        #the simpler  Get-command Get-AzAccessToken -ErrorAction SilentlyContinue loads az.accounts. Only offer the parameter if the module is loaded.
+        if ("Get-AzAccessToken" -in (Get-Module Az.accounts).ExportedCmdlets.Keys) {
             $NoRefreshAttributeCollection.Add((New-Object System.Management.Automation.ParameterAttribute -Property @{       ParameterSetName='AzureParameterSet'}))
             $FromAzParamAttribute = New-Object System.Management.Automation.ParameterAttribute -Property @{ParameterSetName='AzureParameterSet';Position=3}
             $DefProfParamAttribute = New-Object System.Management.Automation.ParameterAttribute -Property @{ParameterSetName='AzureParameterSet';Position=4}
@@ -405,6 +406,10 @@ function Connect-Graph              {
             if ($authcontext.Account) {
                 $result           = 'Welcome To Microsoft Graph++, {0}.' -f $authcontext.Account
                 $user             =   Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/me/"
+                if ($Global:GraphUser -and $Global:GraphUser -ne $user.userPrincipalName) {
+                    Set-GraphOneNoteHome $null
+                    Set-GraphHomeDrive   $null
+                }
                 $Global:GraphUser =  $user.userPrincipalName
                 Add-Member -Force -InputObject $authcontext -NotePropertyName UserDisplayName     -NotePropertyValue $user.displayName
                 Add-Member -Force -InputObject $authcontext -NotePropertyName UserID              -NotePropertyValue $user.ID
@@ -478,13 +483,14 @@ function Show-GraphSession          {
             if ($Script:SkippedSubmodules) {
                 Write-Host -ForegroundColor DarkGray ("Skipped " + ($Script:SkippedSubmodules -join ", ") + " because their Microsoft.Graph module(s) or private.dll file(s) were not found.")
             }
-            if     ($Global:PSDefaultParameterValues['Get-GraphDrive:Drive'])        {
+            if     ($Global:PSDefaultParameterValues['Get-GraphDrive:Drive'])           {
                 Write-Host "Home OneDrive is set"
             }
-            if     ($Global:PSDefaultParameterValues['*GraphOneNoteBook*:Notebook','Get-GraphOneNotePage:Section'].count -eq 2) {
+            if     ($Global:PSDefaultParameterValues['*GraphOneNoteBook*:Notebook'] -and
+                    $Global:PSDefaultParameterValues['Get-GraphOneNotePage:Section'])   {
                     Write-Host "Home Notebook and section are Set"
             }
-            elseif ($Global:PSDefaultParameterValues['*GraphOneNoteBook*:Notebook']) {
+            elseif ($Global:PSDefaultParameterValues['*GraphOneNoteBook*:Notebook'])    {
                 Write-Host "Home Notebook is set"
             }
             Get-MgContext
@@ -554,71 +560,4 @@ function ContextHas                 {
     }
     #otherwise return true or false
     else  {return ( $state -xor $not )}
-}
-
-function Set-GraphOptions {
-    <#
-        .synopsis
-            Sets defaults and the tenant client ID & Client Secret used when logging on without a web dialog
-    #>
-    [cmdletbinding()]
-    param (
-        #Your Tennant ID
-        $TenantID,
-        #Client ID if not using the SDK default of 14d82eec-204b-4c2f-b7e8-296a70dab67e. Must be known to your tennant
-        $ClientID,
-        #Secret set for the client ID in your $TenantID
-        [Alias('Client_Secret,')]
-        $ClientSecret,
-        #Default Scopes to request
-        $DefaultScopes,
-        #Allows a saved Refresh Token (e.g. from Show-GraphSession) to be added to the session.
-        $RefreshToken,
-        #Changes the dafault properties returned by Get-GraphUser and Get-GraphUserList
-        [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones', 'city',
-                    'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'department',
-                    'displayName', 'givenName', 'id', 'imAddresses', 'jobTitle', 'legalAgeGroupClassification',
-                    'mail', 'mailNickname', 'mobilePhone', 'officeLocation',
-                    'onPremisesDomainName', 'onPremisesExtensionAttributes', 'onPremisesImmutableId',
-                    'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName',
-                    'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
-                    'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
-                    'preferredLanguage', 'provisionedPlans', 'proxyAddresses', 'state', 'streetAddress',
-                    'surname', 'usageLocation', 'userPrincipalName', 'userType')]
-        [string[]]$DefaultUserProperties,
-
-        #Changes the default two letter (ISO  3166) country code - for new users so they can be assigned licenses.  Examples include: 'US', 'JP', and 'GB'
-        [ValidateNotNullOrEmpty()]
-        [UpperCaseTransformAttribute()]
-        [ValidateCountryAttribute()]
-        $DefaultUsageLocation
-    )
-
-    if ($TenantID)              {
-        if ($TenantID -notmatch $GUIDRegex) {
-              Write-Warning 'TenantID should be a GUID'  ; break
-        }
-        else {$Script:TenantID           = $TenantID}
-    }
-    if ($ClientID)              {
-        if ($Clientid -notmatch $GUIDRegex) {
-            Write-Warning 'ClientID should be a GUID'  ; break
-        }
-        else {$Script:ClientID           = $ClientID}
-    }
-    if ($ClientSecret)         {
-        if     ($ClientSecret -is [string]) {
-               $Script:ClientSecret      = $ClientSecret
-        }
-        elseif ($ClientSecret -is [securestring]) {
-               $Script:ClientSecret =  (new-object pscredential -ArgumentList "NoName", $ClientSecret).GetNetworkCredential().Password
-        }
-        else  {Write-Warning 'ClientSecret should be a string or preferably a securestring'  ; break}
-    }
-    if ($Script:TenantID)       {Write-Verbose "TenantID: '$Script:TenantID' , ClientID: '$Script:ClientID'"}
-    if ($DefaultScopes)         {$Script:DefaultGraphScopes     = $DefaultScopes}
-    Write-Verbose ('Scopes: ' + ($Script:DefaultGraphScopes -join ', '))
-    if ($RefreshToken)          {$Script:RefreshToken           = $RefreshToken }
-    if ($DefaultUserProperties) {$Script:DefaultUserProperties  = $DefaultUserProperties}
-    if ($DefaultUsageLocation)  {$Script:DefaultUsageLocation   = $DefaultUsageLocation}
 }

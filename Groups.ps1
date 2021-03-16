@@ -227,8 +227,8 @@ function Get-GraphGroup             {
             else                          {$displayname       = $i            }
             if  ($i.id)                   {$groupid = $teamid = $i.id         }
             else                          {$groupid = $teamid = $i            }
-            $groupURI = "$GraphURI/groups/$groupid"
-            $teamURI  = "$GraphURI/teams/$teamid"
+            $groupURI = "$GraphUri/groups/$groupid"
+            $teamURI  = "$GraphUri/teams/$teamid"
             try   {
                 #For each of the switches get the data from /groups{id}/whatever or /teams/{id}.whatever
                 #Add a type to PS Type names so we can format it, and add any properties we expect to want later.
@@ -303,7 +303,7 @@ function Get-GraphGroup             {
                     if ($i.displayName) {$dirObjectsHash[$teamId] = $i.displayName}
                     @() + $result.owner + $result.createdby.user.id  |ForEach-Object  {
                         if (-not $dirObjectsHash[$_]) {
-                            $dirObjectsHash[$_] = (Invoke-GraphRequest  -Uri "$GraphURI/directoryobjects/$_").displayname
+                            $dirObjectsHash[$_] = (Invoke-GraphRequest  -Uri "$GraphUri/directoryobjects/$_").displayname
                         }
                     }
                     foreach ($r in $result) {
@@ -452,7 +452,7 @@ function New-GraphGroup             {
     )
     ContextHas -WorkOrSchoolAccount -BreakIfNot
 
-    if (Invoke-GraphRequest -Uri "$GraphURI/groups?`$filter=displayname eq '$Name'" -ValueOnly) {
+    if (Invoke-GraphRequest -Uri "$GraphUri/groups?`$filter=displayname eq '$Name'" -ValueOnly) {
         throw "There is already a group with the display name '$Name'." ; return
     }
     #Server-side is case-sensitive for [most] JSON so make sure hashtable names and constants have the right case!
@@ -481,8 +481,8 @@ function New-GraphGroup             {
     if ($Members) {
         $settings['members@odata.bind']    = @();
         foreach ($m in $Members) {
-            if  ($m.id) {$settings['members@odata.bind'] += "$GraphURI/users/$($m.id)"}
-            else        {$settings['members@odata.bind'] += "$GraphURI/users/$m"}
+            if  ($m.id) {$settings['members@odata.bind'] += "$GraphUri/users/$($m.id)"}
+            else        {$settings['members@odata.bind'] += "$GraphUri/users/$m"}
         }
     }
     #If we make someone else the owner of the group, we can't make it a team,
@@ -490,13 +490,13 @@ function New-GraphGroup             {
     if ($Owners) {
         $settings['owners@odata.bind']     = @()
         foreach    ($o in $Owners)  {
-            if     ($o.id) {$settings['owners@odata.bind']  += "$GraphURI/users/$($o.id)"}
-            else{           $settings['owners@odata.bind']  += "$GraphURI/users/$o"}
+            if     ($o.id) {$settings['owners@odata.bind']  += "$GraphUri/users/$($o.id)"}
+            else{           $settings['owners@odata.bind']  += "$GraphUri/users/$o"}
         }
     }
     $webparams = @{
         Method     = 'Post'
-        Uri        = "$GraphURI/groups"
+        Uri        = "$GraphUri/groups"
         Body       = (ConvertTo-Json $settings)
         ContentType = 'application/json'
     }
@@ -675,16 +675,16 @@ function Set-GraphTeam              {
 
     Write-Progress -Activity "Updating Team" -Status "Checking team is valid"
     if     ($Team.id)           {
-        $group =  Invoke-GraphRequest -method get "$Graphuri/groups/$($Team.id)" -Headers $DefaultHeader
+        $group =  Invoke-GraphRequest -method get "$GraphUri/groups/$($Team.id)" -Headers $DefaultHeader
     }
     elseif ($Team -is [string] -and $team -match $GuidRegex ) {
-        $group =  Invoke-GraphRequest -method get "$Graphuri/groups/$Team" -Headers $DefaultHeader
+        $group =  Invoke-GraphRequest -method get "$GraphUri/groups/$Team" -Headers $DefaultHeader
     }
     elseif ($Team -is [string]  ) {
         $group =  Get-GraphGroupList -Name $Team
     }
     if ($group.id -and $group.displayName -and $group.resourceProvisioningOptions -contains 'Team') {
-        $webparams['Uri'] = "$Graphuri/teams/$($group.id)"
+        $webparams['Uri'] = "$GraphUri/teams/$($group.id)"
     }
     else   {
         Write-Progress -Activity "Updating Team" -Completed
@@ -1997,21 +1997,19 @@ function Add-GraphWikiTab           {
         Write-Warning -Message 'Could not determine the team and channel IDs'; return
     }
     $webparams = @{'Method'          = 'Post'
-                   'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
+                   'Uri'             = "$GraphUri/teams/$teamID/channels/$channelID/tabs"
                    'ContentType'     = 'application/json'
                    'AsType'          =  ([MicrosoftGraphTeamsTab])
                    'ExcludeProperty' = '@odata.context'
     }
     $webparams['Body'] = ConvertTo-Json ([ordered]@{
         'displayname'         = $TabLabel
-        'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/com.microsoft.teamspace.tab.wiki"}
+        'teamsApp@odata.bind' = "$GraphUri/appCatalogs/teamsApps/com.microsoft.teamspace.tab.wiki"}
     )
 
     Write-Debug $webparams.body
     if ($Force -or $PSCmdlet.Shouldprocess($TabLabel,"Create wiki tab")) {Invoke-GraphRequest @webparams}
 }
-# Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
-# https://products.office.com/en-us/microsoft-teams/appDefinitions.xml
 
 function Add-GraphPlannerTab        {
     <#
@@ -2041,8 +2039,6 @@ function Add-GraphPlannerTab        {
         $Team,
         #The label for the tab.
         $TabLabel,
-        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
-        $PassThru,
         #If Specified the tab will be added without confirming
         $Force
     )
@@ -2076,7 +2072,7 @@ function Add-GraphPlannerTab        {
     $tabURI = "https://tasks.office.com/{0}/Home/PlannerFrame?page=7&planId={1}" -f $Global:GraphUser, $Plan
 
     $webparams = @{'Method'          = 'Post'
-                   'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
+                   'Uri'             = "$GraphUri/teams/$teamID/channels/$channelID/tabs"
                    'ContentType'     = 'application/json'
                    'AsType'          =  ([MicrosoftGraphTeamsTab])
                    'ExcludeProperty' = '@odata.context'
@@ -2084,7 +2080,7 @@ function Add-GraphPlannerTab        {
 
     $webparams['body'] = ConvertTo-Json ([ordered]@{
         'displayname'         = $TabLabel
-        'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/com.microsoft.teamspace.tab.planner"
+        'teamsApp@odata.bind' = "$GraphUri/appCatalogs/teamsApps/com.microsoft.teamspace.tab.planner"
         'configuration' = [ordered]@{
                    'entityId'   = $plan
                    'contentUrl' = $tabURI
@@ -2131,9 +2127,6 @@ function Add-GraphOneNoteTab        {
         $Team,
         #The label for the tab, if left blank the name of the Notebook or Section will be sued
         $TabLabel,
-        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
-        [Alias('PT')]
-        [switch]$PassThru,
         #If Specified the tab will be added without pausing for confirmation, this is the default unless $ConfirmPreference has been set.
         $Force
     )
@@ -2171,7 +2164,7 @@ function Add-GraphOneNoteTab        {
         }
         $webparams = @{
             'Method'          = 'Post'
-            'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
+            'Uri'             = "$GraphUri/teams/$teamID/channels/$channelID/tabs"
             'ContentType'     = 'application/json'
             'AsType'          =  ([MicrosoftGraphTeamsTab])
             'ExcludeProperty' = '@odata.context'
@@ -2206,7 +2199,7 @@ function Add-GraphOneNoteTab        {
 
         #Now we can create the JSON. Such information as there is can be found at https://docs.microsoft.com/en-us/graph/teams-configuring-builtin-tabs
         $json = ConvertTo-Json ([ordered]@{
-                'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/0d820ecd-def2-4297-adad-78056cde7c78"
+                'teamsApp@odata.bind' = "$GraphUri/appCatalogs/teamsApps/0d820ecd-def2-4297-adad-78056cde7c78"
                 'displayname'         = $TabLabel
                 'configuration'       = [ordered]@{
                     'entityId'        = ((New-Guid).tostring() + "_" +  $Notebook.ID)
@@ -2248,8 +2241,6 @@ function Add-GraphSharePointTab     {
         $Channel,
         #A team ID, or a team object, if not specified as part of the channel
         $Team,
-        #Normally the tab is added 'silently'. If passthru is specified, an object describing the new tab will be returned.
-        $PassThru,
         #If Specified the tab will be added without confirming
         $Force
     )
@@ -2277,7 +2268,7 @@ function Add-GraphSharePointTab     {
 
         $webparams = @{
             'Method'          = 'Post'
-            'Uri'             = "$graphuri/teams/$teamID/channels/$channelID/tabs"
+            'Uri'             = "$GraphUri/teams/$teamID/channels/$channelID/tabs"
             'ContentType'     = 'application/json'
             'AsType'          =  ([MicrosoftGraphTeamsTab])
             'ExcludeProperty' = '@odata.context'
@@ -2285,7 +2276,7 @@ function Add-GraphSharePointTab     {
         if ($Template = 'genericList') {
             $webparams['body'] = ConvertTo-Json ([ordered]@{
                 'displayname'         = $TabLabel
-                'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/2a527703-1f6f-4559-a332-d8a7d288cd88"
+                'teamsApp@odata.bind' = "$GraphUri/appCatalogs/teamsApps/2a527703-1f6f-4559-a332-d8a7d288cd88"
                 'configuration'       = [ordered]@{
                             'entityId'   = ""
                             'contentUrl' =  ($WebUrl -replace '(.*/sites/[^/]+/).*$','$1_layouts/15/teamslogon.aspx?spfx=true&dest=') + [uri]::EscapeDataString($WebUrl)
@@ -2297,7 +2288,7 @@ function Add-GraphSharePointTab     {
         elseif ($Template = 'genericList') {
             $webparams['body'] = ConvertTo-Json ([ordered]@{
                 'displayname'         = $TabLabel
-                'teamsApp@odata.bind' = "$GraphURI/appCatalogs/teamsApps/com.microsoft.teamspace.tab.files.sharepoint"
+                'teamsApp@odata.bind' = "$GraphUri/appCatalogs/teamsApps/com.microsoft.teamspace.tab.files.sharepoint"
                 'configuration'       = [ordered]@{
                             'entityId'   = ""
                             'contentUrl' = $WebUrl
@@ -2314,3 +2305,29 @@ function Add-GraphSharePointTab     {
     }
 }
 
+# Adding tab https://docs.microsoft.com/en-us/graph/api/teamstab-add?view=graph-rest-1.0
+# Get-GraphTeamsApp will get the apps but we don't get the ability to configure them
+#-  often some other things will get called as part of setup and need be reverse engineered. e.g. whiteboard calls another service to get a new whiteboard GUID
+function Get-GraphTeamsApp          {
+    <#
+      .synopsis
+        Returns apps from the teams app catalog
+    #>
+    param   (
+        [string]$App
+    )
+    process {
+        ContextHas -scopes 'AppCatalog.Submit', 'AppCatalog.Read.All', 'AppCatalog.ReadWrite.All', 'Directory.Read.All', 'Directory.ReadWrite.All' -BreakIfNot
+        $uri = "$GraphUri/appcatalogs/teamsApps"
+        if ($App -match $guidRegex) {
+            Invoke-GraphRequest "$uri/$App`?`$expand=appdefinitions" -ExcludeProperty '@odata.context'  -AsType ([MicrosoftGraphTeamsApp])
+        }
+        elseif ($App) {
+            $uri += '?$filter=startswith(tolower(displayname),''{0}'')' -f $App.toLower()
+            Invoke-GraphRequest $uri  -ValueOnly -AsType ([MicrosoftGraphTeamsApp])  | Sort-Object -Property Displayname
+        }
+        else   {
+            Invoke-GraphRequest $uri   -ValueOnly -AsType ([MicrosoftGraphTeamsApp]) -Headers @{'ConsistencyLevel'='eventual'} | Sort-Object -Property Displayname
+        }
+    }
+}

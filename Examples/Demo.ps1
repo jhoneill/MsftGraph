@@ -1,10 +1,15 @@
-﻿#select some users and put them in a new team. For my demoa pre-set value of department => group membership
+﻿Get-Module | ForEach-Object {get-command -Module $_ -CommandType Cmdlet,Function} | Measure-Object | ForEach-Object count
+Import-Module Microsoft.Graph.PlusPlus
+Connect-Graph
+
+Get-Module | ForEach-Object {get-command -Module $_ -CommandType Cmdlet,Function} | Measure-Object | ForEach-Object count
+
+#select some users and put them in a new team. For my demoa pre-set value of department => group membership
 $GroupName        = 'Accounts'
 $newProjectName   = "Mccaw"
 Get-GraphUserList -Filter "Department eq '$GroupName'" -OutVariable users  | Format-Table Organization
 New-GraphTeam -Name $GroupName  -Description "The $GroupName Department" -Visibility public -Members $users -OutVariable newTeam
 
-#Teams have a drive, a calendar a notebook and a default channel - let's start with the drive
 Get-GraphTeam $newTeam -Drive -OutVariable teamdrive |  Set-GraphHomeDrive ; $teamDrive
 #later we will add a tab in teams for this drive
 
@@ -13,6 +18,7 @@ Get-GraphDrive -SpecialFolder Documents
 Get-GraphDrive /
 
 #Send a local file to one drive, and open it -use it for exporting in a moment.
+
 Get-ChildItem test*.xlsx -OutVariable files
 #Destination tab completes - use General for preference
 $files  |  Copy-ToGraphFolder  -OutVariable item  -Destination 'root:/General'
@@ -20,7 +26,7 @@ $files  |  Copy-ToGraphFolder  -OutVariable item  -Destination 'root:/General'
 Start-Process $item.webUrl
 
 #Leave the window open to see export happen -  itempath  tab completes - use the file from the previous -
-$users | Select-Object Organization | Export-GraphWorkSheet -SheetName users -ItemPath 'root:/Documents/test.xlsx'
+$users | Select-Object Organization | Export-GraphWorkSheet -SheetName users -ItemPath 'root:/General/test.xlsx'
 
 #groups upgraded to teams have channels for the teams App
 Get-GraphTeam $newTeam -Channels -OutVariable teamFirstChannel
@@ -40,12 +46,10 @@ Add-GraphPlanTask   -Plan    $newTeamplan -Title "Project $newProjectName Object
 #Add Planner and one note to teams.
 Add-GraphPlannerTab -TabLabel 'Planner' -Channel $newChannel  -Plan $NewTeamplan | Out-Null
 
-
 #Groups have a calendar - add a meeting and invite members
-$teamCalendar     = Get-GraphTeam $newTeam -Calendar
-$teamCalendar
-$pattern          = New-GraphRecurrence -Type weekly -DaysOfWeek wednesday -NumberOfOccurrences 52
-$attendees        = ((Get-GraphTeam -Team $newTeam -Members) + (Get-GraphTeam -Team $newTeam -Owners ) )| New-GraphAttendee -AttendeeType optional
+Get-GraphTeam $newTeam -Calendar -OutVariable teamcalendar
+$pattern   = New-GraphRecurrence -Type weekly -DaysOfWeek wednesday -NumberOfOccurrences 52
+$attendees = ((Get-GraphTeam -Team $newTeam -Members) + (Get-GraphTeam -Team $newTeam -Owners ) )| New-GraphAttendee -AttendeeType optional
 Add-GraphEvent -Calendar $teamCalendar  -Subject "Midweek team lunch" -Attendees $attendees -Start ([datetime]::Today.AddHours(12)) -End ([datetime]::Today.AddHours(12)) -Recurrence $Pattern
 
 Get-GraphTeam $newTeam -Notebooks -OutVariable teamnotebook
@@ -56,8 +60,9 @@ Add-GraphOneNoteTab -TabLabel 'Project Notebook' -Channel $newChannel  -Notebook
 
 $teamDrive | Add-GraphSharePointTab -TabLabel "Team Drive" -Channel $NewChannel
 
-$cols    = 'AssignedTo', 'IssueStatus',  'TaskDueDate',   'V3Comments' | ForEach-Object {Get-GraphSiteColumn -Raw -name $_}
-$cols   += Get-GraphSiteColumn -Raw -Name 'priority' -ColumnGroup 'Core Task and Issue Columns'
+Get-GraphTeam $newTeam -Site -OutVariable Site
+$cols  = 'AssignedTo', 'IssueStatus', 'TaskDueDate', 'V3Comments' | ForEach-Object {Get-GraphSiteColumn -Raw -name $_}
+$cols += Get-GraphSiteColumn -Raw -Name 'priority' -ColumnGroup 'Core Task and Issue Columns'
 $newlist = New-GraphList -Name "$newProjectName Issue Tracking" -Columns $cols  -Site $site -Template genericList
 
 Add-GraphListItem  -List $newlist -Fields @{Title='Demo Item';IssueStatus='Active';Priority='(2) Normal';}

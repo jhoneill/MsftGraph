@@ -15,10 +15,11 @@ Set-GraphOptions -DefaultUserProperties  @('businessPhones', 'displayName', 'giv
 if    ($env:GraphScopes) {
         Set-GraphOptions -DefaultScopes ( $env:GraphScopes -split ',\s*')}
 else  { Set-GraphOptions -DefaultScopes @(
+                'AppCatalog.Read.All',
                 'AuditLog.Read.All',
                 'Directory.AccessAsUser.All', #Grant same rights to the directory as the user has
                 'Calendars.ReadWrite',
-                'Calendars.ReadWrite.Shared'
+                'Calendars.ReadWrite.Shared',
                 'ChannelMessage.Read.All',
                 'ChannelMessage.Delete',
                 'ChannelMessage.Edit',
@@ -70,15 +71,16 @@ else  { Set-GraphOptions -DefaultScopes @(
     15. Copy the Application (client) ID    Paste it into this script as the value for ClientID in Set-GraphOptions;
     16. Also copy the tenant ID paste it into this script as the value for TenantID in Set-GraphOptions
     17. Click Certificates and Secrets, add a secret and chose never expires (unless you want to update the script later), click add
-    18. Copy the secret and EITHER (the dirty but portable way) paste into this script as the value for client_Secret in Set-GraphOptions
+    18. Copy the secret and EITHER (the dirty but portable way) paste into this script as the value for clientSecret in Set-GraphOptions
                             OR (clean but not portable) Convert it to a securestring & export: ConvertTo-SecureString -Force -AsPlainText (Get-Clipboard) | Export-Clixml myclientSecret.xml
-                               Get the contents of the file as for setting client_secret in Set-GraphOptions
+                               Get the contents of the file as for setting clientsecret in Set-GraphOptions
 #>
 
 #YOUR tenant ID
-# Set-GraphOptions -TenantID GUID-FOR-YOUR-TENNANT
-
+#Set-GraphOptions -TenantID "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 #A client APP ID known to your tenant
 Set-GraphOptions -ClientID "14d82eec-204b-4c2f-b7e8-296a70dab67e" #the Graph-Powershell SDK GUID. You can create your own. "1950a258-227b-4e31-a9cf-717495945fc2" is known client ID for PowerShell
-#Secret Associated with the  Really this should be saved somewhere else as a secure string but you can put plain text OR a secure string here.
+
+#Really this should be saved somewhere else as a secure string.
+#Set-GraphOptions  -ClientSecret  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 #Set-GraphOptions  -Client_Secret (Import-Clixml "$PSScriptRoot\myclientSecret.xml")

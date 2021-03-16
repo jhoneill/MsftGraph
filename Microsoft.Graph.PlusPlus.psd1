@@ -1,26 +1,27 @@
 ﻿@{
-  Description       =   @'
-  Module to work the Microsoft Graph API with both Office 365 and Microsoft accounts
+  Description          =   @'
+  Module to work the Microsoft Graph API using both AzureAD 'work or school' accounts and 'personal' Microsoft accounts
   it contains over 100 functions to
   * Navigate, upload to and download from OneDrive
-  * Navigate, manipulate pages and sections in OneNote Notebooks
-  * Create and manage groups and teams, and Post to Teams and their channels
-  * Create, read and write plans in team plans.
-  * Read and write calendar events, and contacts in Outlook,
-  * Read and send mail messages
-  * Work with Sharepoint lists
+  * Navigate and manipulate Pages & Sections in OneNote Notebooks
+  * Create and manage Groups and Teams, and post to Teams and their Channels
+  * Create, read and write Plans for Teams.
+  * Read and write Calendar-events and Contacts in Outlook,
+  * Read and send Mail messages in Outlook
+  * Work with Sharepoint Lists
+  * Access ToDo Lists.
 '@
-  Copyright         =   '(c) 2021 James O''Neill. All rights reserved.'
-  Author            =   'James O''Neill'
-  CompanyName       =   'Mobula Consulting'
+  Copyright            =   '(c) 2021 James O''Neill. All rights reserved.'
+  Author               =   'James O''Neill'
+  CompanyName          =   'Mobula Consulting'
 
-  GUID              =   'f564c0f9-7d96-4452-a715-679dc47c20cc'
-  ModuleVersion     =   '1.4.0'
-  rootModule        =   '.\Microsoft.Graph.PlusPlus.psm1'
-  RequiredModules   = @(@{ModuleName = 'Microsoft.Graph.Authentication'; ModuleVersion = '1.4.0'; })
-  FormatsToProcess  =   'Microsoft.Graph.PlusPlus.format.ps1xml'
-  TypesToProcess    = @('Microsoft.Graph.PlusPlus.types.ps1xml')
-  FunctionsToExport = @('Add-FileToGraphOneNote',
+  GUID                 =   'f564c0f9-7d96-4452-a715-679dc47c20cc'
+  ModuleVersion        =   '1.4.2'
+  RootModule           =   '.\Microsoft.Graph.PlusPlus.psm1'
+  RequiredModules      = @(@{ModuleName = 'Microsoft.Graph.Authentication'; ModuleVersion = '1.4.0'; })
+  FormatsToProcess     =   'Microsoft.Graph.PlusPlus.format.ps1xml'
+  TypesToProcess       = @('Microsoft.Graph.PlusPlus.types.ps1xml')
+  FunctionsToExport    = @('Add-FileToGraphOneNote',
                         'Add-GraphEvent',
                         'Add-GraphGroupMember',
                         'Add-GraphGroupThread',
@@ -79,6 +80,7 @@
                         'Get-GraphSiteColumn',
                         'Get-GraphSiteUserList',
                         'Get-GraphSKU',
+                        'Get-GraphTeamsApp',
                         'Get-GraphToDoList'
                         'Get-GraphUser',
                         'Get-GraphUserList',
@@ -159,7 +161,7 @@
                         'Update-GraphOneNotePage',
                         'Update-GraphToDoTask'
   )
-  AliasesToExport   = @('Add-FileToGraphNoteBook',
+  AliasesToExport      = @('Add-FileToGraphNoteBook',
                         'Add-GraphNoteBookPage',
                         'Add-GraphTeamChannel',
                         'Add-GraphTeamMember',
@@ -195,8 +197,8 @@
                         'GWhoAmI'
                         'igr'
   )
-
-  FileList          = @(
+  FileList             = @(
+        '.\README.md'
         '.\LICENSE',
         '.\Microsoft.Graph.PlusPlus.psd1',
         '.\Microsoft.Graph.PlusPlus.psm1',
@@ -225,6 +227,7 @@
         '.\Examples\Data-XLSx-Drive-dlChart.ps1',
         '.\Examples\Demo.ps1',
         '.\Examples\Link.png',
+        '.\Examples\New-BcAuthContext.ps1',
         '.\Examples\OneDrive.gif',
         '.\Examples\Team.gif',
         '.\Examples\Template_groups.csv',
@@ -233,20 +236,16 @@
 
     )
 
+  CompatiblePSEditions = @('Core', 'Desktop')
+  PowerShellVersion    = '5.1'
   PrivateData = @{
        PSData    = @{
-           Tags       = @('MicrosoftGraph', 'Microsoft', 'Office365', 'Graph', 'PowerShell', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner', 'MSGraph')
-           Category   = 'Scripting office Online'
-           ProjectUri = 'https://github.com/jhoneill/MsftGraph'
-           LicenseUri = 'https://github.com/jhoneill/MsftGraph/blob/master/LICENSE'
+           Tags        = @('MicrosoftGraph', 'Microsoft', 'Office365', 'Graph', 'PowerShell', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner', 'MSGraph')
+           Category    = 'Functions'
+           ProjectUri  = 'https://github.com/jhoneill/MsftGraph'
+           LicenseUri  = 'https://github.com/jhoneill/MsftGraph/blob/master/LICENSE'
         } # End of PSData hashtable
   }
-
-  # Supported PSEditions
-  # CompatiblePSEditions = @()
-
-  # Minimum version of the Windows PowerShell engine required by this module
-  # PowerShellVersion = ''
 
   # Minimum version of the common language runtime (CLR) required by this module. This prerequisite is valid for the PowerShell Desktop edition only.
   # CLRVersion = ''

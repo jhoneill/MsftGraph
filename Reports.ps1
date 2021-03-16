@@ -47,7 +47,6 @@ function Get-GraphReport       {
         #If specified the data will be written in CSV format to the path provided, otherwise it will be output to the pipeline
         $Path
     )
-    if (-not $script:WorkOrSchool) {Write-Warning   -Message "This command only works when you are logged in with a work or school account." ; return    }
     if     ($Date)    {
         if ($report -match 'Counts$|Pages$|Storage$') {Write-Warning -Message 'Reports ending with Counts, Pages or Storage do not support date filtering' ; return }
         if ($report -match '^Office365Activation')    {Write-Warning -Message 'Office365Activation Reports do not support any filtering.'  ; return }
@@ -66,8 +65,13 @@ function Get-GraphReport       {
         $uri = "$GraphUri/reports/microsoft.graph.Get{0}"                      -f $Report
       }
     }
-    if ($path) { Invoke-GraphRequest -Method GET -uri $uri | Out-File -FilePath $Path}
-    else       { Invoke-GraphRequest -Method GET -uri $uri | ConvertFrom-Csv }
+    if ($Path) { Invoke-GraphRequest -Method GET -uri $uri -OutputFilePath $Path}
+    else       {
+        $Path = [System.IO.Path]::GetTempFileName()
+        Invoke-GraphRequest -Method GET -uri $uri -OutputFilePath $Path
+        Import-Csv  $Path
+        Remove-Item $Path
+        }
 }
 
 function Get-GraphSignInLog    {
