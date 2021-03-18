@@ -148,11 +148,11 @@ function Get-GraphUserList        {
         else {
             $result = @()
             foreach ($n in $Name) {
-                $filter = "&`$Filter=startswith(userPrincipalName,'{0}') or " +
-                                    "startswith(displayName,'{0}') or "       +
-                                    "startswith(givenName,'{0}') or "         +
-                                    "startswith(surname,'{0}') or "           +
-                                    "startswith(mail,'{0}')"          -f ($n -replace "'","''")
+                $filter = ("&`$Filter=startswith(userPrincipalName,'{0}') or " +
+                                     "startswith(displayName,'{0}') or "  +
+                                     "startswith(givenName,'{0}') or "  +
+                                     "startswith(surname,'{0}') or "  +
+                                     "startswith(mail,'{0}')"      ) -f ($n -replace "'","''")
                  $result += Invoke-GraphRequest -Uri ($uri + $filter) @webParams
             }
         }

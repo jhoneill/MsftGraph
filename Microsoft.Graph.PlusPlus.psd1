@@ -16,7 +16,7 @@
   CompanyName          =   'Mobula Consulting'
 
   GUID                 =   'f564c0f9-7d96-4452-a715-679dc47c20cc'
-  ModuleVersion        =   '1.4.2'
+  ModuleVersion        =   '1.4.3'
   RootModule           =   '.\Microsoft.Graph.PlusPlus.psm1'
   RequiredModules      = @(@{ModuleName = 'Microsoft.Graph.Authentication'; ModuleVersion = '1.4.0'; })
   FormatsToProcess     =   'Microsoft.Graph.PlusPlus.format.ps1xml'
@@ -152,7 +152,6 @@
                         'Set-GraphListItem',
                         'Set-GraphPlanDetails',
                         'Set-GraphPlanTask',
-                        'Set-GraphTaskDetails',
                         'Set-GraphTeam',
                         'Set-GraphUser',
                         'Show-GraphFolder',
