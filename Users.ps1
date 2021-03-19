@@ -310,12 +310,7 @@ function Get-GraphUser            {
                  $UserID = Get-GraphUserList -Name $UserID
         }
         #endregion
-        #if select is in use ensure we get ID, UPN and Display-name.
-        if ($Select) {
-            foreach ($s in @('ID', 'userPrincipalName', 'displayName')){
-                 if ($s -notin $Select) {$Select += $s }
-            }
-        }
+
         [void]$PSBoundParameters.Remove('UserID')
 
         foreach ($u in $UserID) {

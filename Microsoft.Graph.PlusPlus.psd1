@@ -44,6 +44,7 @@
                         'Export-GraphWorkSheet',
                         'Find-GraphPeople',
                         'Get-AccessToken',
+                        'Get-GraphApplication',
                         'Get-GraphBucketTaskList',
                         'Get-GraphChannel',
                         'Get-GraphChannelReply',

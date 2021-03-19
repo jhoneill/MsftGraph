@@ -976,15 +976,33 @@
         <View><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphServicePrincipal</Name><viewselectedby><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphServicePrincipal</TypeName></viewselectedby>
         <TableControl>
             <TableHeaders>
-            <TableColumnHeader><Label>Id</Label></TableColumnHeader>
             <TableColumnHeader><Label>DisplayName</Label></TableColumnHeader>
+            <TableColumnHeader><Label>Id</Label></TableColumnHeader>
             <TableColumnHeader><Label>AppId</Label></TableColumnHeader>
             <TableColumnHeader><Label>SignInAudience</Label></TableColumnHeader>
             </TableHeaders>
             <TableRowEntries><TableRowEntry>
                 <TableColumnItems>
-                <TableColumnItem><PropertyName>Id</PropertyName></TableColumnItem>
                 <TableColumnItem><PropertyName>DisplayName</PropertyName></TableColumnItem>
+                <TableColumnItem><PropertyName>Id</PropertyName></TableColumnItem>
+                <TableColumnItem><PropertyName>AppId</PropertyName></TableColumnItem>
+                <TableColumnItem><PropertyName>SignInAudience</PropertyName></TableColumnItem>
+                </TableColumnItems>
+            </TableRowEntry></TableRowEntries>
+        </TableControl>
+       </View>
+       <View><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphApplication</Name><viewselectedby><TypeName>Microsoft.Graph.PowerShell.Models.MicrosoftGraphApplication</TypeName></viewselectedby>
+        <TableControl>
+            <TableHeaders>
+            <TableColumnHeader><Label>DisplayName</Label></TableColumnHeader>
+            <TableColumnHeader><Label>Id</Label></TableColumnHeader>
+            <TableColumnHeader><Label>AppId</Label></TableColumnHeader>
+            <TableColumnHeader><Label>SignInAudience</Label></TableColumnHeader>
+            </TableHeaders>
+            <TableRowEntries><TableRowEntry>
+                <TableColumnItems>
+                <TableColumnItem><PropertyName>DisplayName</PropertyName></TableColumnItem>
+                <TableColumnItem><PropertyName>Id</PropertyName></TableColumnItem>
                 <TableColumnItem><PropertyName>AppId</PropertyName></TableColumnItem>
                 <TableColumnItem><PropertyName>SignInAudience</PropertyName></TableColumnItem>
                 </TableColumnItems>

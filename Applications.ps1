@@ -18,9 +18,9 @@ function Get-GraphServicePrincipal {
       .Description
         A replacement for the SDK's Get-MgServicePrincipal
         That has orderby which doesn't work - it's in the Docs but the API errors if you try
-        It doesn't have search by name, or select Application or Managed IDs
+        It doesn't have find by name, or select Application or Managed IDs
       .Example
-        PS > Get-GraphServicePrincipal "Microsoft graph"
+        PS > Get-GraphServicePrincipal "Microsoft graph*"
 
         Id                                   DisplayName                      AppId                                SignInAudience
         --                                   -----------                      -----                                --------------
@@ -28,7 +28,7 @@ function Get-GraphServicePrincipal {
         4e71d88a-0a46-4274-85b8-82ad86877010 Microsoft Graph Change Tracking  0bf30f3b-4a52-48df-9a82-234910c4a086 AzureADMultipleOrgs
         ...
 
-        Run with just a name the command returns service principals with matching names.
+        Run with a name the command returns service principals with matching names.
         .Example
         PS >Get-GraphServicePrincipal 25b13fbf-2f44-457a-9e68-d3414fc97915 -ExpandAppRoles
 
@@ -76,12 +76,6 @@ function Get-GraphServicePrincipal {
         [Parameter(ParameterSetName='List1')]
         [String]$Filter,
 
-        #Search items by search phrases
-        [Parameter(ParameterSetName='List1')]
-        [Parameter(ParameterSetName='List2')]
-        [Parameter(ParameterSetName='List3')]
-        [String]$Search,
-
         #Returns the list of application roles to those the role name, displayname or ID match the parameter value. Wildcards are supported
         [Parameter(ParameterSetName='AllRoles', Mandatory=$true)]
         [switch]$ExpandAppRoles,
@@ -99,7 +93,6 @@ function Get-GraphServicePrincipal {
         [string]$ScopeFilter
     )
     begin   {
-        Test-GraphSession
         [String]$managedIdentityFilter = @(
             '00000001-0000-0000-c000-000000000000' #Azure ESTS Service
             '00000007-0000-0000-c000-000000000000' #Common Data Service
@@ -115,41 +108,37 @@ function Get-GraphServicePrincipal {
             '00000004-0000-0ff1-ce00-000000000000' #Skype for Business Online
             '00000002-0000-0000-c000-000000000000' #Windows Azure Active Directory
         ).foreach{"appId eq '$PSItem'"} -join ' or '
+
+        if ($ExpandScopes)   {$ScopeFilter   = '*'}
+        if ($ExpandAppRoles) {$AppRoleFilter = '*'}
+
+        $webparams = @{
+                    AsType          =  ([MicrosoftGraphServicePrincipal])
+                    ExcludeProperty = @('resourceSpecificApplicationPermissions','@odata.context','createdDateTime','verifiedPublisher')
+                    Headers         = @{'ConsistencyLevel'= 'Eventual'}
+        }
     }
     process {
-        if  (   -not    $ServicePrincipalId)    {
-            if         ($O365ServicePrincipals  -and $PSBoundParameters['Filter']) {
-                        $PSBoundParameters['Filter'] ="( $($PSBoundParameters['Filter']) ) and $managedIdentityFilter"
-            }
-            elseif     ($O365ServicePrincipals) {
-                        $PSBoundParameters['Filter'] =  $managedIdentityFilter
-            }
-            elseif     ($ManagedIdentity)       {
-                        $PSBoundParameters['Filter']="servicePrincipaltype eq 'ManagedIdentity'"
-            }
-            elseif     ($Application)           {
-                        $PSBoundParameters['Filter']="servicePrincipaltype eq 'Application'"
-            }
-            elseif     ($AppId) {
-                        $PSBoundParameters['Filter']="appid eq '$AppId'"
-            }
-            foreach    ($param in @('Application', 'AppId', 'ManagedIdentity', 'O365ServicePrincipals')) {
-                  [void]$PSBoundParameters.Remove($param )
-            }
-            Microsoft.Graph.Applications.private\Get-MgServicePrincipal_List1 @PSBoundParameters -all -ConsistencyLevel Eventual | Sort-Object displayname
+        if ( -not    $ServicePrincipalId)    {
+            if      ($ManagedIdentity)             {$filter  = "?`$filter=servicePrincipaltype eq 'ManagedIdentity'"}
+            elseif  ($Application)                 {$filter  = "?`$filter=servicePrincipaltype eq 'Application'"}
+            elseif  ($AppId)                       {$filter  = "?`$filter=appid eq '$AppId'" }
+            elseif  ($PSBoundParameters['Filter'] -and
+                     $O365ServicePrincipal )       {$filter  = "?`$filter=( $($PSBoundParameters['Filter']) ) and $managedIdentityFilter"}
+            elseif  ($PSBoundParameters['Filter']) {$filter  = "?`$filter=$($PSBoundParameters['Filter'])"}
+            elseif  ($O365ServicePrincipals)       {$filter  = "?`$filter=$managedIdentityFilter"}
+
+            if      ($Property -and $filter)       {$filter += '&$select=' +($property -join ',')}
+            elseif  ($Property)                    {$filter  = '?$select=' +($property -join ',')}
+            Invoke-GraphRequest "$GraphUri/servicePrincipals$filter" -ValueOnly @webparams | Sort-Object displayname
         }
         else {
-            foreach    ($param in @('ServicePrincipalId', 'ExpandAppRoles', 'ExpandScopes', 'AppRoleFilter', 'ScopeFilter')) {
-                  [void]$PSBoundParameters.Remove($param )
-            }
-            foreach    ($sp in $ServicePrincipalId) {
+            foreach ($sp in $ServicePrincipalId) {
                 $result = $null
                 if     ($sp -match $GUIDRegex)      {
-                    $uri = "$GraphUri/servicePrincipals/$sp"
-                    if ($Property) {$uri += '?$select=' +($property -join ',')}
-                    try {
-                        $result = Invoke-GraphRequest $uri -AsType ([MicrosoftGraphServicePrincipal])
-                    }
+                    $webparams['uri'] = "$GraphUri/servicePrincipals/$sp"
+                    if ($Property) {$webparams['uri'] += '?$select=' +($property -join ',')}
+                    try {$result = Invoke-GraphRequest @webparams}
                     catch {
                         if ($_.Exception.Response.StatusCode.value__  -eq 404) {
                             Write-Warning "$sp was not found as a service principal ID. It may be an App ID.";  continue
@@ -158,28 +147,94 @@ function Get-GraphServicePrincipal {
                     }
                 }
                 else   {
-                        [void]$PSBoundParameters.Remove('ServicePrincipalId')
-                        $psboundParameters['Filter']="startswith(displayName,'$sp')"
-                        $result = Microsoft.Graph.Applications.private\Get-MgServicePrincipal_List1 @PSBoundParameters -ConsistencyLevel Eventual | Sort-Object displayname
+                    $webparams['uri'] = "$GraphUri/servicePrincipals?`$filter=" + (getFilterString $sp)
+                    if ($Property) {$webparams['uri'] += '&$select=' +($property -join ',')}
+                    $result = Invoke-GraphRequest  -ValueOnly  @webparams
                 }
-                if     ($AppRoleFilter)  {
-                        $result | Select-Object -ExpandProperty approles |
-                                    Where-Object {$_.id -like $AppRoleFilter  -or $_.DisplayName -like $AppRoleFilter -or $_.value -like $AppRoleFilter } |
-                                        Sort-Object -Property Value
-                }
-                elseif ($ExpandAppRoles) {
-                        $result | Select-Object -ExpandProperty approles | Sort-Object -Property Value
+                if     ($AppRoleFilter) {
+                    $(foreach ($r in $result) {$r.approles |
+                            Where-Object {$_.id -like $AppRoleFilter  -or $_.DisplayName -like $AppRoleFilter -or $_.value -like $AppRoleFilter } |
+                            Add-Member -PassThru -NotePropertyName ServicePrincipal -NotePropertyValue $r.Id} ) |
+                                Sort-Object -Property Value
                 }
                 elseif ($ScopeFilter)    {
-                        $result | Select-Object -ExpandProperty Oauth2PermissionScopes |
-                                    Where-Object {$_.id -like $ScopeFilter  -or $_.AdminConsentDisplayName -like $ScopeFilter -or $_.value -like $ScopeFilter } |
-                                        Sort-Object -Property Value
+                    $(foreach ($r in $result) {$r.Oauth2PermissionScopes |
+                        Where-Object {$_.id -like $ScopeFilter  -or $_.AdminConsentDisplayName -like $ScopeFilter -or $_.value -like $ScopeFilter } |
+                            Add-Member -PassThru -NotePropertyName ServicePrincipal -NotePropertyValue $r.Id} ) |
+                                Sort-Object -Property Value
                 }
-                elseif ($ExpandScopes)   {
-                        $result | Select-Object -ExpandProperty Oauth2PermissionScopes | Sort-Object -Property Value
-                }
-                else   {$result}
+                else {$result | Sort-Object -Property displayname}
             }
+        }
+    }
+}
+
+function Get-GraphApplication {
+    <#
+      .Synopsis
+        Returns information about Applications
+    #>
+
+    [CmdletBinding(DefaultParameterSetName='List1')]
+    [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphApplication])]
+    param   (
+        [Parameter(ParameterSetName='List3',Position=0)]
+        [string]$Id,
+
+        #The GUID(s) for Apps(s). Or App objects. If a name is given instead, the command will try to resolve matching App principals
+        [Parameter(ParameterSetName='List2',ValueFromPipelineByPropertyName=$true)]
+        [string]$AppId,
+
+        #Select properties to be returned
+        [Alias('Select')]
+        [String[]]$Property,
+
+        #Filters items by property values
+        [Parameter(ParameterSetName='List1')]
+        [String]$Filter
+    )
+    process {
+        $result = @()
+        $webparams = @{
+                    ExcludeProperty = @('verifiedPublisher', 'applicationTemplateId','addins','@odata.context')
+                    Headers         = @{'ConsistencyLevel'= 'Eventual'}
+        }
+        if ( -not    $Id)    {
+            if      ($PSBoundParameters['Filter']) {$filter  = "?`$filter=$($PSBoundParameters['Filter'])"}
+            elseif  ($AppId)                       {$filter  = "?`$filter=AppID eq '$AppId'"}
+            if      ($Property -and $filter)       {$filter +=  '&$select=' +($property -join ',')}
+            elseif  ($Property)                    {$filter  =  '?$select=' +($property -join ',')}
+
+            $result += Invoke-GraphRequest "$GraphUri/Applications$filter" -ValueOnly @webparams
+        }
+        else {
+            foreach ($app in $Id) {
+                if  ($app -match $GUIDRegex)      {
+                    $webparams['uri'] = "$GraphUri/applications/$app"
+                    if ($Property) {$webparams['uri'] += '?$select=' +($property -join ',')}
+                    try   { $result += Invoke-GraphRequest @webparams}
+                    catch {
+                            if ($_.Exception.Response.StatusCode.value__  -eq 404) {
+                                Write-Warning "$sp was not found as an ID It may be an APPID.";  continue
+                            }
+                            else {throw $_.Exception }
+                    }
+                }
+                else   {
+                        $filter =  '?$filter=' + (getFilterString $app)
+                        if ($Property) {$filter += '&$select=' +($property -join ',')}
+                        $result += Invoke-GraphRequest "$GraphUri/applications$filter" -ValueOnly  @webparams
+                }
+            }
+        }
+        foreach ($r in $result) {
+            foreach ($p in $r.passwordCredentials) {
+                $p.customKeyIdentifier = [byte[]][char[]]$p.customKeyIdentifier
+            }
+            foreach ($k in $r.keyCredentials) {
+                $k.customKeyIdentifier = [byte[]][char[]]$k.customKeyIdentifier
+            }
+            New-Object -TypeName MicrosoftGraphApplication -Property $r
         }
     }
 }

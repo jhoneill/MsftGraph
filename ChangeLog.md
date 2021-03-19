@@ -1,7 +1,12 @@
 # 1.4.3
-* Added This changelog !
+* Added This ChangeLog.md !
 * Fixed bug searching for users by name. It was only searching in the mail field. 
-* Set-GraphTaskDetails should be private.
+* `Set-GraphTaskDetails` should be private - removed it from the export list in the psd1.
+* Changed validation of -DefaultUsageLocation in Set-GraphOptions to work round an error when reloading the module
+* Add a helper function:  `getFilterString` "bob*" returns `startswith(displayName,'bob')` 
+  and  `getFilterString bob  mail` returns  `displayName -eq 'bob' or mail -eq 'bob' `
+* Used this to remove the implicit wild card form Get-GraphServicePrincipal.
+* Cleaned up Get-GraphServicePrincipal and added Get-GraphApplication.
 
 # 1.4.1 & 1.4.2
 No code changes. Fixing incorrect files bundled to the PowerShell Gallery. 

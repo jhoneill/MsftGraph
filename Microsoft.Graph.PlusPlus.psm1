@@ -275,6 +275,27 @@ class UPNCompleter                : IArgumentCompleter {
         return $result
     }
 }
+
+function getFilterString {
+param (
+[validatescript({
+    if ($_ -match '\*.*\*|^\*$') {throw [ParameterBindingException]::new("Wild cannot be '*something*' or just '*'")} else {$true}
+})]
+[parameter(position=0,mandatory=$true)]
+$SearchTerm ,
+[parameter(position=1)]
+$ExtraFields = @()
+)
+#validation blocked "* and *something*" so we have no *, * at the start, in the middle, or at the end
+if     ($SearchTerm -notmatch '\*')         {$filterStrings = ,              "displayName eq '$SearchTerm'"      }
+elseif ($SearchTerm -match   '^\*(.+)')     {$filterStrings = ,     "endswith(displayName,'$($Matches[1])')"    }
+elseif ($SearchTerm -match   '(.+)\*$')     {$filterStrings = ,   "startswith(displayName,'$($Matches[1])')"    }
+elseif ($SearchTerm -match  '^(.+)\*(.+)$') {$filterStrings = , ("(startswith(displayName,'$($Matches[1])')" +
+                                                               " and endswith(displayName,'$($Matches[2])'))"  )}
+
+foreach ($f in $ExtraFields) {$filterStrings += $filterStrings[0]   -replace 'displayName',$f }
+$filterStrings -join ' or '
+}
 #endregion
 
 . "$PSScriptRoot\Authentication.ps1"
@@ -290,7 +311,7 @@ $ImportCmds = [ordered]@{
   'Users.Actions'                = @()
   'Identity.SignIns'             = @()
   'Reports'                      = @()
-  'Applications'                 =('Get-MgServicePrincipal_List1') #Get-MgServicePrincipal_Get2
+  'Applications'                 = @()
 }
 foreach ($subModule in $ImportCmds.keys) {
     $result = $null
@@ -359,23 +380,18 @@ function Set-GraphOptions {
 
         #Changes the default two letter (ISO  3166) country code - for new users so they can be assigned licenses.  Examples include: 'US', 'JP', and 'GB'
         [ValidateNotNullOrEmpty()]
-        [ValidateCountryAttribute()]
         [string]$DefaultUsageLocation
     )
 
-    if ($TenantID)              {
-        if ($TenantID -notmatch $GUIDRegex) {
-              Write-Warning 'TenantID should be a GUID'  ; break
-        }
+    if     ($TenantID)              {
+        if ($TenantID -notmatch $GUIDRegex) {Write-Warning 'TenantID should be a GUID'  ; break }
         else {$Script:TenantID           = $TenantID}
     }
-    if ($ClientID)              {
-        if ($Clientid -notmatch $GUIDRegex) {
-            Write-Warning 'ClientID should be a GUID'  ; break
-        }
-        else {$Script:ClientID           = $ClientID}
+    if     ($ClientID)              {
+        if ($Clientid -notmatch $GUIDRegex) {Write-Warning 'ClientID should be a GUID'  ; break}
+        else {$Script:ClientID  = $ClientID}
     }
-    if ($ClientSecret)         {
+    if     ($ClientSecret)          {
         if     ($ClientSecret -is [string]) {
                $Script:ClientSecret      = $ClientSecret
         }
@@ -384,12 +400,17 @@ function Set-GraphOptions {
         }
         else  {Write-Warning 'ClientSecret should be a string or preferably a securestring'  ; break}
     }
-    if ($Script:TenantID)       {Write-Verbose "TenantID: '$Script:TenantID' , ClientID: '$Script:ClientID'"}
-    if ($DefaultScopes)         {$Script:DefaultGraphScopes     = $DefaultScopes}
+    if     ($Script:TenantID)       {Write-Verbose "TenantID: '$Script:TenantID' , ClientID: '$Script:ClientID'"}
+    if     ($DefaultScopes)         {$Script:DefaultGraphScopes     = $DefaultScopes}
     Write-Verbose ('Scopes: ' + ($Script:DefaultGraphScopes -join ', '))
-    if ($RefreshToken)          {$Script:RefreshToken           = $RefreshToken }
-    if ($DefaultUserProperties) {$Script:DefaultUserProperties  = $DefaultUserProperties}
-    if ($DefaultUsageLocation)  {$Script:DefaultUsageLocation   = $DefaultUsageLocation.ToUpper()}
+
+    #it would be nice to the use the country validator but this goes wrong when reloading the module and calling something when everything is happening in the PSM1 file.
+    if     ($DefaultUsageLocation -and -not [cultureInfo]::GetCultures("SpecificCultures").where({$_.name -match "$DefaultUsageLocation$"})) {
+           Write-Warning 'DefaultUsageLocation should be an ISO 2 letter country code like GB, US or JP'  ; break
+    }
+    elseif ($DefaultUsageLocation ) {$Script:DefaultUsageLocation   = $DefaultUsageLocation.ToUpper() }
+    if     ($DefaultUserProperties) {$Script:DefaultUserProperties  = $DefaultUserProperties}
+    if     ($RefreshToken)          {$Script:RefreshToken           = $RefreshToken }
 }
 
 #call a script with calls to Set-GraphOptions
