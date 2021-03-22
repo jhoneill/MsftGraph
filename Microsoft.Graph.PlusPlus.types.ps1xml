@@ -21,10 +21,12 @@
         <ScriptProperty><Name>ManagerMail</Name><GetScriptBlock>
             $This.Manager.Mail
         </GetScriptBlock></ScriptProperty>
-
         <ScriptProperty><Name>Licensed</Name><GetScriptBlock>
             if ($This.AssignedLicenses) {$true} else {$null}
         </GetScriptBlock></ScriptProperty>
+        <ScriptMethod><Name>ToString</Name><Script>
+            $this.UserPrincipalName
+        </Script></ScriptMethod>
     </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphEvent</Name><Members>
         <ScriptProperty><Name>When</Name><GetScriptBlock>
@@ -45,6 +47,21 @@
         <ScriptProperty><Name>Where</Name>
             <GetScriptBlock>$this.location.displayname
         </GetScriptBlock></ScriptProperty>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphTeam</Name><Members>
+        <ScriptMethod><Name>ToString</Name><Script>
+            $this.DisplayName
+        </Script></ScriptMethod>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphGroup</Name><Members>
+        <ScriptMethod><Name>ToString</Name><Script>
+            $this.DisplayName
+        </Script></ScriptMethod>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphChannel</Name><Members>
+        <ScriptMethod><Name>ToString</Name><Script>
+            $this.DisplayName
+        </Script></ScriptMethod>
     </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDrive</Name><Members>
         <AliasProperty><Name>Drive</Name>

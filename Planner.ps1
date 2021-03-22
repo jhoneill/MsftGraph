@@ -714,7 +714,7 @@ function Expand-GraphTask        {
         $i = 0 #Counter for progress bar.
         Write-Progress -Activity "Getting task details" -Status "Extending Tasks" -PercentComplete 0
         foreach ($t in $allTasks) {
-            $assignees = $t.assignments.keys |  foreach-object {$userhash[$_]}
+            if ($t.Assignments.keys) {$assignees = $t.assignments.keys |  foreach-object {$userhash[$_]} }
             $details   = Invoke-GraphRequest  -Uri "$GraphUri/planner/tasks/$($t.id)/details"
             $expandedTask = $t | Select-Object -Property * -ExcludeProperty keys,values,additionalproperties,count   |
                 Add-Member -Force -PassThru -NotePropertyName Assignees   -NotePropertyValue ($assignees -join ", ") |

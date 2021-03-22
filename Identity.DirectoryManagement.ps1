@@ -678,13 +678,13 @@ function Get-GraphDeletedObject         {
         #By default user objects are returned. This switches the choice to group objects.
         [switch]$Group
     )
-    if ($name)  {$u    = "?`$filter=startswith(displayName,'{0}')" -f ($Name -replace "'","''" )}
+    if ($name)  {$u    = '?$filter=' +(FilterString $Name)}
     else        {$u    = ''}
     if ($Group) {$type = 'Group'} else {$type='User'}
     Invoke-GraphRequest -Uri "$GraphUri/directory/deleteditems/microsoft.graph.$type$u" -AsType ([pscustomobject])  -ValueOnly
 }
 
-function Restore-GraphDeletedObject     {
+ function Restore-GraphDeletedObject     {
     <#
       .synopsis
         Recovers a user or group from the AAD recycle bin

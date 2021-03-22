@@ -1,19 +1,5 @@
 ﻿using namespace Microsoft.Graph.PowerShell.Models
 
-function ConvertTo-GraphDateTimeTimeZone {
-    <#
-        .synopsis
-            Converts a datetime object to dateTimeTimezone object with the current time zone.
-    #>
-    param   (
-        [dateTime]$d
-    )
-    New-object MicrosoftGraphDateTimeZone -Property @{
-                Datetime = $d.ToString('yyyy-MM-ddTHH:mm:ss')
-                Timezone = (Get-TimeZone).id
-    }
-}
-
 function ConvertTo-GraphUser      {
     <#
       .Synopsis
@@ -76,7 +62,7 @@ function Get-GraphUserList        {
                     'displayName', 'givenName', 'id', 'imAddresses', 'jobTitle', 'legalAgeGroupClassification',
                     'mail', 'mailNickname', 'mobilePhone', 'officeLocation',
                     'onPremisesDomainName', 'onPremisesExtensionAttributes', 'onPremisesImmutableId',
-                    'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName',
+                    'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccouname',
                     'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
                     'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
                     'preferredLanguage', 'provisionedPlans', 'proxyAddresses', 'state', 'streetAddress',
@@ -148,11 +134,7 @@ function Get-GraphUserList        {
         else {
             $result = @()
             foreach ($n in $Name) {
-                $filter = ("&`$Filter=startswith(userPrincipalName,'{0}') or " +
-                                     "startswith(displayName,'{0}') or "  +
-                                     "startswith(givenName,'{0}') or "  +
-                                     "startswith(surname,'{0}') or "  +
-                                     "startswith(mail,'{0}')"      ) -f ($n -replace "'","''")
+                $filter = '&$Filter=' + (FilterString $n -ExtraFields 'userPrincipalName','givenName','surname','mail')
                  $result += Invoke-GraphRequest -Uri ($uri + $filter) @webParams
             }
         }
@@ -1019,18 +1001,13 @@ function Import-GraphUser         {
                     Write-Warning  "User '$upn' was marked for addition, but that name already exists."
                     continue
             }
-            elseif ($user.Action -eq 'Add'    -and (-not $user.DisplayName) ) {
-                Write-Warning "User was missing a DisplayName"
-                continue
-            }
             elseif ($user.Action -eq 'Add'    -and
                 ($force -or $PSCmdlet.ShouldProcess($upn,"Add new user"))){
-                $params = @{Force=$true; DisplayName=$user.DisplayName; UserPrincipalName= $user.UserPrincipalName;   }
-                if ($user.MailNickName)      {$params['MailNickName']    = $user.MailNickName   }
-                if ($user.GivenName)         {$params['GivenName']       = $user.GivenName      }
-                if ($user.Surname)           {$params['Surname']         = $user.Surname        }
-                if ($user.Initialpassword)   {$params['Initialpassword'] = $user.Initialpassword}
-                if ($user.PasswordPolicies)  {$params['Initialpassword'] = $user.PasswordPolicies -split $ListSeparator}
+                $params = @{Force=$true}
+                foreach ($p in @('DisplayName','UserPrincipalName', 'MailNickName', 'GivenName', 'Surname', 'Initialpassword')) {
+                     if ($user.$p)  {$params[$p] = $user.$p}
+                }
+                if ($user.PasswordPolicies)  {$params['PasswordPolicies'] = $user.PasswordPolicies -split $ListSeparator}
                 if ($user.NoPasswordChange -in @("Yes","True","1") ) {
                             {$params['NoPasswordChange'] = $true}
                 }
@@ -1050,7 +1027,7 @@ function Import-GraphUser         {
             if     ($user.Action -eq 'Set') {
                 $params = @{'UserId' = $upn}
                 $Setparameters = (Get-Command Set-GraphUser ).Parameters.Values |
-                    Where-Object name -notin (Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters  )
+                    Where-Object name -notin ([Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters  )
 
                 foreach ($p in $setparameters) {
                     $pName = $p.name
@@ -1099,7 +1076,7 @@ function Export-GraphUser         {
     Get-GraphUserList @listParams | Select-Object  $exportFields | Export-Csv -Path $Path -NoTypeInformation
 }
 
-#MailBox commands: these only depend on the user module from the SDK so go in the same file as user commands
+#region MailBox commands: these only depend on the user module from the SDK so go in the same file as user commands
 function New-GraphMailAddress     {
     <#
       .synopsis
@@ -1131,205 +1108,6 @@ function New-GraphRecipient       {
         $DisplayName
     )
     @{ 'emailAddress' =  @{'address'=$mail; name=$DisplayName }}
-}
-
-function New-GraphAttendee        {
-    <#
-      .Synopsis
-        Helper function to create a new meeting attendee, with a mail address and the type of attendance.
-    #>
-    [cmdletbinding(DefaultParameterSetName='Default')]
-    [outputType([system.collections.hashtable])]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
-    param   (
-        # The recipient's email address, e.g Alex@contoso.com
-        [Parameter(Position=0, ValueFromPipelineByPropertyName=$true,ParameterSetName='Default',Mandatory=$true)]
-        [Alias('Mail')]
-        [String]$Address,
-        #The displayname for the recipient
-        [Parameter(Position=1, ValueFromPipelineByPropertyName=$true,ParameterSetName='Default')]
-        [Alias('DisplayName')]
-        $Name,
-        #Is the attendee required or optional or a resource (such as a room). Defaults to required
-        [ValidateSet('required', 'optional', 'resource')]
-        $AttendeeType = 'required',
-        [Parameter(ValueFromPipeline=$true,ParameterSetName='PipedStrings',Mandatory=$true)]
-        $InputObject
-    )
-    #$EmailAddress = New-GraphMailAddress -Address $Address -DisplayName $Name
-    # New-Object -TypeName MicrosoftGraphAttendee -Property @{emailaddress=$EmailAddress ; Type=$AttendeeType}
-    process {
-        if ($Address) {
-            if (-not $Name) {$Name = $Address}
-            @{ 'type'= $AttendeeType ; 'emailAddress' =  @{'address'=$Address; name=$Name }}
-        }
-    }
-}
-
-function New-GraphPhysicalAddress {
-    <#
-      .synopsis
-        Builds a street / postal / physical address to use in the contact commands
-       .Example
-        >$fabrikamAddress = New-GraphPhysicalAddress  "123 Some Street" Seattle WA 98121 "United States"
-        Creates an address - if the -Street, City,  State, Postalcode country are not explictly
-        specified they will be assigned in that order. Quotes are desireable but only necessary
-        when a value contains spaces.
-        It can then be used like this. Set-GraphContact $pavel -BusinessAddress $fabrikamAddress
-    #>
-    [cmdletbinding()]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
-    param   (
-        #Street address. This can contain carriage returns for a district, e.g. "101 London Road`r`nBotley"
-        [String]$Street,
-        #City, or town as people outside the US tend to call it
-        [String]$City,
-        #State, Province, County, the administrative level below country
-        [String]$State,
-        #Postal code. Even it parses as a number, as with US ZIP codes, it will be converted to a string
-        [String]$PostalCode,
-        #Usually a country but could be some other geographical entity
-        [String]$CountryOrRegion
-    )
-    $Address = @{}
-    foreach ($P in $PSBoundParameters.Keys.Where({$_ -notin [cmdlet]::CommonParameters})) {
-        $Address[$p] + $PSBoundParameters[$p]
-    }
-    $Address
-}
-
-function New-GraphRecurrence      {
-<#
-    .synopsis
-        Helper function to create the patterned recurrence for a task or event
-    .links
-        https://docs.microsoft.com/en-us/graph/api/resources/patternedrecurrence?view=graph-rest-1.0
-#>
-    param   (
-        #The day of the month on which the event occurs. Required if type is absoluteMonthly or absoluteYearly.
-        [ValidateRange(1,31)]
-        [int]$DayOfMonth = 1,
-
-        #Required if type is weekly, relativeMonthly, or relativeYearly. A collection of the days of the week on
-        # which the event occurs. If type is relativeMonthly or relativeYearly,
-        # and daysOfWeek specifies more than one day, the event falls on the first day that satisfies the pattern.
-        [ValidateSet('sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday')]
-        [String[]]$DaysOfWeek = @(),
-
-        #The first day of the week. Default is sunday. Required if type is weekly.
-        [ValidateSet('sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday')]
-        [String]$FirstDayOfWeek ='sunday',
-
-        #Specifies on which instance of the allowed days specified in daysOfsWeek the event occurs, counted from the first instance in the month.
-        #Default is first. Optional and used if type is relativeMonthly or relativeYearly.
-        [ValidateSet('first', 'second', 'third', 'fourth', 'last')]
-        [string]$Index  ="first",
-
-        #The number of units between occurrences, where units can be in days, weeks, months, or years, depending on the type. Defaults to 1
-        [int]$Interval = 1,
-
-        #The month in which the event occurs. This is a number from 1 to 12.
-        [ValidateRange(1,12)]
-        [int]$Month,
-
-        #The recurrence pattern type:  daily = repeats based on the number of days specified by interval between occurrences.;
-        #Weekly = repeats on the same day or days of the week, based on the number of weeks between each set of occurrences.
-        #absoluteMonthly = Event repeats on the specified day of the month, based on the number of months between occurrences.
-        #relativeMonthly = Event repeats on the specified day or days of the week, in the same relative position in the month, based on the number of months between occurrences.
-        #absoluteYearly	Event repeats on the specified day and month, based on the number of years between occurrences.
-        #relativeYearly	Event repeats on the specified day or days of the week, in the same relative position in a specific month of the year
-        [validateSet('daily', 'weekly', 'absoluteMonthly', 'relativeMonthly', 'absoluteYearly', 'relativeYearly')]
-        [string]$Type = 'daily',
-
-        #The number of times to repeat the event. Required and must be positive if type is numbered.
-        $NumberOfOccurrences = 0 ,
-
-        #The date to start applying the recurrence pattern. The first occurrence of the meeting may be this date or later, depending on the recurrence pattern of the event.
-        #Must be the same value as the start property of the recurring event. Required
-        [DateTime]$startDate = ([datetime]::now),
-
-        #The date to stop applying the recurrence pattern. Depending on the recurrence pattern of the event, the last occurrence of the meeting may not be this date.
-        [DateTime]$EndDate,
-
-        # 'Time zone for the startDate and endDate properties. Optional. If not specified, the time zone of the event is used.'
-        [string]$RecurrenceTimeZone
-    )
-    if ($endDate) {
-        $range =   @{
-            numberOfOccurrences = $numberOfOccurrences
-            startDate           = ($startDate.ToString('yyyy-MM-dd') )
-            endDate             = ($EndDate.ToString(  'yyyy-MM-dd') )
-            recurrenceTimeZone  = $RecurrenceTimeZone
-            type                = 'endDate'
-        }
-    }
-    elseif ($numberOfOccurrences) {
-        $range =  @{
-            numberOfOccurrences = $numberOfOccurrences
-            startDate           = ($startDate.ToString('yyyy-MM-dd') )
-            type                = 'numbered'
-        }
-    }
-    else {
-        $range =  @{
-            startDate           = ($startDate.ToString('yyyy-MM-dd') )
-            type                = 'noEnd'
-        }
-    }
-    $pattern =  @{
-        dayOfMonth     = $DayOfMonth
-        daysOfWeek     = $DaysOfWeek
-        firstDayOfWeek = $FirstDayOfWeek
-        index          = $Index
-        interval       = $Interval
-        month          = $month
-        type           = $type
-    }
-    return @{
-            pattern   = $pattern
-            range     = $range
-    }
-}
-
-function Get-GraphCalendarPath    {
-    param   (
-        $Calendar,
-        $Group,
-        $User
-    )
-    if     ($Calendar -and $Calendar.CalendarPath) {
-            return $Calendar.CalendarPath
-    }
-    elseif ($Calendar -and  $User)      { #get a specific calendar for a specific user
-        if ($User.ID)     {$user = $User.ID}
-        if ($Calendar.id) {
-            $path = "users/$User/calendars/$($Calendar.id)"
-            Add-Member -Force -InputObject $Calendar -NotePropertyName CalendarPath -NotePropertyValue $path
-            return $path
-        }
-        else {return "users/$user/calendars/$Calendar"}
-    }
-    elseif ($Calendar -and -not $group) { #if we got a calendar without a path or a user or group assume it is current user's
-        if ($Calendar.id) {
-            $path = "me/calendars/$($Calendar.id)"
-            Add-Member -Force -InputObject $Calendar -NotePropertyName CalendarPath -NotePropertyValue $path
-            return $path
-        }
-        else {return "me/calendars/$Calendar"}
-
-    }
-    elseif ($User)    {  # get the default calendar for a specific user
-        if ($User.ID)    {return "users/$($user.ID)/calendar"}
-        else             {return "users/$user/calendar"}
-        #for the default calendar you can also use users/{id}/events or users//calendarView?param without "Calendar"
-    }
-    elseif ($Group)   {  # get the [only] calendar for a group
-        if ($Group.ID)   {return "groups/$($Group.id)/calendar"}
-        else             {return "groups/$Group/calendar" }  #for the default calendar you can also use groups/{id}/events or groups/calendarView?param without "Calendar"
-    }
-    else  {  #no User, group or calendar specified get the current users default calendar.
-            return '/me/calendar'   #for the default calendar you can also use me/events or me/calendarView?params without "Calendar"
-    }
 }
 
 function Get-GraphMailFolder      {
@@ -1383,7 +1161,7 @@ function Get-GraphMailFolder      {
         if     ($ParentFolder.id) {      $Uri     = $baseUri + '/{1}/childfolders?$top={0}' -f $top, $parentfolder.id }
         elseif ($ParentFolder)    {      $Uri     = $baseUri + '/{1}/childfolders?$top={0}' -f $top, $ParentFolder    }
         else                      {      $Uri     = $baseUri + '?$top={0}'                  -f $top }
-        if     ($Name)            {      $filter  = "startswith(displayName,'{0}') "        -f ($Name -replace "'","''" ) }
+        if     ($Name)            {      $filter  = FilterString $Name }
     }
     if     ($Select)                     {$uri    = $uri + '&$select=' + ($Select -join ',') }
     if     ($Filter)                     {$uri    = $uri + $JoinChar + '&$Filter='  + $Filter  }
@@ -1889,343 +1667,183 @@ function Send-GraphMailForward    {
     Write-Debug $Json
     Invoke-GraphRequest -Method post -Uri $uri -ContentType 'application/json' -Body $json
 }
+#endregion
 
-function Get-GraphContact         {
+#region Outlook calendar -  only needs items found in the user module, so we don't give it it's own PS1 file
+function New-GraphAttendee        {
     <#
       .Synopsis
-        Get the user's contacts
-      .Example
-        get-graphContacts -name "o'neill" | ft displayname, mobilephone
-        Gets contacts where the display name, given name, surname, file-as name, or email begins with
-        O'Neill - note the function handles apostrophe, - a single one would normal cause an error with the query.
-        The results are displayed as table with display name and mobile number
+        Helper function to create a new meeting attendee, with a mail address and the type of attendance.
     #>
-    [cmdletbinding(DefaultParameterSetName="None")]
-    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact])]
+    [cmdletbinding(DefaultParameterSetName='Default')]
+    [outputType([system.collections.hashtable])]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
     param   (
-        #UserID as a guid or User Principal name. If not specified defaults to "me"
-        [string]$User,
-        #If specified selects the first n contacts
-        [int]$Top,
-        #A custom set of contact properties to select
-        [ValidateSet('assistantName', 'birthday', 'businessAddress', 'businessHomePage', 'businessPhones',
-                     'categories', 'changeKey', 'children', 'companyName', 'createdDateTime', 'department',
-                     'displayName', 'emailAddresses', 'fileAs', 'generation', 'givenName', 'homeAddress',
-                     'homePhones', 'id', 'imAddresses', 'initials', 'jobTitle', 'lastModifiedDateTime',
-                     'manager', 'middleName', 'mobilePhone',  'nickName', 'officeLocation', 'otherAddress',
-                     'parentFolderId', 'personalNotes', 'profession', 'spouseName', 'surname', 'title',
-                     'yomiCompanyName', 'yomiGivenName', 'yomiSurname')]
-        [string[]]$Select,
-        #A custom OData Sort string.
-        [string]$OrderBy,
-        #If specified looks for contacts where the display name, file-as Name, given name or surname beging with ...
-        [Parameter(Mandatory=$true, ParameterSetName='FilterByName')]
-        [string]$Name,
-        #A custom OData Filter String
-        [Parameter(Mandatory=$true, ParameterSetName='FilterByString')]
-        [string]$Filter
+        # The recipient's email address, e.g Alex@contoso.com
+        [Parameter(Position=0, ValueFromPipelineByPropertyName=$true,ParameterSetName='Default',Mandatory=$true)]
+        [Alias('Mail')]
+        [String]$Address,
+        #The displayname for the recipient
+        [Parameter(Position=1, ValueFromPipelineByPropertyName=$true,ParameterSetName='Default')]
+        [Alias('DisplayName')]
+        $Name,
+        #Is the attendee required or optional or a resource (such as a room). Defaults to required
+        [ValidateSet('required', 'optional', 'resource')]
+        $AttendeeType = 'required',
+        [Parameter(ValueFromPipeline=$true,ParameterSetName='PipedStrings',Mandatory=$true)]
+        $InputObject
     )
-
-    #region build the URI - if we got a user ID, use it, add select, filter, orderby and/or top as needed
-    if     ($User.id) {$uri = "$GraphUri/users/$($User.id)/contacts"}
-    elseif ($User)    {$uri = "$GraphUri/users/$User/contacts" }
-    else                {$uri = "$GraphUri/me/contacts" }
-
-    $JoinChar = "?" #will next parameter be added to the URI with a "?" or a "&" ?
-    if ($Select)  { $uri = $uri + '?$select=' + ($Select -join ',')    ; $JoinChar = "&" }
-    if ($Name)    { $uri = $uri + $JoinChar + ("`$filter=startswith(displayName,'{0}') or startswith(givenName,'{0}') or startswith(surname,'{0}')  or startswith(fileAs,'{0}')" -f ($Name -replace "'","''" )  )
-                  $JoinChar = "&"
-    }
-    if ($Filter)  { $uri = $uri + $JoinChar + '$Filter='  + $Filter  ; $JoinChar = "&" }
-    if ($OrderBy) { $uri = $uri + $JoinChar + '$orderby=' + $orderby ; $JoinChar = "&" }
-    if ($Top)     { $uri = $uri + $JoinChar + '$top='     + $top}
-    #endregion
-
-    Invoke-GraphRequest -Uri  $uri -ValueOnly -AllValues -AsType ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact]) -ExcludeProperty "@odata.etag"
-}
-
-function New-GraphContact         {
-    <#
-      .Synopsis
-        Adds an entry to the current users Outlook contacts
-      .Description
-        Almost all the paramters can be accepted form a piped object to make import easier.
-       .Example
-       >New-GraphContact -GivenName Pavel -Surname Bansky -Email pavelb@fabrikam.onmicrosoft.com -BusinessPhones  "+1 732 555 0102"
-       Creates a new contact; if no displayname is given, one will be decided using given name and suranme;
-       .Example
-       >
-       >$PavelMail = New-GraphRecipient -DisplayName "Pavel Bansky [Fabikam]" -Mail  pavelb@fabrikam.onmicrosoft.com
-       >New-GraphContact -GivenName Pavel -Surname Bansky -Email $pavelmail  -BusinessPhones  "+1 732 555 0102"
-        This creates the same contanct but sets up their email with a display name.
-        New recipient creates a hash table
-        @{'emailaddress' = @ {
-                'name' = 'Pavel Bansky [Fabikam]'
-                'address' = 'pavelb@fabrikam.onmicrosoft.com'
-            }
-        }
-    #>
-    [cmdletbinding(SupportsShouldProcess=$true)]
-    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact])]
-    param   (
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $GivenName,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $MiddleName,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $Initials ,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $Surname,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $NickName,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $FileAs,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $DisplayName,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $CompanyName,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $JobTitle,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $Department,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $Manager,
-        #One or more instant messaging addresses, as a single string with semi colons between addresses or as an array of strings or MailAddress objects created with New-GraphMailAddress
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $Email,
-        #One or more instant messaging addresses, as an array or as a single string with semi colons between addresses
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $IM,
-        #A single mobile phone number
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $MobilePhone,
-        #One or more Business phones either as an array or as single string with semi colons between numbers
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $BusinessPhones,
-        #One or more home phones either as an array or as single string with semi colons between numbers
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $HomePhones,
-        #An address object created with  New-GraphPhysicalAddress
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $Homeaddress,
-        #An address object created with  New-GraphPhysicalAddress
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $BusinessAddress,
-        #An address object created with  New-GraphPhysicalAddress
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $OtherAddress,
-        #One or more categories either as an array or as single string with semi colons between them.
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $Categories,
-        #The contact's Birthday as a date
-        [Parameter(ValueFromPipelineByPropertyName)]
-        [dateTime]$Birthday ,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $PersonalNotes,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $Profession,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $AssistantName,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $Children,
-        [Parameter(ValueFromPipelineByPropertyName)]
-        $SpouseName,
-        #If sepcified the contact will be created without prompting for confirmation. This is the default state but can change with the setting of confirmPreference.
-        [Switch]$Force
-    )
-
+    #$EmailAddress = New-GraphMailAddress -Address $Address -DisplayName $Name
+    # New-Object -TypeName MicrosoftGraphAttendee -Property @{emailaddress=$EmailAddress ; Type=$AttendeeType}
     process {
-        Set-GraphContact @PSBoundParameters -IsNew
+        if ($Address) {
+            if (-not $Name) {$Name = $Address}
+            @{ 'type'= $AttendeeType ; 'emailAddress' =  @{'address'=$Address; name=$Name }}
+        }
     }
 }
 
-function Set-GraphContact         {
-    <#
-      .Synopsis
-        Modifies or adds an entry in the current users Outlook contacts
-      .Example
-        >
-        > $pavel = Get-GraphContact -Name pavel
-        > Set-GraphContact $pavel -CompanyName "Fabrikam" -Birthday "1974-07-22"
-        The first line gets the Contact which was added in the 'New-GraphContact" example
-        and the second adds Birthday and Company-name attributes to the contact.
-       .Example
-        >
-        > $fabrikamAddress = New-GraphPhysicalAddress  "123 Some Street" Seattle WA 98121 "United States"
-        > Set-GraphContact $pavel -BusinessAddress $fabrikamAddress
-        This continues from the previous example, creating an address in the first line
-        and adding it to the contact in the second.
-
-    #>
-    [cmdletbinding(SupportsShouldProcess=$true)]
-    [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact])]
+function New-GraphRecurrence      {
+<#
+    .synopsis
+        Helper function to create the patterned recurrence for a task or event
+    .links
+        https://docs.microsoft.com/en-us/graph/api/resources/patternedrecurrence?view=graph-rest-1.0
+#>
     param   (
-    #The contact to be updated either as an ID or as contact object containing an ID.
-    [Parameter(ValueFromPipeline=$true,ParameterSetName='UpdateContact',Mandatory=$true, Position=0 )]
-    $Contact,
-    #If specified, instead of providing a contact, instructs the command to create a contact instead of updating one.
-    [Parameter(ParameterSetName='NewContact',Mandatory=$true )]
-    [switch]$IsNew,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $GivenName,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $MiddleName,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Initials ,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Surname,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $NickName,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $FileAs,
-    #If not specified a display name will be generated, so updates without the display name may result in overwriting an existing one
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $DisplayName,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $CompanyName,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $JobTitle,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Department,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Manager,
-    #One or more mail addresses, as a single string with semi colons between addresses or as an array of strings or MailAddress objects created with New-GraphMailAddress
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Email,
-    #One or more instant messaging addresses, as an array or as a single string with semi colons between addresses
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $IM,
-    #A single mobile phone number
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $MobilePhone,
-    #One or more Business phones either as an array or as single string with semi colons between numbers
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $BusinessPhones,
-    #One or more home phones either as an array or as single string with semi colons between numbers
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $HomePhones,
-    #An address object created with  New-GraphPhysicalAddress
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Homeaddress,
-    #An address object created with  New-GraphPhysicalAddress
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $BusinessAddress,
-    #An address object created with  New-GraphPhysicalAddress
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $OtherAddress,
-    #One or more categories either as an array or as single string with semi colons between them.
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Categories,
-    #The contact's Birthday as a date
-    [Parameter(ValueFromPipelineByPropertyName)]
-    [nullable[dateTime]]$Birthday ,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $PersonalNotes,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Profession,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $AssistantName,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $Children,
-    [Parameter(ValueFromPipelineByPropertyName)]
-    $SpouseName,
-    #If sepcified the contact will be created without prompting for confirmation. This is the default state but can change with the setting of confirmPreference.
-    [Switch]$Force
+        #The day of the month on which the event occurs. Required if type is absoluteMonthly or absoluteYearly.
+        [ValidateRange(1,31)]
+        [int]$DayOfMonth = 1,
+
+        #Required if type is weekly, relativeMonthly, or relativeYearly. A collection of the days of the week on
+        # which the event occurs. If type is relativeMonthly or relativeYearly,
+        # and daysOfWeek specifies more than one day, the event falls on the first day that satisfies the pattern.
+        [ValidateSet('sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday')]
+        [String[]]$DaysOfWeek = @(),
+
+        #The first day of the week. Default is sunday. Required if type is weekly.
+        [ValidateSet('sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday')]
+        [String]$FirstDayOfWeek ='sunday',
+
+        #Specifies on which instance of the allowed days specified in daysOfsWeek the event occurs, counted from the first instance in the month.
+        #Default is first. Optional and used if type is relativeMonthly or relativeYearly.
+        [ValidateSet('first', 'second', 'third', 'fourth', 'last')]
+        [string]$Index  ="first",
+
+        #The number of units between occurrences, where units can be in days, weeks, months, or years, depending on the type. Defaults to 1
+        [int]$Interval = 1,
+
+        #The month in which the event occurs. This is a number from 1 to 12.
+        [ValidateRange(1,12)]
+        [int]$Month,
+
+        #The recurrence pattern type:  daily = repeats based on the number of days specified by interval between occurrences.;
+        #Weekly = repeats on the same day or days of the week, based on the number of weeks between each set of occurrences.
+        #absoluteMonthly = Event repeats on the specified day of the month, based on the number of months between occurrences.
+        #relativeMonthly = Event repeats on the specified day or days of the week, in the same relative position in the month, based on the number of months between occurrences.
+        #absoluteYearly	Event repeats on the specified day and month, based on the number of years between occurrences.
+        #relativeYearly	Event repeats on the specified day or days of the week, in the same relative position in a specific month of the year
+        [validateSet('daily', 'weekly', 'absoluteMonthly', 'relativeMonthly', 'absoluteYearly', 'relativeYearly')]
+        [string]$Type = 'daily',
+
+        #The number of times to repeat the event. Required and must be positive if type is numbered.
+        $NumberOfOccurrences = 0 ,
+
+        #The date to start applying the recurrence pattern. The first occurrence of the meeting may be this date or later, depending on the recurrence pattern of the event.
+        #Must be the same value as the start property of the recurring event. Required
+        [DateTime]$startDate = ([datetime]::now),
+
+        #The date to stop applying the recurrence pattern. Depending on the recurrence pattern of the event, the last occurrence of the meeting may not be this date.
+        [DateTime]$EndDate,
+
+        # 'Time zone for the startDate and endDate properties. Optional. If not specified, the time zone of the event is used.'
+        [string]$RecurrenceTimeZone
     )
-    begin   {
-        $webParams = @{
-            'ContentType'    = 'application/json'
-            'URI'             = "$GraphUri/me/contacts"
-            'AsType'          =  ([Microsoft.Graph.PowerShell.Models.MicrosoftGraphContact])
-            'ExcludeProperty' = @('@odata.etag', '@odata.context' )
+    if ($endDate) {
+        $range =   @{
+            numberOfOccurrences = $numberOfOccurrences
+            startDate           = ($startDate.ToString('yyyy-MM-dd') )
+            endDate             = ($EndDate.ToString(  'yyyy-MM-dd') )
+            recurrenceTimeZone  = $RecurrenceTimeZone
+            type                = 'endDate'
         }
     }
-    process {
-        $contactSettings = @{  }
-        if ($Email)                           {$contactSettings['emailAddresses'] = @() }
-        if ($Email -is [string])              {$Email = $Email -split '\s*;\s*'}
-        foreach ($e in $Email) {
-            if     ($e.emailAddress)          {$contactSettings.emailAddresses    += $e.emailAddress   }
-            elseif ($e -is [string])          {$contactSettings.emailAddresses    += @{'address' = $e} }
-            else                              {$contactSettings.emailAddresses    += $e  }
+    elseif ($numberOfOccurrences) {
+        $range =  @{
+            numberOfOccurrences = $numberOfOccurrences
+            startDate           = ($startDate.ToString('yyyy-MM-dd') )
+            type                = 'numbered'
         }
-        if     ($IM             -is [string]) {$contactSettings['imAddresses']     = @() + $IM             -split '\s*;\s*'}
-        elseif ($IM                         ) {$contactSettings['imAddresses']     =       $IM}
-        if     ($Categories     -is [string]) {$contactSettings['categories']      = @() + $Categories     -split '\s*;\s*'}
-        elseif ($Categories                 ) {$contactSettings['categories']      =       $Categories}
-        if     ($Children       -is [string]) {$contactSettings['children']        = @() + $Children       -split '\s*;\s*'}
-        elseif ($Children                   ) {$contactSettings['children']        =       $Children}
-        if     ($BusinessPhones -is [string]) {$contactSettings['businessPhones']  = @() + $BusinessPhones -split '\s*;\s*'}
-        elseif ($BusinessPhones             ) {$contactSettings['businessPhones']  =       $BusinessPhones}
-        if     ($HomePhones     -is [string]) {$contactSettings['homePhones']      = @() + $HomePhones     -split '\s*;\s*'}
-        elseif ($HomePhones                 ) {$contactSettings['homePhones']      =       $HomePhones  }
-        if     ($MobilePhone                ) {$contactSettings['mobilePhone']     =       $MobilePhone}
-        if     ($GivenName                  ) {$contactSettings['givenName']       =       $GivenName}
-        if     ($MiddleName                 ) {$contactSettings['middleName']      =       $MiddleName}
-        if     ($Initials                   ) {$contactSettings['initials']        =       $Initials}
-        if     ($Surname                    ) {$contactSettings['surname']         =       $Surname}
-        if     ($NickName                   ) {$contactSettings['nickName']        =       $NickName}
-        if     ($FileAs                     ) {$contactSettings['fileAs']          =       $FileAs}
-        if     ($DisplayName                ) {$contactSettings['displayName']     =       $DisplayName}
-        if     ($Manager                    ) {$contactSettings['manager']         =       $Manager}
-        if     ($JobTitle                   ) {$contactSettings['jobTitle']        =       $JobTitle}
-        if     ($Department                 ) {$contactSettings['department']      =       $Department}
-        if     ($CompanyName                ) {$contactSettings['companyName']      =      $CompanyName}
-        if     ($PersonalNotes              ) {$contactSettings['personalNotes']   =       $PersonalNotes}
-        if     ($Profession                 ) {$contactSettings['profession']      =       $Profession}
-        if     ($AssistantName              ) {$contactSettings['assistantName']   =       $AssistantName}
-        if     ($Children                   ) {$contactSettings['children']        =       $Children}
-        if     ($SpouseName                 ) {$contactSettings['spouseName']      =       $spouseName}
-        if     ($Homeaddress                ) {$contactSettings['homeaddress']     =       $Homeaddress}
-        if     ($BusinessAddress            ) {$contactSettings['businessAddress'] =       $BusinessAddress}
-        if     ($OtherAddress               ) {$contactSettings['otherAddress']    =       $OtherAddress}
-        if     ($Birthday                   ) {$contactSettings['birthday']        =       $Birthday.tostring('yyyy-MM-dd')} #note this is a different date format to most things !
-
-        $json = ConvertTo-Json $contactSettings
-        Write-Debug $json
-        if ($IsNew) {
-            if ($force -or $PSCmdlet.ShouldProcess($DisplayName,'Create Contact')) {
-                Invoke-GraphRequest @webParams -method Post  -Body $json
-            }
+    }
+    else {
+        $range =  @{
+            startDate           = ($startDate.ToString('yyyy-MM-dd') )
+            type                = 'noEnd'
         }
-        else {#if ContactPassed
-            if ($force -or $PSCmdlet.ShouldProcess($Contact.DisplayName,'Update Contact')) {
-                if ($Contact.id) {$webParams.uri += '/' + $Contact.ID}
-                else             {$webParams.uri += '/' + $Contact }
-                Invoke-GraphRequest @webParams -method Patch -Body $json
-            }
-        }
+    }
+    $pattern =  @{
+        dayOfMonth     = $DayOfMonth
+        daysOfWeek     = $DaysOfWeek
+        firstDayOfWeek = $FirstDayOfWeek
+        index          = $Index
+        interval       = $Interval
+        month          = $month
+        type           = $type
+    }
+    return @{
+            pattern   = $pattern
+            range     = $range
     }
 }
 
-function Remove-GraphContact      {
-    <#
-      .synopsis
-         Deletes a contact from the default user's contacts
-      .Example
-        > Get-GraphContact -Name pavel | Remove-GraphContact
-        Finds and removes any user whose given name, surname, email or display name
-        matches Pavel*. This might return unexpected users, fortunately there is a prompt
-        before deleting - the prompt it can be supressed by using the -Force switch if you
-        are confident you have the right contact selected.
-    #>
-    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
+function Get-GraphCalendarPath    {
     param   (
-        #The contact to remove, as an ID or as a contact object containing an ID
-        [parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true )]
-        $Contact,
-        #If specified the contact will be removed without prompting for confirmation
-        $Force
+        $Calendar,
+        $Group,
+        $User
     )
-    process {
-        if ($force -or $pscmdlet.ShouldProcess($Contact.DisplayName, 'Delete contact')) {
-            if ($Contact.id) {$Contact = $Contact.id}
-            Invoke-GraphRequest -Method Delete -uri "$GraphUri/me/contacts/$Contact"
-        }
+    #if we already have the path, just return it; if we got no parameters assume current user's default calendar.
+    if ((-not $User)  -and
+        (-not $Group) -and
+        (-not $Calendar)   )                         {return '/me/calendar' }  #for the default calendar you can also use me/events or me/calendarView?params without "Calendar"
+    elseif   ($Calendar -and $Calendar.CalendarPath) {return $Calendar.CalendarPath}
+    elseif   ($Group)                                { # get the [only] calendar for a group
+             $groupId = idfromGroup $group
+             if (-not $groupId -or $groupId.count -gt 1 ) {
+                throw ([System.Management.Automation.ParameterBindingException]::new('Cannot resolve the group information provided to a single group.'))
+            }
+            else {return "groups/$groupId/calendar" }  #for the default calendar you can also use groups/{id}/events or groups/calendarView?param without "Calendar"
     }
+    if       ($Calendar -and -not $user)             { #if we got a calendar without a path or user assume it is current user's
+         if  ($Calendar.id) {
+              $path = "me/calendars/$($Calendar.id)"
+              Add-Member -Force -InputObject $Calendar -NotePropertyName CalendarPath -NotePropertyValue $path
+              return $path
+          }
+          else {return "me/calendars/$Calendar"}
+    }
+
+    #we must have a user with or without a calendar at this point - so resolve the user
+    if       ($User -and $User.ID)               {$User = $User.ID}
+    elseif   ($User -and $User -is [string]  -and
+              $User -notmatch "\w@\w|$GUIDRegex")    {#Resolve name to UPN
+            $User =  Invoke-GraphRequest  -ValueOnly ($GraphUri + '/users/?$Filter=' +
+                            (FilterString $user  -ExtraFields 'userPrincipalName','givenName','surname','mail')) | ForEach-Object userPrincipalName
+    }
+    if       ($User.count -gt 1 -or -not $User)  {
+             throw ([System.Management.Automation.ParameterBindingException]::new('Cannot resolve the user information provided to an account.'))
+    }
+
+    if (-not $Calendar)    {return "users/$user/calendar"} #get the default calendar for a specific user
+    elseif  ($Calendar.id) {
+             $path = "users/$User/calendars/$($Calendar.id)"
+             Add-Member -Force -InputObject $Calendar -NotePropertyName CalendarPath -NotePropertyValue $path
+             return $path
+    }
+    else                   {return "users/$user/calendars/$Calendar"}
+    #for the default calendar you can also use users/{id}/events or users//calendarView?param without "Calendar"
 }
 
-#Outlook calendar - also only needs items found in the user module, so we don't give it it's own PS1 file
 function Get-GraphEvent           {
     <#
       .Synopsis
@@ -2240,8 +1858,7 @@ function Get-GraphEvent           {
            the future, or specify the subject line or a custom filter.
       .Example
         >
-        >$team = Get-GraphTeam -ByName consultants
-        >Get-GraphEvent -Team $team
+        >Get-GraphEvent -Team consultants
         Finds the team (group) named "Consultants", and gets events in the team's calendar.
         Note that the because "team" and "group" are used interchangably the parameter is
         named "Group" with an alias of "Team"
@@ -2262,8 +1879,8 @@ function Get-GraphEvent           {
         >Get-GraphEvent  -filter "isorganizer eq false" -OrderBy start/datetime
         This uses the same filter as the previous example but sorts the results at the
         server before they are returned. Note that some fields like 'start' are record types,
-        and one of their propperties, as in this case, may need to be specified to perform
-        a sort, and the syntax is property/ChildProperty.
+        and one of their properties may need to be specified to perform a sort, as in this case,
+        and the syntax is property/ChildProperty.
       .Example
         >
         >$userTimezone = (Get-GraphUser -MailboxSettings).timezone
@@ -2279,25 +1896,27 @@ function Get-GraphEvent           {
     [cmdletbinding(DefaultParameterSetName="None")]
     param   (
         #UserID as a guid or User Principal name, whose calendar should be fetched.
-        [Parameter( Mandatory=$true, ParameterSetName="User"          ,ValueFromPipelineByPropertyName=$true)]
-        [Parameter( Mandatory=$true, ParameterSetName="UserAndSubject",ValueFromPipelineByPropertyName=$true)]
-        [Parameter( Mandatory=$true, ParameterSetName="UserAndFilter" ,ValueFromPipelineByPropertyName=$true)]
+        [Parameter( ParameterSetName="User",           ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [Parameter( ParameterSetName="UserAndSubject", ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [Parameter( ParameterSetName="UserAndFilter",  ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [ArgumentCompleter([UPNcompleter])]
         [string]$User,
 
         #A sepecific calendar
-        [Parameter( Mandatory=$true, ParameterSetName="Cal",           ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [Parameter( Mandatory=$true, ParameterSetName="CalAndSubject", ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [Parameter( Mandatory=$true, ParameterSetName="CalAndFilter",  ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [Parameter( ParameterSetName="User",          ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [Parameter( ParameterSetName="UserAndSubject",ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-        [Parameter( ParameterSetName="UserAndFilter", ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+        [Parameter( ParameterSetName="Cal",            ValueFromPipelineByPropertyName=$true, Mandatory=$true, ValueFromPipeline=$true)]
+        [Parameter( ParameterSetName="CalAndSubject",  ValueFromPipelineByPropertyName=$true, Mandatory=$true, ValueFromPipeline=$true)]
+        [Parameter( ParameterSetName="CalAndFilter",   ValueFromPipelineByPropertyName=$true, Mandatory=$true, ValueFromPipeline=$true)]
+        [Parameter( ParameterSetName="User",           ValueFromPipelineByPropertyName=$true, ValueFromPipeline=$true)]
+        [Parameter( ParameterSetName="UserAndSubject", ValueFromPipelineByPropertyName=$true, ValueFromPipeline=$true)]
+        [Parameter( ParameterSetName="UserAndFilter",  ValueFromPipelineByPropertyName=$true, ValueFromPipeline=$true)]
         $Calendar,
 
         #Group ID or a Group object with an ID, whose calendar should be fetched
-        [Parameter(Mandatory=$true, ParameterSetName="GroupID"        ,ValueFromPipelineByPropertyName=$true)]
-        [Parameter(Mandatory=$true, ParameterSetName="GroupAndSubject",ValueFromPipelineByPropertyName=$true)]
-        [Parameter(Mandatory=$true, ParameterSetName="GroupAndFilter" ,ValueFromPipelineByPropertyName=$true)]
+        [Parameter(ParameterSetName="GroupID",         ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [Parameter(ParameterSetName="GroupAndSubject", ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [Parameter(ParameterSetName="GroupAndFilter",  ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
         [Alias("Team")]
+        [ArgumentCompleter([GroupCompleter])]
         $Group,
 
         #Time zone to rennder event times. By default the time zone of the local machine will me use
@@ -2322,16 +1941,16 @@ function Get-GraphEvent           {
         [string]$OrderBy,
 
         #If specified, fetch events where the subject line begins with
-        [Parameter(Mandatory=$true, ParameterSetName='CalAndSubject',  ValueFromPipelineByPropertyName=$true)]
-        [Parameter(Mandatory=$true, ParameterSetName="UserAndSubject", ValueFromPipelineByPropertyName=$true)]
-        [Parameter(Mandatory=$true, ParameterSetName="GroupAndSubject",ValueFromPipelineByPropertyName=$true)]
+        [Parameter(ParameterSetName='CalAndSubject',   ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [Parameter(ParameterSetName="UserAndSubject",  ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [Parameter(ParameterSetName="GroupAndSubject", ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
         [string]$Subject,
 
         #A custom selection filter
-        [Parameter(Mandatory=$true, ParameterSetName="CurrentFilter", ValueFromPipelineByPropertyName=$true)]
-        [Parameter(Mandatory=$true, ParameterSetName="CalAndFilter",  ValueFromPipelineByPropertyName=$true)]
-        [Parameter(Mandatory=$true, ParameterSetName="UserAndFilter", ValueFromPipelineByPropertyName=$true)]
-        [Parameter(Mandatory=$true, ParameterSetName="GroupAndFilter",ValueFromPipelineByPropertyName=$true)]
+        [Parameter(ParameterSetName="CurrentFilter",   ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [Parameter(ParameterSetName="CalAndFilter",    ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [Parameter(ParameterSetName="UserAndFilter",   ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
+        [Parameter(ParameterSetName="GroupAndFilter",  ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
         [string]$Filter
     )
 
@@ -2395,7 +2014,7 @@ function Add-GraphEvent           {
         >$Chris = New-Attendee -Mail Chris@Contoso.com -display 'Chris Cross' optional
         >$Phil  = New-Attendee -Mail Phil@Contoso.com
         >Add-GraphEvent -subject "Phase II planning" -Start "2019-02-02 14:00" -End "2019-02-02 14:30" -Attendees $chris,$phil
-        Creates a meeting with a two additonal attendee. The first command creates an optional attendee with a display name
+        Creates a meeting with a second additonal attendee. The first command creates an optional attendee with a display name
         the second creates an attendee with no displayed name and the default 'required' type
         Finally the meeting is created.
     #>
@@ -2403,6 +2022,7 @@ function Add-GraphEvent           {
     param   (
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
         [Parameter( ParameterSetName="User",ValueFromPipelineByPropertyName=$true)]
+        [ArgumentCompleter([UPNCompleter])]
         [string]$User,
 
         #A sepecific calendar belonging to a user.
@@ -2412,6 +2032,7 @@ function Add-GraphEvent           {
         #Group ID or a Group object with an ID whose calendar should be fetched
         [Parameter(Mandatory=$true, ParameterSetName="Group", ValueFromPipelineByPropertyName=$true)]
         [Alias('Team')]
+        [ArgumentCompleter([GroupCompleter])]
         $Group,
 
         #Subject for the appointment
@@ -2515,8 +2136,6 @@ function Set-GraphEvent           {
         Modifies an event on a calendar
       .link
         Get-GraphEvent
-      .Example
-        TBC
     #>
     [cmdletbinding(SupportsShouldProcess=$true,DefaultParameterSetName='None')]
     param   (
@@ -2526,6 +2145,7 @@ function Set-GraphEvent           {
 
         #UserID as a guid or User Principal name, whose calendar should be fetched If not specified defaults to "me"
         [Parameter( ParameterSetName="User",ValueFromPipelineByPropertyName=$true)]
+        [ArgumentCompleter([UPNCompleter])]
         [string]$User,
 
         #A sepecific calendar belonging to a user.
@@ -2535,6 +2155,7 @@ function Set-GraphEvent           {
         #Group ID or a Group object with an ID whose calendar should be fetched
         [Parameter(Mandatory=$true, ParameterSetName="Group", ValueFromPipelineByPropertyName=$true)]
         [Alias('Team')]
+        [ArgumentCompleter([GroupCompleter])]
         $Group,
 
         #Subject for the appointment
@@ -2673,9 +2294,22 @@ function Remove-GraphEvent        {
         }
     }
 }
+#endregion
 
-#To-do-list functions are here because they are in the Users.private module, not a module of their own
-# they require the Tasks.ReadWrite  scope
+#region to-do-list functions are here because they are in the User module  -- they require the Tasks.ReadWrite  scope
+function ConvertTo-GraphDateTimeTimeZone {
+    <#
+        .synopsis
+            Converts a datetime object to dateTimeTimezone object with the current time zone.
+    #>
+    param   (
+        [dateTime]$d
+    )
+    New-object MicrosoftGraphDateTimeZone -Property @{
+                Datetime = $d.ToString('yyyy-MM-ddTHH:mm:ss')
+                Timezone = (Get-TimeZone).id
+    }
+}
 
 function Get-GraphToDoList        {
     <#
@@ -3013,3 +2647,4 @@ function Remove-GraphToDoList     {
         }
     }
 }
+#endregion

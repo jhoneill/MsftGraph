@@ -2,15 +2,24 @@ using namespace System.Management.Automation
 using namespace Microsoft.Graph.PowerShell.Models
 using namespace Microsoft.Graph.PowerShell.Authentication
 
-$Global:GraphUri                  = 'https://graph.microsoft.com/v1.0'   #May want this outside the module
-$Script:GUIDRegex                 = '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$'
-$Script:WellKnownMailFolderRegex  = '^[/\\]?(archive|clutter|conflicts|conversationhistory|deleteditems|drafts|inbox|junkemail|localfailures|msgfolderroot|outbox|recoverableitemsdeletions|scheduled|searchfolders|sentitems|serverfailures|syncissues)[/\\]?$'
-$Script:DefaultUserProperties     = @('businessPhones', 'displayName', 'givenName', 'id', 'jobTitle', 'mail', 'mobilePhone', 'officeLocation', 'preferredLanguage', 'surname', 'userPrincipalName',
-                                      'assignedLicenses', 'department', 'usageLocation', 'userType')
-$Script:DefaultUsageLocation      = 'GB'
-$Script:SkippedSubmodules         = @()
+$Global:GraphUri                  =   'https://graph.microsoft.com/v1.0'   #Global: instead of Script: for use in cmdline invoke-graphRequest etc.
+$Script:GUIDRegex                 =   '^\{?[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}\}?$'
+$Script:WellKnownMailFolderRegex  =   '^[/\\]?(' +  (@(
+                                            'archive',       'clutter',       'conflicts', 'conversationhistory',
+                                            'deleteditems',  'drafts',        'inbox',     'junkemail',
+                                            'localfailures', 'msgfolderroot', 'outbox',    'recoverableitemsdeletions',
+                                            'scheduled',     'searchfolders', 'sentitems', 'serverfailures',
+                                            'syncissues'
+                                        ) -join '|' ) + ')[/\\]?$'
+$Script:DefaultUserProperties     = @(
+                                        'businessPhones',   'displayName',    'givenName',  'id',  'jobTitle', 'mail',
+                                        'mobilePhone',      'officeLocation', 'preferredLanguage', 'surname',  'userPrincipalName',
+                                        'assignedLicenses', 'department',     'usageLocation',     'userType'
+                                    )
+$Script:DefaultUsageLocation      =   'GB'
+$Script:SkippedSubmodules         = @(    )
 
-#region completer, transformer, and validator attributes for parameters **CLASSES NEED TO BE IN PSM1
+#region global helper functions, completer, transformer, and validator attributes for parameters **CLASSES NEED TO BE IN PSM1
 class UpperCaseTransformAttribute : ArgumentTransformationAttribute  {
     [object] Transform([System.Management.Automation.EngineIntrinsics]$EngineIntrinsics, [object] $InputData) {
         if ($inputData -is [string]) {return $Inputdata.toUpper()}
@@ -25,6 +34,45 @@ class ValidateCountryAttribute    : ValidateArgumentsAttribute {
                              }).TwoLetterIsoRegionName) {
             Throw [ParameterBindingException]::new("'$Argument' is not an ISO 3166 country Code")
         }
+    }
+}
+
+class ChannelCompleter            : IArgumentCompleter {
+    [string] $GroupID = ''
+    [System.Collections.Generic.IEnumerable[CompletionResult]] CompleteArgument(
+        [string]$CommandName, [string]$ParameterName, [string]$WordToComplete,
+        [Language.CommandAst]$CommandAst, [System.Collections.IDictionary] $FakeBoundParameters
+    ) {
+        $result =  [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()
+
+        #strip quotes from word to complete - replace " or ' with nothing
+        $wordToComplete = $wordToComplete -replace '"|''', ''
+        if (-not $this.GroupID) {
+            $Group = $null
+            if ($FakeBoundParameters['Group']) {$Group = $FakeBoundParameters['Group']}
+            if ($FakeBoundParameters['Team' ]) {$Group = $FakeBoundParameters['Team']}
+            #I do mean = not -eq in the elseif statements.
+            elseif ($key = $Global:PSDefaultParameterValues.Keys.where({"$CommandName`:Team"  -like $_})) {
+                $Group = $Global:PSDefaultParameterValues[$key]
+            }
+            elseif ($key = $Global:PSDefaultParameterValues.Keys.where({"$CommandName`:Group" -like $_})) {
+                $Group = $Global:PSDefaultParameterValues[$key]
+            }
+            if     ($Group.ID)                       { $this.Groupid = $Group.id}
+            elseif ($Group -is [string] -and
+                    $Group -match $Script:GUIDRegex) { $this.GroupID = $Group}
+            elseif ($Group -is [string])             { $this.GroupID = idfromteam $Group }
+        }
+        if ($this.groupID -and $this.groupID -match $Script:GUIDRegex) {
+            Invoke-GraphRequest "$global:GraphUri/Teams/$($this.groupID)/Channels?$`select=id,displayname" -ValueOnly |
+                ForEach-Object {
+                    if ($_.displayname  -like "$wordToComplete*") {$_.displayName}
+                } | Sort-Object |
+                    ForEach-Object {
+                        $result.Add([System.Management.Automation.CompletionResult]::new("'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
+                    }
+        }
+        return $result
     }
 }
 
@@ -249,10 +297,14 @@ class TeamCompleter               : IArgumentCompleter {
 
         #strip quotes from word to complete - replace " or ' with nothing
         $wordToComplete = $wordToComplete -replace '"|''', ''
-        if ($wordToComplete) {$uri =  $Global:GraphUri +  ("/groups?`$filter=startswith(displayname,'{0}')')" -f $wordToComplete)}
-        else                 {$uri = "$Global:GraphUri/Groups/?`$Top=20"}
+
+        if ($wordToComplete) {$uri = "$Global:GraphUri/groups?`$select=id,resourceProvisioningOptions,displayname&`$filter=startswith(displayname,'{0}')" -f $wordToComplete}
+        else                 {$uri = "$Global:GraphUri/groups?`$select=id,resourceProvisioningOptions,displayname"}
         #had "ResourceProvisioningOptions eq 'team' and " in the filter but it removed some valid teams so this is just completing groups for now
-        Invoke-GraphRequest -Uri $uri -ValueOnly | ForEach-Object displayname | Sort-Object | ForEach-Object {
+
+        Invoke-GraphRequest -Uri $uri -ValueOnly |
+            ForEach-Object {if ("Team" -in $_.resourceProvisioningOptions) {$_.displayname}} |
+                Sort-Object | ForEach-Object {
                 $result.Add([System.Management.Automation.CompletionResult]::new("'$_'", $_, ([CompletionResultType]::ParameterValue) , $_) )
         }
         return $result
@@ -276,32 +328,39 @@ class UPNCompleter                : IArgumentCompleter {
     }
 }
 
-function getFilterString {
-param (
-[validatescript({
-    if ($_ -match '\*.*\*|^\*$') {throw [ParameterBindingException]::new("Wild cannot be '*something*' or just '*'")} else {$true}
-})]
-[parameter(position=0,mandatory=$true)]
-$SearchTerm ,
-[parameter(position=1)]
-$ExtraFields = @()
-)
-#validation blocked "* and *something*" so we have no *, * at the start, in the middle, or at the end
-if     ($SearchTerm -notmatch '\*')         {$filterStrings = ,              "displayName eq '$SearchTerm'"      }
-elseif ($SearchTerm -match   '^\*(.+)')     {$filterStrings = ,     "endswith(displayName,'$($Matches[1])')"    }
-elseif ($SearchTerm -match   '(.+)\*$')     {$filterStrings = ,   "startswith(displayName,'$($Matches[1])')"    }
-elseif ($SearchTerm -match  '^(.+)\*(.+)$') {$filterStrings = , ("(startswith(displayName,'$($Matches[1])')" +
-                                                               " and endswith(displayName,'$($Matches[2])'))"  )}
+function FilterString {
+    param (
+        [validatescript({
+            if ($_ -is [string] -and $_ -match '\*.*\*|^\*$') {throw [ParameterBindingException]::new("Wildcard cannot be '*something*' or just '*'")} else {$true}
+        })]
+        [parameter(position=0,mandatory=$true)]
+        [string]$SearchTerm ,
+        [parameter(position=1)]
+        $ExtraFields = @(),
+        [switch]$ToLower
+    )
+    if ($toLower) {$SearchTerm = $SearchTerm.ToLower() }
+    #Replace '  with '' - ensure we don't turn '' into '''' !
+    $SearchTerm = $SearchTerm -replace "(?<!')'(?!')" ,"''"
+    #validation blocked "* and *something*" so we have no *, * at the start, in the middle, or at the end
+    if     ($SearchTerm -notmatch '\*')         {$filterStrings = ,              "displayName eq '$SearchTerm'"     }
+    elseif ($SearchTerm -match   '^\*(.+)')     {$filterStrings = ,     "endswith(displayName,'$($Matches[1])')"    }
+    elseif ($SearchTerm -match   '(.+)\*$')     {$filterStrings = ,   "startswith(displayName,'$($Matches[1])')"    }
+    elseif ($SearchTerm -match  '^(.+)\*(.+)$') {$filterStrings = , ("(startswith(displayName,'$($Matches[1])')" +
+                                                                " and endswith(displayName,'$($Matches[2])'))"  )}
+    if ($ToLower) {$filterStrings[0] = $filterStrings[0] -replace 'displayName' , 'toLower(displayName)'}
 
-foreach ($f in $ExtraFields) {$filterStrings += $filterStrings[0]   -replace 'displayName',$f }
-$filterStrings -join ' or '
+    foreach ($f in $ExtraFields) {$filterStrings += $filterStrings[0]   -replace 'displayName',$f }
+    $filterStrings -join ' or '
 }
 #endregion
 
+#region load the bulk of the module
 . "$PSScriptRoot\Authentication.ps1"
 
 #Submodules which need the class and/or private functions from the SDK module.
 $ImportCmds = [ordered]@{
+  'PersonalContacts'             = @()
   'Users'                        = @('New-MgUserTodoList_CreateExpanded1','New-MgUserTodoListTask_CreateExpanded1', 'Remove-MgUserTodoList_Delete1',
                                      'Remove-MgUserTodoListTask_Delete1', 'Update-MgUserTodoListTask_UpdateExpanded1') #'Get-MgUser_List1' ,
   'Identity.DirectoryManagement' = @('Get-MgDomain_Get1', 'Get-MgDomain_List1', 'Get-MgDomainNameerenceByRef_List1',
@@ -346,6 +405,7 @@ else { #These submodules will work with just the users module.
 if ($Script:SkippedSubmodules) {
       Write-Host -ForegroundColor DarkGray ("Skipped " + ($Script:SkippedSubmodules -join ", ") + " because their Microsoft.Graph module(s) or private.dll file(s) were not found.")
 }
+#endregion
 
 function Set-GraphOptions {
     <#

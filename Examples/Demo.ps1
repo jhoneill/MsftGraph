@@ -47,10 +47,9 @@ Add-GraphPlanTask   -Plan    $newTeamplan -Title "Project $newProjectName Object
 Add-GraphPlannerTab -TabLabel 'Planner' -Channel $newChannel  -Plan $NewTeamplan | Out-Null
 
 #Groups have a calendar - add a meeting and invite members
-Get-GraphTeam $newTeam -Calendar -OutVariable teamcalendar
 $pattern   = New-GraphRecurrence -Type weekly -DaysOfWeek wednesday -NumberOfOccurrences 52
 $attendees = ((Get-GraphTeam -Team $newTeam -Members) + (Get-GraphTeam -Team $newTeam -Owners ) )| New-GraphAttendee -AttendeeType optional
-Add-GraphEvent -Calendar $teamCalendar  -Subject "Midweek team lunch" -Attendees $attendees -Start ([datetime]::Today.AddHours(12)) -End ([datetime]::Today.AddHours(12)) -Recurrence $Pattern
+Add-GraphEvent -Team $newTeam -Subject "Midweek team lunch" -Attendees $attendees -Start ([datetime]::Today.AddHours(12)) -End ([datetime]::Today.AddHours(12)) -Recurrence $Pattern
 
 Get-GraphTeam $newTeam -Notebooks -OutVariable teamnotebook
 New-GraphOneNoteSection -Notebook $teamNotebook -SectionName $newProjectName -OutVariable NewSection

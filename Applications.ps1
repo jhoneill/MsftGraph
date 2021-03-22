@@ -147,7 +147,7 @@ function Get-GraphServicePrincipal {
                     }
                 }
                 else   {
-                    $webparams['uri'] = "$GraphUri/servicePrincipals?`$filter=" + (getFilterString $sp)
+                    $webparams['uri'] = "$GraphUri/servicePrincipals?`$filter=" + (FilterString $sp)
                     if ($Property) {$webparams['uri'] += '&$select=' +($property -join ',')}
                     $result = Invoke-GraphRequest  -ValueOnly  @webparams
                 }
@@ -221,7 +221,7 @@ function Get-GraphApplication {
                     }
                 }
                 else   {
-                        $filter =  '?$filter=' + (getFilterString $app)
+                        $filter =  '?$filter=' + (FilterString $app)
                         if ($Property) {$filter += '&$select=' +($property -join ',')}
                         $result += Invoke-GraphRequest "$GraphUri/applications$filter" -ValueOnly  @webparams
                 }
