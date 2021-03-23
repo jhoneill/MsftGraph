@@ -597,7 +597,7 @@ function Grant-GraphDirectoryRole       {
                 Write-Debug $body
                 if ($Force -or $pscmdlet.ShouldProcess($m.displayname,"Grant access to role '$($r.displayname)'")) {
                     try   { Invoke-GraphRequest -Uri "$graphuri/directoryroles/$($role.id)/members/`$ref" -Method post -Body $body -ContentType 'application/json'}
-                    catch { Write-Warning "The request failed. This may be because the member has already been added to the role" }
+                    catch { Write-Warning "The request failed. This may be because the member '$($m.toString())' has already been added to the '$($r.displayname)' role." }
                 }
             }
         }

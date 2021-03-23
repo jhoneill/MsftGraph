@@ -1,6 +1,2 @@
 "UserPrincipalName","MailNickname","GivenName","Surname","DisplayName","UsageLocation","AccountDisabled","PasswordPolicies","Mail","MobilePhone","BusinessPhones","Manager","JobTitle","Department","OfficeLocation","CompanyName","StreetAddress","City","State","Country","PostalCode"
 "bob@mobulaconsulting.com","bob","Bob","Cratchett","Bob Cratchett","GB","False",,"bob@mobulaconsulting.com",,"","Jacob@mobulaconsulting.com","Clerk","Accounts",,,,,,,
-"J@mobulaconsulting.com","J","James","O'Neill","James O'Neill","GB","False","None","J@mobulaconsulting.com","+447801881010","",,,,,,,,,,
-"Jacob@mobulaconsulting.com","Jacob","Jacob","Marley","Jacob Marley","GB","False","None","Jacob@mobulaconsulting.com",,"",,"Office Manager","Accounts",,,,,,,
-"James@mobulaconsulting.onmicrosoft.com","James","James","O'Neill","James O'Neill (ADMIN)","GB","False",,"James@mobulaconsulting.onmicrosoft.com","+44 7801881010","07801881010",,,,,,,,,"GB",
-"mcp_miserablebugger.com#EXT#@mobulaconsulting.onmicrosoft.com","mcp_miserablebugger.com#EXT#",,,"James O'Neill",,"False",,"mcp@miserablebugger.com",,"",,,,,,,,,,

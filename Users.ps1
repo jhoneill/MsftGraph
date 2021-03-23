@@ -563,8 +563,14 @@ function Set-GraphUser            {
     begin   {
         #things we don't want to put in the JSON body when we send the changes.
         $excludedParams = [Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters + @('Force', 'PassThru', 'UserID', 'AccountDisabled', 'Photo', 'Manager')
-        $settings = @{}
-        $returnProps = $Script:DefaultUserProperties
+        $settings       = @{}
+        $returnProps    = $Script:DefaultUserProperties
+        if ($userid -ne $me -and $userid -ne $global:GraphUser -and
+            $PSBoundparameters['aboutMe', 'birthday', 'hireDate', 'interests', 'mySite', 'pastProjects',
+                              'preferredName', 'responsibilities', 'schools', 'skills']) {
+            Write-Warning 'One or more of the selected properties can only be set by the account owner themselves.'
+            break
+        }
         foreach ($p in $PSBoundparameters.Keys.where({$_ -notin $excludedParams})) {
             #turn "Param" into "param" make dates suitable text, and switches booleans
             $key   = $p.toLower()[0] + $p.Substring(1)
@@ -574,7 +580,7 @@ function Set-GraphUser            {
             if ($value -is [switch])   {$value = $value -as [bool]}
             $settings[$key] = $value
         }
-        if ($PSBoundparameters['AccountDisabled']) {#allows -accountDisabled:$false
+        if ($PSBoundparameters.ContainsKey('AccountDisabled')) {#allows -accountDisabled:$false
             $settings['accountEnabled'] = -not $AccountDisabled
             if ($returnProps -notcontains 'accountEnabled') {$returnProps += 'accountEnabled'}
         }
@@ -729,14 +735,19 @@ function New-GraphUser            {
         [string[]]$PasswordPolicies,
 
         #A hash table of properties which can be passed as parameters to Set-GraphUser command after the account is created
-        [hashtable]$SetableProperties,
+        [hashtable]$SettableProperties,
 
-        #If Specified prevents any confirmation dialog from appearing
-        [switch]$Force,
+        [ArgumentCompleter([GroupCompleter])]
+        $Groups,
 
-        #Unless passthru is specified, only passwords created when running the command are returned. When specified user objects are returned.
-        [Alias('Pt')]
-        [switch]$Passthru
+        [ArgumentCompleter([RoleCompleter])]
+        $Roles,
+
+        [ArgumentCompleter([SkuCompleter])]
+        $Licenses,
+
+        #If specified prevents any confirmation dialog from appearing
+        [switch]$Force
     )
     #region we allow the names to be passed flexibly make sure we have what we need
     # Accept upn and display name -split upn to make a mailnickname, leave givenname/surname blank
@@ -803,7 +814,19 @@ function New-GraphUser            {
     if ($force -or $pscmdlet.ShouldProcess($displayname, 'Create New User')){
         try {
             $u = Invoke-GraphRequest @webparams
-            if ($Passthru ) {return $u }
+            if ($SetableProperties) {
+                Set-GraphUser -UserID $u.id @SettableProperties -Force
+            }
+            if ($Groups) {
+                Add-GraphGroupMember -Group $groups -Member $u
+            }
+            if ($Roles) {
+                Grant-GraphDirectoryRole -Role $Roles -Member $u
+            }
+            if ($Licenses) {
+                Grant-GraphLicense -SKUID $Licenses -UserID $u
+            }
+            if ($PSBoundParameters['Initialpassword'] ) {return $u }
         }
         catch {
         # xxxx Todo figure out what errors need to be handled (illegal name, duplicate user)
@@ -843,7 +866,6 @@ function Reset-GraphUserPassword  {
     }
     if (-not $Initialpassword)    {
              $Initialpassword   = ([datetime]"1/1/1800").AddDays((Get-Random 146000)).tostring("ddMMMyyyy")
-             Write-Output "$UserPrincipalName, $Initialpassword"
     }
     $webparams = @{
         'Method'            = 'PATCH'
@@ -856,6 +878,7 @@ function Reset-GraphUserPassword  {
 
     Write-Debug $webparams.Body
     if ($force -or $pscmdlet.ShouldProcess($UserPrincipalName, 'Reset password for user')){
+        Write-Output "$UserPrincipalName, $Initialpassword"
         Invoke-GraphRequest @webparams
     }
 }
@@ -971,26 +994,25 @@ function Import-GraphUser         {
         }
     }
     end     {
-        if (-not $Quiet) { $InformationPreference = 'continue'  }
+
 
         foreach ($user in $list) {
             $upn = $user.UserPrincipalName
-            if (-not $upn) {
-                Write-Warning "User was missing a UPN"
-                continue
+            if     (-not $upn) {
+                    Write-Warning "User was missing a UPN"
+                    continue
             }
-            else {
-                 $exists =  (Invoke-GraphRequest "$GraphUri/users?`$Filter=userprincipalName eq '$upn'" -ValueOnly) -as [bool]
-            }
+            else   {$exists =  (Invoke-GraphRequest "$GraphUri/users?`$Filter=userprincipalName eq '$upn'" -ValueOnly) -as [bool]}
+
             if     ($user.Action -eq 'Remove' -and (-not $exists)) {
-                Write-Warning "User '$upn' was marked for removal, but no matching user was found."
-                continue
+                    Write-Warning "User '$upn' was marked for removal, but no matching user was found."
+                    continue
             }
             elseif ($user.Action -eq 'Remove' -and
                    ($force -or $PSCmdlet.ShouldProcess($upn,"Remove user "))){
-                Remove-Graphuser -Force -user $user
-                Write-Information "Removed user'$upn'"
-                continue
+                    Remove-Graphuser -Force -user $user
+                    Write-Verbose "Removed user '$upn'."
+                    continue
             }
 
             if     ($user.Action -eq 'Add'    -and $exists) {
@@ -998,41 +1020,57 @@ function Import-GraphUser         {
                     continue
             }
             elseif ($user.Action -eq 'Add'    -and
-                ($force -or $PSCmdlet.ShouldProcess($upn,"Add new user"))){
-                $params = @{Force=$true}
-                foreach ($p in @('DisplayName','UserPrincipalName', 'MailNickName', 'GivenName', 'Surname', 'Initialpassword')) {
-                     if ($user.$p)  {$params[$p] = $user.$p}
+                   ($force -or $PSCmdlet.ShouldProcess($upn,"Create new user"))){
+                    $params = @{Force=$true}
+                    foreach ($p in @('DisplayName','UserPrincipalName', 'MailNickName','GivenName',
+                                     'Surname', 'Initialpassword','UsageLocation').where({$user.$_})) {
+                        $params[$p] = $user.$p
+                    }
+                    if ($user.PasswordPolicies)  {
+                        $params['PasswordPolicies'] = $user.PasswordPolicies -split $ListSeparator
+                    }
+                    if ($user.NoPasswordChange -in @("Yes","True","1") ) {
+                        $params['NoPasswordChange'] = $true
+                    }
+                    if ($user.ForceMFAPasswordChange -in @("Yes","True","1") ) {
+                        $params['ForceMFAPasswordChange'] = $true
+                    }
+                    New-GraphUser @params
+                    Write-Verbose "Added user '$($user.DisplayName)' as '$upn'"
+                    $exists      = $true
+                    $user = $user | Select-Object -Property * -ExcludeProperty 'DisplayName', 'MailNickName','GivenName', 'Surname','UsageLocation'
+                    $user.Action = "Set"
                 }
-                if ($user.PasswordPolicies)  {$params['PasswordPolicies'] = $user.PasswordPolicies -split $ListSeparator}
-                if ($user.NoPasswordChange -in @("Yes","True","1") ) {
-                            {$params['NoPasswordChange'] = $true}
-                }
-                if ($user.ForceMFAPasswordChange -in @("Yes","True","1") ) {
-                            {$params['ForceMFAPasswordChange'] = $true}
-                }
-                New-GraphUser @params
-                Write-Information "Added user '$($user.DisplayName)' as '$upn'"
-                $exists = $true
-                $user.Action = "Set"
-            }
 
             if     ($user.Action -eq 'Set'    -and (-not $exists)) {
-                Write-Warning "User '$upn' was marked for update, but no matching user was found."
-                continue
+                    Write-Warning "User '$upn' was marked for update, but no matching user was found."
+                    continue
             }
-            if     ($user.Action -eq 'Set') {
-                $params = @{'UserId' = $upn}
-                $Setparameters = (Get-Command Set-GraphUser ).Parameters.Values |
-                    Where-Object name -notin ([Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters  )
+            if     ($user.Action -eq 'Set' -and
+                   ($force -or $PSCmdlet.ShouldProcess($upn,"Set properties of user"))){
+                    $params = @{'UserId' = $upn ; 'Force'= $true}
+                    $Setparameters = (Get-Command Set-GraphUser ).Parameters.Values |
+                        Where-Object name -notin ([Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters  )
 
-                foreach ($p in $setparameters) {
-                    $pName = $p.name
-                    if     ($user.$pname -and ($p.parameterType -eq [string[]] )) {$params[$pName] = $user.$pName -split $ListSeparator  }
-                    elseif ($user.$pname -and ($p.switchParameter))               {$params[$pName] = $user.$pName -in @("Yes","True","1")  }
-                    elseif ($user.$pname)                                         {$params[$pName] = $user.$pName}
-                }
-                Set-GraphUser @params
-                Write-Information "Updated properties of user '$upn'"
+                    foreach ($p in $setparameters) {
+                        $pName = $p.name
+                        if     ($user.$pname -and ($p.parameterType -eq [string[]] )) {$params[$pName] = $user.$pName -split $ListSeparator  }
+                        elseif ($user.$pname -and ($p.switchParameter))               {$params[$pName] = $user.$pName -in @("Yes","True","1")  }
+                        elseif ($user.$pname)                                         {$params[$pName] = $user.$pName}
+                    }
+                    if ($params.count -gt 2) {Set-GraphUser @params}
+
+                    if ($user.Groups)   {
+                        Add-GraphGroupMember   -Group ($user.groups -split $ListSeparator) -Member $upn -Force
+                    }
+                    if ($user.Roles)    {
+                        Grant-GraphDirectoryRole -Role ($user.Roles -split $ListSeparator) -Member $upn -Force
+                    }
+                    if ($user.Licenses) {
+                        Grant-GraphLicense   -SKUID ($user.Licenses -split $ListSeparator) -UserID $upn -Force
+                    }
+
+                    Write-Verbose "Updated properties of user '$upn'"
             }
         }
     }
