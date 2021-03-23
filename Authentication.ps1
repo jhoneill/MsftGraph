@@ -27,11 +27,13 @@ function Test-GraphSession          {
     .synopsis
         Connect if necessary, catch tokens needing renewal.
 #>
-    if (-not [GraphSession]::Instance.AuthContext) {Connect-Graph}
+    param ( [switch]$Quiet )
+
+    if (-not [GraphSession]::Instance.AuthContext) {Connect-Graph -Quiet:$Quiet}
     elseif  ([GraphSession]::Instance.AuthContext.TokenExpires -is [datetime] -and
              [GraphSession]::Instance.AuthContext.TokenExpires -lt [datetime]::Now.AddMinutes(-1)) {
         if ($Script:RefreshParams) {
-            Write-Host -ForegroundColor DarkCyan "Token Expired! Refreshing before executing command."
+            if (-not $Quiet) { Write-Host -ForegroundColor DarkCyan "Token Expired! Refreshing before executing command."}
             Connect-Graph @script:RefreshParams
         }
         else {Write-Warning "Token appears to have expired and no refresh information is available "}
@@ -200,6 +202,7 @@ function Connect-Graph              {
     #>
     [cmdletbinding(DefaultParameterSetName='UserParameterSet')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification='False positive for global vars.')]
+    [Alias('New-GraphSession','GraphSession')]
     param        (
         [Parameter(ParameterSetName = 'UserParameterSet', Position = 1 )]
         #An array of delegated permissions to consent to.
@@ -446,14 +449,20 @@ function Show-GraphSession          {
     [OutputType([String])]
     [alias('GWhoAmI')]
     param  (
+        #If specified returns only the current account
         [Parameter(ParameterSetName='Who')]
         [switch]$Who,
+        #If specified returns only the scopes available to the current session
         [Parameter(ParameterSetName='Scopes')]
         [switch]$Scopes,
+        #If specified returns the options set using Set-GraphOption
         [Parameter(ParameterSetName='Options')]
         [switch]$Options,
+        #If specified returns the current app name.
         [Parameter(ParameterSetName='AppName')]
-        [switch]$AppName
+        [switch]$AppName,
+        #If specified runs Test-GraphSession to ensure a session exists.
+        [switch]$Force
     )
     dynamicparam {
         $paramDictionary     = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
@@ -468,31 +477,41 @@ function Show-GraphSession          {
         return $paramDictionary
     }
     end {
-        if     (-not       [GraphSession]::Instance.AuthContext) {Write-Host  "Ready for Connect-Graph."; return}
+        if     ($Force)   {Test-GraphSession -Quiet}
+        if     (-not       [GraphSession]::Instance.AuthContext)  {Write-Host  "Ready for Connect-Graph."; return}
         if     ($Scopes)  {[GraphSession]::Instance.AuthContext.Scopes}
         elseif ($Who)     {[GraphSession]::Instance.AuthContext.Account}
         elseif ($AppName) {[GraphSession]::Instance.AuthContext.AppName}
-        elseif ($Options) {[pscustomobject]@{
-            'TenantID'        = $Script:TenantID
-            'ClientID'        = $Script:ClientID
-            'ClientSecretSet' = $Script:Client_Secret -as [bool]
-            'DefaultScopes'   = $Script:DefaultGraphScopes -join ', '
+        elseif ($Options) {[pscustomobject][Ordered]@{
+            'TenantID'              = $Script:TenantID
+            'ClientID'              = $Script:ClientID
+            'ClientSecretSet'       = $Script:Client_Secret -as [bool]
+            'DefaultScopes'         = $Script:DefaultGraphScopes -join ', '
+            'DefaultUserProperties' = $Script:DefaultUserProperties -join ', '
+            'DefaultUsageLocation'  = $Script:DefaultUsageLocation
         }}
         elseif (     $PSBoundParameters['RefreshToken']) {return $Script:RefreshToken}
         elseif (-not $PSBoundParameters['CachedToken'])  {
-            if ($Script:SkippedSubmodules) {
+            if      ($Script:SkippedSubmodules) {
                 Write-Host -ForegroundColor DarkGray ("Skipped " + ($Script:SkippedSubmodules -join ", ") + " because their Microsoft.Graph module(s) or private.dll file(s) were not found.")
             }
-            if     ($Global:PSDefaultParameterValues['Get-GraphDrive:Drive'])           {
+            if      ($Global:PSDefaultParameterValues['Get-GraphDrive:Drive'])           {
                 Write-Host "Home OneDrive is set"
             }
-            if     ($Global:PSDefaultParameterValues['*GraphOneNoteBook*:Notebook'] -and
-                    $Global:PSDefaultParameterValues['Get-GraphOneNotePage:Section'])   {
-                    Write-Host "Home Notebook and section are Set"
+            if      ($Global:PSDefaultParameterValues['*GraphOneNoteBook*:Notebook'] -and
+                     $Global:PSDefaultParameterValues['Get-GraphOneNotePage:Section'])   {
+                     Write-Host "Home Notebook and section are set"
             }
-            elseif ($Global:PSDefaultParameterValues['*GraphOneNoteBook*:Notebook'])    {
-                Write-Host "Home Notebook is set"
+            elseif  ($Global:PSDefaultParameterValues['*GraphOneNoteBook*:Notebook'])    {
+                     Write-Host "Home Notebook is set"
             }
+            if      ($Global:PSDefaultParameterValues['Add-Graph*Tab:Team']) {
+                     Write-Host "Default Group is set and team-enabled, default calendar is a team calendar."
+            }
+            elseif  ($Global:PSDefaultParameterValues['*-GraphEvent:Group']) {
+                     Write-Host "Default Group is set and but not team-enabled, default calendar is a team calendar."
+            }
+            else   {Write-Host "Default Group is not set, default calendar is for the signed-in user."}
             Get-MgContext
         }
         else {

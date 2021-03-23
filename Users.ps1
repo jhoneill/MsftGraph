@@ -688,16 +688,12 @@ function New-GraphUser            {
         [string]$DisplayName,
 
         #The given name (first name) of the user.
-        [Parameter(ParameterSetName='UPNFromDomainDisplay')]
-        [Parameter(ParameterSetName='DomainFromUPNDisplay')]
         [Parameter(ParameterSetName='UPNFromDomainLast',Mandatory=$true)]
         [Parameter(ParameterSetName='DomainFromUPNLast',Mandatory=$true)]
         [Alias('FirstName')]
         [string]$GivenName,
 
         #User's last / family name
-        [Parameter(ParameterSetName='UPNFromDomainDisplay')]
-        [Parameter(ParameterSetName='DomainFromUPNDisplay')]
         [Parameter(ParameterSetName='UPNFromDomainLast',Mandatory=$true)]
         [Parameter(ParameterSetName='DomainFromUPNLast',Mandatory=$true)]
         [Alias('LastName')]
@@ -1803,7 +1799,7 @@ function Get-GraphCalendarPath    {
         $User
     )
     #if we already have the path, just return it; if we got no parameters assume current user's default calendar.
-    if ((-not $User)  -and
+    if ((-not $User -or $user -eq 'me')  -and
         (-not $Group) -and
         (-not $Calendar)   )                         {return '/me/calendar' }  #for the default calendar you can also use me/events or me/calendarView?params without "Calendar"
     elseif   ($Calendar -and $Calendar.CalendarPath) {return $Calendar.CalendarPath}
@@ -1895,7 +1891,7 @@ function Get-GraphEvent           {
     #>
     [cmdletbinding(DefaultParameterSetName="None")]
     param   (
-        #UserID as a guid or User Principal name, whose calendar should be fetched.
+        #UserID as a guid or User Principal name, whose calendar should be fetched. "me" can be used as a shortcut for current user
         [Parameter( ParameterSetName="User",           ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
         [Parameter( ParameterSetName="UserAndSubject", ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
         [Parameter( ParameterSetName="UserAndFilter",  ValueFromPipelineByPropertyName=$true, Mandatory=$true)]
@@ -1967,12 +1963,12 @@ function Get-GraphEvent           {
         $CalendarPath = Get-GraphCalendarPath -Calendar $Calendar -Group $Group -User $User
         $uri          = "$GraphUri/$CalendarPath"
         #region apply the selection criteria. If -days is specified use calendar view, otherwise use events and add filter, orderby, select and top as needed
-        if  ($days)    {
-                        $start = [datetime]::Today.ToString("yyyy-MM-dd't'HH:mm:ss")       # 'o' for ISO format time may work here.
-                        $end   = [datetime]::Today.AddDays($days).tostring("yyyy-MM-dd't'HH:mm:ss")
-                        $uri  += "/calendarview?`$expand=calendar&startdatetime=$start&enddatetime=$end"
+        if  ($days)      {
+                           $start = [datetime]::Today.ToString("yyyy-MM-dd't'HH:mm:ss")       # 'o' for ISO format time may work here.
+                           $end   = [datetime]::Today.AddDays($days).tostring("yyyy-MM-dd't'HH:mm:ss")
+                           $uri  += "/calendarview?`$expand=calendar&startdatetime=$start&enddatetime=$end"
         }
-        else {             $uri  +=  '/events?$expand=calendar'}
+        else             { $uri  +=  '/events?$expand=calendar'}
 
         if ($Select)     { $uri  +=  '&$select=' + ($Select -join ',') }
 

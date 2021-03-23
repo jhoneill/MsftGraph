@@ -636,7 +636,13 @@ function Set-GraphDefaultGroup      {
        $null = $Global:PSDefaultParameterValues.Remove($_)
     }
     if ($Group -is [string]) {$Group = Get-GraphGroup $Group -NoTeamInfo}
-    if ($Group -and -not ($group.Count -gt 1)){
+    if (-not $Group -or ($group.Count -gt 1)){
+        Write-Warning 'Could not resolve the information provided to a single group.'
+    }
+    elseif ($Group.securityEnabled) {
+        Write-Warning "Only commands for unified groups accept a default, but $($Group.DisplayName) is a security group."
+    }
+    else {
         $Global:PSDefaultParameterValues[              '*-GraphEvent:Group'] = $Group
         $Global:PSDefaultParameterValues[        '*-GraphGroupThread:Group'] = $Group
         $Global:PSDefaultParameterValues[      'Send-GraphGroupReply:Group'] = $Group
@@ -647,7 +653,6 @@ function Set-GraphDefaultGroup      {
             $Global:PSDefaultParameterValues[    '*New-GraphTeamPlan:Team']  = $Group
         }
     }
-    else {Write-Warning 'Could not resolve the group provided.'}
 }
 
 function Set-GraphGroup             {
