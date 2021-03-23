@@ -1,5 +1,18 @@
 ﻿@{
-  Description          =   @'
+  Copyright            =   '(c) 2021 James O''Neill. All rights reserved.'
+  Author               =   'James O''Neill'
+  CompanyName          =   'Mobula Consulting'
+  ModuleVersion        =   '1.4.3'
+  PrivateData   = @{
+       PSData    = @{
+           Prerelease  = 'beta1';
+           Tags        = @('MicrosoftGraph', 'Microsoft', 'Office365', 'Graph', 'PowerShell', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner', 'MSGraph')
+           Category    = 'Functions'
+           ProjectUri  = 'https://github.com/jhoneill/MsftGraph'
+           LicenseUri  = 'https://github.com/jhoneill/MsftGraph/blob/master/LICENSE'
+        }
+  }
+  Description          = @'
   Module to work the Microsoft Graph API using both AzureAD 'work or school' accounts and 'personal' Microsoft accounts
   it contains over 100 functions to
   * Navigate, upload to and download from OneDrive
@@ -11,12 +24,9 @@
   * Work with Sharepoint Lists
   * Access ToDo Lists.
 '@
-  Copyright            =   '(c) 2021 James O''Neill. All rights reserved.'
-  Author               =   'James O''Neill'
-  CompanyName          =   'Mobula Consulting'
-
+  CompatiblePSEditions = @('Core', 'Desktop')
+  PowerShellVersion    =   '5.1'
   GUID                 =   'f564c0f9-7d96-4452-a715-679dc47c20cc'
-  ModuleVersion        =   '1.4.3'
   RootModule           =   '.\Microsoft.Graph.PlusPlus.psm1'
   RequiredModules      = @(@{ModuleName = 'Microsoft.Graph.Authentication'; ModuleVersion = '1.4.0'; })
   FormatsToProcess     =   'Microsoft.Graph.PlusPlus.format.ps1xml'
@@ -203,6 +213,7 @@
   FileList             = @(
         '.\README.md'
         '.\LICENSE',
+        '.\ChangeLog.md'
         '.\Microsoft.Graph.PlusPlus.psd1',
         '.\Microsoft.Graph.PlusPlus.psm1',
         '.\ActionCard.ps1',
@@ -213,6 +224,7 @@
         '.\Identity.SignIns.ps1',
         '.\Notes.ps1',
         '.\OneDrive.ps1',
+        '.\PersonalContacts.ps1',
         '.\Planner.ps1',
         '.\Reports.ps1',
         '.\Sharepoint.ps1',
@@ -236,19 +248,11 @@
         '.\Examples\Template_groups.csv',
         '.\Examples\Template_membership.csv',
         '.\Examples\Template_users.csv'
-
-    )
-
-  CompatiblePSEditions = @('Core', 'Desktop')
-  PowerShellVersion    = '5.1'
-  PrivateData = @{
-       PSData    = @{
-           Tags        = @('MicrosoftGraph', 'Microsoft', 'Office365', 'Graph', 'PowerShell', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner', 'MSGraph')
-           Category    = 'Functions'
-           ProjectUri  = 'https://github.com/jhoneill/MsftGraph'
-           LicenseUri  = 'https://github.com/jhoneill/MsftGraph/blob/master/LICENSE'
-        } # End of PSData hashtable
-  }
+        '.\Examples\PlannerImportExport\Create_Planner_Template.ps1',
+        '.\Examples\PlannerImportExport\Export-planner-to-xlsx.ps1',
+        '.\Examples\PlannerImportExport\Import-Planner-From-Xlsx.ps1',
+        '.\Examples\PlannerImportExport\Planner-Export.xlsx'
+  )
 
   # Minimum version of the common language runtime (CLR) required by this module. This prerequisite is valid for the PowerShell Desktop edition only.
   # CLRVersion = ''

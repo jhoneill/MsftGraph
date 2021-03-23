@@ -928,20 +928,30 @@ function Add-GraphGroupMember       {
             #group(s) resolved in begin block so should have an ID and display name.
             if ($AsOwner) {$uri   = "$GraphUri/groups/$($g.ID)/owners/`$ref" }
             else          {$uri   = "$GraphUri/groups/$($g.ID)/members/`$ref"}
-            #I'm not really expecting an array of users so I have left this is one call for each user.
-            #To optimize it piped users could be collected in the process block and the work done in the end block
+            #There is more efficient way to add many users, but that isn't the main use case so using one call per user.
+            #That optimization would be to collect piped user in the process block and make one call per group in the end block
             foreach ($m in $member) {
                 #if we weren't passed as a user as a an object, resolve what we did get ...
-                if   (-not $m.id)  {
+                if   (-not ($m.id -and $g.displayname))  {
                     try   {$m     = Get-GraphUser -User $m -Select displayname}
                     catch {throw "Could not get a user matching $m"; return }
                     if (-not $m) {throw "Could not get a member ID"; return }
                 }
+                #Getting a group gets the members but we can't expand members AND owners.
+                if ($m.id -in $g.members.id -and -not $AsOwner) {
+                    Write-Warning "'$($m.displayName)' is already a member of the group '$($g.displayname)'."
+                    continue
+                }
                 $body = ConvertTo-Json @{'@odata.id' = "$GraphUri/directoryObjects/$($m.id)"   }
                 Write-Debug $body
                 if ($Force -or $PSCmdlet.shouldprocess($m.displayname,"Add to Group '$($g.displayname)'")) {
-                    Invoke-GraphRequest -Method post -Uri $uri -Body $body -ContentType 'application/json'
-                    Write-Verbose "ADDED $($m.displayname) to group $($g.displayname)"
+                    try   {  Invoke-GraphRequest -Method post -Uri $uri -Body $body -ContentType 'application/json'  }
+                    catch { #if the group is was a variable, the member list may not be current, and we don't validate new owners
+                        if ($_.Exception.Response.StatusCode.value__ -eq 400) {
+                            Write-Warning "Adding to group $($g.displayname) returned 'Bad Request' - may already $($m.displayname) be assigned."
+                        }
+                        else {throw $_}
+                    }
                 }
             }
         }
@@ -969,6 +979,7 @@ function Remove-GraphGroupMember    {
         #The ID of the Group / team
         [Parameter(Mandatory=$true, Position=0)]
         [Alias("Team")]
+        [ArgumentCompleter([GroupCompleter])]
         $Group,
         #A group object with an ID field, or a user object, user ID or UPN
         [Parameter(Mandatory=$true, Position=1, ValueFromPipeline=$true)]
@@ -982,6 +993,7 @@ function Remove-GraphGroupMember    {
     begin   {
         #ensure we have an ID for the group(s) we were passed. If we got a GUID in a string, we'll confirm it's a group and get the display name.
         $Group = foreach ($g in $Group) {
+              # at least this user must be in the group. If the group is empty we will re-fetch it.
               if     ($g.id -and $g.displayname -and $g.Members.Count -ge 1) {$g}
               else   {Get-GraphGroup $g  -NoTeamInfo -ErrorAction Stop  }
         }
@@ -999,8 +1011,9 @@ function Remove-GraphGroupMember    {
                 }
                 #group(s) resolved in begin block so should have an ID and display name.
 
-                if ($FromOwners) { $uri = "$GraphUri/groups/$($g.ID)/owners/$($m.id)/`$ref" }
-                else {             $Uri = "$GraphUri/groups/$($g.ID)/members/$($m.id)/`$ref"}
+                if ($FromOwners)                 {$uri = "$GraphUri/groups/$($g.ID)/owners/$($m.id)/`$ref" }
+                elseif ($m.id -in $g.members.id) {$uri = "$GraphUri/groups/$($g.ID)/members/$($m.id)/`$ref"}
+                else {Write-Warning "'$($m.displayName)' is not a member of the group '$($g.displayname)'." ; continue }
                 if ($Force -or $PSCmdlet.Shouldprocess($m.displayName,"Remove from Group $($g.displayname)")) {
                     try {
                         Invoke-GraphRequest -Method Delete -Uri $uri
