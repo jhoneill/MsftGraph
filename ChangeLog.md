@@ -1,9 +1,11 @@
 # 1.4.3
 * Added This ChangeLog.md !
 * Fixed breaking typo in `Import-GraphUser`
+* Fixed a bug which prevented `Remove user` running
 * Fixed parameter sets in `Add-GraphUser` so UPN, displayname, first name and last name can all be specified together. 
 * Fixed bug searching for users by name. It was only searching in the `mail` field. 
 * In `Add-GraphGroupMember` / `Remove-GraphGroupMember` handle user members already being in the desired state.
+* Cleaned up the import processes and exmaple templates.
 * Moved Personal contact functions to their own file and load the PersonalContacts DLL (Contact is incorrectly defined in Users so we need the right DLL)
 * `Set-GraphTaskDetails` should be private - removed it from the export list in the psd1.
 * Changed validation of `-DefaultUsageLocation` in `Set-GraphOptions` to work round an error when reloading the module

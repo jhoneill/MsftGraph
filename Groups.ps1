@@ -209,6 +209,7 @@ function Get-GraphGroup             {
         # The proceed as if ID had been passed as one or more groups.
         elseif  ($ID -is [string] -and  $ID -notmatch $guidregex)   {
                        $ID = Get-GraphGroupList -Name $id
+                       if (-not $id) {Write-Warning "'$($PSBoundParameters['id'])' did not match any groups.";  return}
         }
         # We'll loop through an array and (or single object) with either GUIDs or objects.
         $usersAndGroups = @()
@@ -509,8 +510,11 @@ function New-GraphGroup             {
     if ($Force -or $PSCmdlet.shouldprocess($Name,"Add new Group")) {
         Write-Progress -Activity 'Creating Group/Team' -CurrentOperation "Adding Group $Name"
         $group = Invoke-GraphRequest @webparams -As ([MicrosoftGraphGroup]) -Exclude "@odata.context","creationOptions"
-
-        if (-not $AsTeam) {
+        if     ($Owners) { $
+            Write-Progress -Activity 'Creating Group/Team' -CurrentOperation "Setting Group ownership on $Name"
+            Owners | Add-GraphGroupMember -Group $group -AsOwner -Force
+        }
+        if     (-not $AsTeam) {
             Write-Progress -Activity 'Creating Group/Team' -Completed
             return $group
         }
@@ -522,7 +526,7 @@ function New-GraphGroup             {
             $TimeToStop = [datetime]::Now.AddMinutes(2)
             $retries = 0
             do {
-                try {
+                try   {
                     $team      = Invoke-GraphRequest @webparams -Exclude '@odata.context' -As ([MicrosoftGraphTeam]) |
                                     Add-Member -PassThru -NotePropertyName Mail -NotePropertyValue $group.Mail
                 }
@@ -541,10 +545,6 @@ function New-GraphGroup             {
             $team.Members     = $group.members
             $team.visibility  = $group.visibility
 
-            if ($Owners) { $
-                Write-Progress -Activity 'Creating Group/Team' -CurrentOperation "Setting Group ownership on $Name"
-                Owners | Add-GraphGroupMember -Group $group -AsOwner -Force
-            }
             Write-Progress -Activity 'Creating Group/Team' -Completed
             $team
         }
@@ -878,10 +878,12 @@ function Remove-GraphGroup          {
         }
         foreach ($g in $Group){
             if ($Force -or $PSCmdlet.Shouldprocess("$($g.displayname)","Delete Group")) {
+                Write-Progress -Activity "Deleting Group" -CurrentOperation $g.displayname
                 Invoke-GraphRequest -Method Delete  -Uri "$GraphUri/groups/$($g.id)/"
                 Write-Verbose "REMOVED GROUP $($g.displayname)"
             }
         }
+        Write-Progress -Activity "Deleting Group" -Completed
     }
 }
 
@@ -1098,9 +1100,7 @@ function Import-GraphGroupMember    {
         [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
         #Usually the command will prompt for confirmation -Force disables this primpt
-        [switch]$Force,
-        #Supresses output of Added, Removed, or No action messages for each row in the file.
-        [switch]$Quiet
+        [switch]$Force
     )
     begin   {
         $list = @()
@@ -1112,25 +1112,24 @@ function Import-GraphGroupMember    {
         }
     }
     end     {
-        if (-not $Quiet) { $InformationPreference = 'continue'  }
         $groups = ($List | Group-Object -NoElement -Property memberof).Name
         foreach ($g in $groups) {
             $w = $Null
             $Members = (Get-GraphGroup $g -Members -WarningAction SilentlyContinue -WarningVariable W).UserPrincipalName
-            if ($w) {Write-Warning "Skipping Group $g it did not match a group." ; continue}
+            if ($w) {Write-Warning "Skipping '$g' it did not match a group." ; continue}
             foreach    ($member in $list.where({$_.memberof -eq $g}) ) {
                 $upn =  $member.UserPrincipalName
                 if    (($member.Action -eq 'Add' -and $upn -notin $Members) -and
-                       ($force -or $PSCmdlet.ShouldProcess($upn,"Add user to group'$g'"))) {
+                       ($force -or $PSCmdlet.ShouldProcess($upn,"Add user to group '$g'"))) {
                         Add-GraphGroupMember -Force -Group $g -Member $upn
-                        Write-Information "Added $UPN user to group'$g'"
+                        Write-Verbose "Added $UPN user to group'$g'"
                 }
                 elseif (($member.Action -eq 'Remove' -and $upn -in $Members) -and
-                        ($force -or $PSCmdlet.ShouldProcess($upn,"Remove member from group'$g'"))){
+                        ($force -or $PSCmdlet.ShouldProcess($upn,"Remove member from group '$g'"))){
                         Remove-GraphGroupMember -Force -Group $g -Member $upn
-                        Write-Information "Removed $UPN user from group'$g'"
+                        Write-Verbose "Removed $UPN user from group'$g'"
                 }
-                else   {Write-Information -Message "No action needed for $g / $upn"}
+                else   {Write-Verbose -Message "No action needed for $g / $upn"}
             }
         }
     }
@@ -1160,9 +1159,7 @@ function Import-GraphGroup          {
         [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
         $Path,
         #Disables any prompt for confirmation
-        [switch]$Force,
-        #Supresses output of Added, Removed, or No action messages for each row in the file.
-        [switch]$Quiet
+        [switch]$Force
     )
     begin   {
         $list = @()
@@ -1174,27 +1171,33 @@ function Import-GraphGroup          {
         }
     }
     end     {
-        if (-not $Quiet) { $InformationPreference = 'continue'  }
         $existingGroups = Get-GraphGroupList
         $existingNames  = $existingGroups.DisplayName
         foreach ($group in $list) {
             $displayName = $group.DisplayName
-            if (($Group.Action -eq 'Remove' -and $displayname -in $existingNames) -and
+            if (($group.Action -eq 'Remove' -and $displayname -in $existingNames) -and
                 ($force -or $PSCmdlet.ShouldProcess($displayname,"Remove group "))){
                         Remove-GraphGroup -Force -Group $displayname
-                        Write-Information "Removed group'$displayname'"
+                        Write-Host "Removed group'$displayname'"
             }
-            elseif (($Group.Action -eq 'Add' -and $displayname -notin $existingNames) -and
+            elseif (($group.Action -eq 'Add' -and $displayname -notin $existingNames) -and
                 ($force -or $PSCmdlet.ShouldProcess($displayname,"Add new group"))){
                     $params = @{Force=$true; Name=$displayName}
                     if ($group.Type -match 'Security') {$params['AsSecurity'] = $true}
                     if ($group.Type -match 'Team')     {$params['AsTeam'] = $true}
                     if ($group.Visibility)             {$params['Visibility'] = $group.Visibility}
                     if ($group.Description)            {$params['Description'] = $group.Description}
-                    New-GraphGroup @params
-                    Write-Information "Added group'$displayName'"
+                    $g = New-GraphGroup @params
+                    if ($g -isnot [MicrosoftGraphTeam]) {$g}
+                    else {
+                        $stoptime = [datetime]::Now.AddMinutes(2);
+                        do    {$g = Get-GraphGroup $g.id}
+                        until ($g.ResourceProvisioningOptions.Count -or [datetime]::now -gt $stoptime -or (start-sleep -Seconds 5))
+                        $g
+                    }
+                    Write-Verbose "Added group'$displayName'"
             }
-            else {  Write-Information "No action taken for group '$displayName'"}
+            else {  Write-Verbose "No action taken for group '$displayName'"}
         }
     }
 }

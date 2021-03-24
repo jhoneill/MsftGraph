@@ -1,2 +1,7 @@
-"UserPrincipalName","MailNickname","GivenName","Surname","DisplayName","UsageLocation","AccountDisabled","PasswordPolicies","Mail","MobilePhone","BusinessPhones","Manager","JobTitle","Department","OfficeLocation","CompanyName","StreetAddress","City","State","Country","PostalCode"
-"bob@mobulaconsulting.com","bob","Bob","Cratchett","Bob Cratchett","GB","False",,"bob@mobulaconsulting.com",,"","Jacob@mobulaconsulting.com","Clerk","Accounts",,,,,,,
+Action,UserPrincipalName,MailNickname,GivenName,Surname,DisplayName,UsageLocation,AccountDisabled,PasswordPolicies,Mail,MobilePhone,BusinessPhones,Manager,JobTitle,Department,Groups,Roles,Licenses,OfficeLocation,CompanyName,StreetAddress,City,State,Country,PostalCode
+Set,Jacob@mobulaconsulting.com,,,,,,TRUE,,,,,,,,,,,,,,,,,
+Add,Helena@mobulaconsulting.com,Helena,Helena,Handcart,Helena Handcart,GB,FALSE,,Helena@mobulaconsulting.com,,,Jacob@mobulaconsulting.com,,Accounts,,,,Oxford,,,,,,
+Add,Carol@mobulaconsulting.com,Carol,Carol,Singer,Carol Singer,GB,,,Carol@mobulaconsulting.com,07776 543 210,01865 234567,,Musicologist,Legal,Consultants;Accounts,Directory Readers,POWER_BI_STANDARD,,,High St,Oxford,OXON,UK,OX1 1AA
+Add,Ruth@mobulaconsulting.com,Ruth,Ruth,Thatcher,Ruth Thatcher,GB,,,Ruth@mobulaconsulting.com,,,,,Legal,,,,,Reed and Rite Roofs,,,,,
+Remove,Doug@mobulaconsulting.com,,Doug,Graves,,,,,,,,,,,,,,,,,,,,
+Add,Robin@mobulaconsulting.com,,Robin,Banks,,,,,,,,,Grounds keeper,Facilities,Consultants;Accounts,Directory Readers,POWER_BI_STANDARD,,,,,,,

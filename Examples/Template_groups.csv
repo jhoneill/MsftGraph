@@ -1,4 +1,7 @@
 Action,DisplayName,Description,Type,Visibility
-Add,Test99,Test99,,Public
-Remove,Test110,Test110,,
-Add,Test222,Testing,Team,
+Remove,Test99,,,
+Add,Test111a,Test Group 111,,Private
+Add,Test222b,Testing,Team,Private
+Remove,Test333C,Another Test Group,Security,Private
+Add,Test222D,Further Testing,Team,
+Add,Test333E,Another Test Group,Security,

@@ -477,6 +477,7 @@ function Set-GraphUser            {
         Needs consent to use the User.ReadWrite, User.ReadWrite.All, Directory.ReadWrite.All,
         or Directory.AccessAsUser.All scope.
     #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSPossibleIncorrectComparisonWithNull', '', Justification='In this case we want exactly that behaviour')]
     [OutputType([Microsoft.Graph.PowerShell.Models.MicrosoftGraphUser])]
     [cmdletbinding(SupportsShouldprocess=$true)]
     param   (
@@ -567,9 +568,9 @@ function Set-GraphUser            {
         $returnProps    = $Script:DefaultUserProperties
         if ($userid -ne $me -and $userid -ne $global:GraphUser -and
             $PSBoundparameters['aboutMe', 'birthday', 'hireDate', 'interests', 'mySite', 'pastProjects',
-                              'preferredName', 'responsibilities', 'schools', 'skills']) {
-            Write-Warning 'One or more of the selected properties can only be set by the account owner themselves.'
-            break
+                              'preferredName', 'responsibilities', 'schools', 'skills'] -ne $null) {
+            Write-Warning "One or more of the selected properties can only be set by user '$UserID'."
+            return
         }
         foreach ($p in $PSBoundparameters.Keys.where({$_ -notin $excludedParams})) {
             #turn "Param" into "param" make dates suitable text, and switches booleans
@@ -900,7 +901,9 @@ function Remove-GraphUser         {
     process{
        ContextHas -WorkOrSchoolAccount -BreakIfNot
         #xxxx todo check scopes
-
+        if ($userid -is [string] -and $UserID -notmatch "\w@\w|$guidregex") {
+            $userId = Get-GraphUser $UserID
+        }
         #allow an array of users to be passed.
         foreach ($u in $UserID ) {
             if     ($u.displayName)       {$displayname = $u.displayname}
@@ -909,7 +912,7 @@ function Remove-GraphUser         {
             if     ($u.id)                {$u = $U.id}
             elseif ($u.UserPrincipalName) {$u = $U.UserPrincipalName}
             if ($Force -or $pscmdlet.ShouldProcess($displayname,"Delete User")) {
-                try {
+                try   {
                     Remove-MgUser_Delete -UserId $u -ErrorAction Stop
                 }
                 catch {
@@ -971,7 +974,7 @@ function Import-GraphUser         {
         * DisplayName
 
 #>
-    [cmdletbinding(SupportsShouldProcess=$true)]
+    [cmdletbinding(SupportsShouldProcess=$true,ConfirmImpact='High')]
     param   (
         #One or more files to read for input.
         [Parameter(Position=0,ValueFromPipeline=$true,Mandatory=$true)]
@@ -994,15 +997,15 @@ function Import-GraphUser         {
         }
     }
     end     {
-
-
         foreach ($user in $list) {
             $upn = $user.UserPrincipalName
             if     (-not $upn) {
                     Write-Warning "User was missing a UPN"
                     continue
             }
-            else   {$exists =  (Invoke-GraphRequest "$GraphUri/users?`$Filter=userprincipalName eq '$upn'" -ValueOnly) -as [bool]}
+            else   {
+                    Write-Progress -Activity 'Configuring users' -CurrentOperation $upn -Status 'Checking for existing user'
+                    $exists =  (Invoke-GraphRequest "$GraphUri/users?`$Filter=userprincipalName eq '$upn'" -ValueOnly) -as [bool]}
 
             if     ($user.Action -eq 'Remove' -and (-not $exists)) {
                     Write-Warning "User '$upn' was marked for removal, but no matching user was found."
@@ -1010,6 +1013,7 @@ function Import-GraphUser         {
             }
             elseif ($user.Action -eq 'Remove' -and
                    ($force -or $PSCmdlet.ShouldProcess($upn,"Remove user "))){
+                    Write-Progress -Activity 'Configuring users' -CurrentOperation $upn -Status 'Removing existing user'
                     Remove-Graphuser -Force -user $user
                     Write-Verbose "Removed user '$upn'."
                     continue
@@ -1021,6 +1025,7 @@ function Import-GraphUser         {
             }
             elseif ($user.Action -eq 'Add'    -and
                    ($force -or $PSCmdlet.ShouldProcess($upn,"Create new user"))){
+                    Write-Progress -Activity 'Configuring users' -CurrentOperation $upn -Status 'Creating user'
                     $params = @{Force=$true}
                     foreach ($p in @('DisplayName','UserPrincipalName', 'MailNickName','GivenName',
                                      'Surname', 'Initialpassword','UsageLocation').where({$user.$_})) {
@@ -1040,8 +1045,11 @@ function Import-GraphUser         {
                     $exists      = $true
                     $user = $user | Select-Object -Property * -ExcludeProperty 'DisplayName', 'MailNickName','GivenName', 'Surname','UsageLocation'
                     $user.Action = "Set"
-                }
-
+                    Write-Progress -Activity 'Configuring users' -CurrentOperation $upn -Status 'Checking new account is available'
+                    $stopTime = [datetime]::now.AddMinutes(2)
+                    do    {$newUser = Get-graphuser $upn }
+                    until ($newUser -or [datetime]::now -gt $stopTime -or (Start-Sleep -Seconds 5))
+            }
             if     ($user.Action -eq 'Set'    -and (-not $exists)) {
                     Write-Warning "User '$upn' was marked for update, but no matching user was found."
                     continue
@@ -1052,27 +1060,33 @@ function Import-GraphUser         {
                     $Setparameters = (Get-Command Set-GraphUser ).Parameters.Values |
                         Where-Object name -notin ([Cmdlet]::CommonParameters + [Cmdlet]::OptionalCommonParameters  )
 
-                    foreach ($p in $setparameters) {
+                    foreach ($p in $setparameters.where({$user.($_.name)}) ) {
                         $pName = $p.name
-                        if     ($user.$pname -and ($p.parameterType -eq [string[]] )) {$params[$pName] = $user.$pName -split $ListSeparator  }
-                        elseif ($user.$pname -and ($p.switchParameter))               {$params[$pName] = $user.$pName -in @("Yes","True","1")  }
-                        elseif ($user.$pname)                                         {$params[$pName] = $user.$pName}
+                        if      ($p.parameterType -eq [string[]] ) {$params[$pName] = $user.$pName -split $ListSeparator  }
+                        elseif  ($p.switchParameter)               {$params[$pName] = $user.$pName -in @("Yes","True","1")  }
+                        else                                       {$params[$pName] = $user.$pName}
                     }
-                    if ($params.count -gt 2) {Set-GraphUser @params}
+                    if ($params.count -gt 2) {
+                        Write-Progress -Activity 'Configuring users' -CurrentOperation $upn -Status 'Setting user properties'
+                        Set-GraphUser @params
+                    }
 
                     if ($user.Groups)   {
+                        Write-Progress -Activity 'Configuring users' -CurrentOperation $upn -Status 'Adding user to group(s)'
                         Add-GraphGroupMember   -Group ($user.groups -split $ListSeparator) -Member $upn -Force
                     }
-                    if ($user.Roles)    {
-                        Grant-GraphDirectoryRole -Role ($user.Roles -split $ListSeparator) -Member $upn -Force
-                    }
                     if ($user.Licenses) {
+                        Write-Progress -Activity 'Configuring users' -CurrentOperation $upn -Status 'Granting license(s)'
                         Grant-GraphLicense   -SKUID ($user.Licenses -split $ListSeparator) -UserID $upn -Force
                     }
-
+                    if ($user.Roles)    {
+                        Write-Progress -Activity 'Configuring users' -CurrentOperation $upn -Status 'Adding user to role(s)'
+                        Grant-GraphDirectoryRole -Role ($user.Roles -split $ListSeparator) -Member $upn -Force
+                    }
                     Write-Verbose "Updated properties of user '$upn'"
             }
         }
+        Write-Progress -Activity 'Configuring users' -Completed
     }
 }
 

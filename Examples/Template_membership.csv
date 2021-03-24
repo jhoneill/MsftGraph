@@ -1,3 +1,4 @@
-"Action","MemberOf","UserPrincipalName","DisplayName"
-"Add","Consultanting","bob@mobulaconsulting.com","Bob Cratchett"
-"Add","Test101","bob@mobulaconsulting.com","Bob Cratchett"
+Action,MemberOf,UserPrincipalName,DisplayName
+Add,Consultants,ruth@mobulaconsulting.com,Ruth Thatcher
+Remove,Consultants,robin@mobulaconsulting.com,Anything can appear in Display name
+Remove,Consultanting,bob@mobulaconsulting.com,Bob Cratchett

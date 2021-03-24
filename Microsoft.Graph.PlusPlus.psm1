@@ -361,7 +361,7 @@ function FilterString {
 #Submodules which need the class and/or private functions from the SDK module.
 $ImportCmds = [ordered]@{
   'PersonalContacts'             = @()
-  'Users'                        = @('New-MgUserTodoList_CreateExpanded1','New-MgUserTodoListTask_CreateExpanded1', 'Remove-MgUserTodoList_Delete1',
+  'Users'                        = @('Remove-MgUser_Delete','New-MgUserTodoList_CreateExpanded1','New-MgUserTodoListTask_CreateExpanded1', 'Remove-MgUserTodoList_Delete1',
                                      'Remove-MgUserTodoListTask_Delete1', 'Update-MgUserTodoListTask_UpdateExpanded1') #'Get-MgUser_List1' ,
   'Identity.DirectoryManagement' = @('Get-MgDomain_Get1', 'Get-MgDomain_List1', 'Get-MgDomainNameerenceByRef_List1',
                                      'Get-MgDomainServiceConfigurationRecord_List1' , 'Get-MgDomainVerificationDnsRecord_List1',

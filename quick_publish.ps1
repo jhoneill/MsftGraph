@@ -23,3 +23,4 @@ Get-ChildItem -Recurse -File -Exclude $MyInvocation.MyCommand.name |
 if ($PSCmdlet.ShouldProcess('Publish')) {
     Publish-Module -NuGetApiKey $key -Repository PSGallery -AllowPrerelease -Name Microsoft.Graph.PlusPlus
 }
+ git reset HEAD --hard
