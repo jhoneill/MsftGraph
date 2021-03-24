@@ -63,6 +63,30 @@
             $this.DisplayName
         </Script></ScriptMethod>
     </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenotePage</Name><Members>
+        <ScriptMethod><Name>ToString</Name><Script>
+            $this.Title
+        </Script></ScriptMethod>
+        <ScriptMethod><Name>Open</Name><Script>
+            Start-Process $this.Links.OneNoteWebUrl.Href
+        </Script></ScriptMethod>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphOnenoteSection</Name><Members>
+        <ScriptMethod><Name>ToString</Name><Script>
+            $this.DisplayName
+        </Script></ScriptMethod>
+        <ScriptMethod><Name>Open</Name><Script>
+            Start-Process $this.Links.OneNoteWebUrl.Href
+        </Script></ScriptMethod>
+    </Members></Type>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphNotebook</Name><Members>
+        <ScriptMethod><Name>ToString</Name><Script>
+            $this.DisplayName
+        </Script></ScriptMethod>
+        <ScriptMethod><Name>Open</Name><Script>
+            Start-Process $this.Links.OneNoteWebUrl.Href
+        </Script></ScriptMethod>
+    </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDrive</Name><Members>
         <AliasProperty><Name>Drive</Name>
             <ReferencedMemberName>id</ReferencedMemberName>

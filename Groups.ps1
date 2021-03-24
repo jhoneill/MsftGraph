@@ -647,7 +647,7 @@ function Set-GraphDefaultGroup      {
         $Global:PSDefaultParameterValues[        '*-GraphGroupThread:Group'] = $Group
         $Global:PSDefaultParameterValues[      'Send-GraphGroupReply:Group'] = $Group
         $Global:PSDefaultParameterValues['Get-GraphGroupConversation:Group'] = $Group
-        if ($Group.ResourceProvisioningOptions -contains 'team'){
+        if ($Group.ResourceProvisioningOptions -contains 'team' -or $Group -is [MicrosoftGraphTeam]){
             $Global:PSDefaultParameterValues[       '*-GraphChannel*:Team']  = $Group
             $Global:PSDefaultParameterValues[         'Add-Graph*Tab:Team']  = $Group
             $Global:PSDefaultParameterValues[    '*New-GraphTeamPlan:Team']  = $Group

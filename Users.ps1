@@ -598,6 +598,11 @@ function Set-GraphUser            {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
         #xxxx todo check scopes  User.ReadWrite, User.ReadWrite.All, Directory.ReadWrite.All,        or Directory.AccessAsUser.All scope.
 
+        if ($UserID -is [string] -and
+            $UserID -notmatch "^me$|\w@\w|$GUIDRegex" ) {
+            $UserID = Get-GraphUser $UserID
+        }
+
         #allow an array of users to be passed.
         foreach ($id in $UserID ) {
             #region configure the web parameters for changing the user. Allow for filtered objects with an ID or a UPN
@@ -637,16 +642,24 @@ function Set-GraphUser            {
                 $webparams['uri'] = $baseUri
             }
             if ($Manager)   {
-                $baseUri                    =  $webparams['uri']
-                $webparams['uri']           =  $webparams['uri'] + 'manager/$ref'
-                $webparams['Method']        = 'Put'
-                $webparams['Contenttype']   = 'application/json'
-                $json = ConvertTo-Json @{ '@odata.id' =  "$GraphUri/users/$manager" }
-                Write-Debug  $json
-                if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {
-                    $null = Invoke-GraphRequest  @webparams -Body $json
+                if ($Manager -is [string] -and $Manager -notmatch "$GUIDRegex|\w@\w") {
+                                 $Manager = Get-GraphUser $manager}
+                if ($Manger.id) {$Manager = $Manager.id}
+                if ($Manager -isnot [string] -or $Manager -notmatch "$GUIDRegex|\w@\w" ) {
+                    Write-Warning "Could not resolve the manager"
                 }
-                $webparams['uri'] = $baseUri
+                else {
+                    $json = ConvertTo-Json @{ '@odata.id' =  "$GraphUri/users/$manager" }
+                    Write-Debug  $json
+                    $baseUri                    =  $webparams['uri']
+                    $webparams['uri']           =  $webparams['uri'] + 'manager/$ref'
+                    $webparams['Method']        = 'Put'
+                    $webparams['Contenttype']   = 'application/json'
+                    if ($Force -or $Pscmdlet.Shouldprocess($userID ,'Update User')) {
+                        $null = Invoke-GraphRequest  @webparams -Body $json
+                    }
+                    $webparams['uri'] = $baseUri
+                }
             }
             if ($PassThru)  {
                Invoke-GraphRequest ($webparams.uri + '?$expand=manager&$select=' + ($returnProps -join ',')) | ConvertTo-GraphUser
@@ -706,21 +719,24 @@ function New-GraphUser            {
         [Alias('LastName')]
         [string]$Surname,
 
-        #A script block specifying how the displayname should be built, by default it is {"$GivenName $Surname"};
-        [Parameter(ParameterSetName='UPNFromDomainLast')]
-        [Parameter(ParameterSetName='DomainFromUPNLast')]
-        [scriptblock]$DisplayNameRule = {"$GivenName $Surname"},
-
-        #A script block specifying how the mailnickname should be built, by default it is $GivenName.$Surname with punctuation removed;
-        [Parameter(ParameterSetName='UPNFromDomainLast')]
-        [Parameter(ParameterSetName='DomainFromUPNLast')]
-        [scriptblock]$NickNameRule    = {($GivenName -replace '\W','') +'.' + ($Surname -replace '\W','')},
+        #ID or UserPrincipalName of the user's manager
+        [ArgumentCompleter([UPNCompleter])]
+        [string]$Manager,
 
         #A two letter country code (ISO standard 3166). Required for users that will be assigned licenses due to legal requirement to check for availability of services in countries.  Examples include: 'US', 'JP', and 'GB'
         [ValidateNotNullOrEmpty()]
         [UpperCaseTransformAttribute()]
         [ValidateCountryAttribute()]
         [string]$UsageLocation = $Script:DefaultUsageLocation,
+
+        [ArgumentCompleter([GroupCompleter])]
+        $Groups,
+
+        [ArgumentCompleter([RoleCompleter])]
+        $Roles,
+
+        [ArgumentCompleter([SkuCompleter])]
+        $Licenses,
 
         #The initial password for the user. If none is specified one will be generated and output by the command
         [string]$Initialpassword,
@@ -731,6 +747,7 @@ function New-GraphUser            {
         #If specified the user will need to use Multi-factor authentication when changing their password.
         [switch]$ForceMFAPasswordChange,
 
+
         #Specifies built-in password policies to apply to the user
         [ValidateSet('DisableStrongPassword','DisablePasswordExpiration')]
         [string[]]$PasswordPolicies,
@@ -738,14 +755,18 @@ function New-GraphUser            {
         #A hash table of properties which can be passed as parameters to Set-GraphUser command after the account is created
         [hashtable]$SettableProperties,
 
-        [ArgumentCompleter([GroupCompleter])]
-        $Groups,
+        #A script block specifying how the displayname should be built, by default it is {"$GivenName $Surname"};
+        [Parameter(ParameterSetName='UPNFromDomainLast')]
+        [Parameter(ParameterSetName='DomainFromUPNLast')]
+        [scriptblock]$DisplayNameRule = {"$GivenName $Surname"},
 
-        [ArgumentCompleter([RoleCompleter])]
-        $Roles,
+        #A script block specifying how the mailnickname should be built, by default it is $GivenName.$Surname with punctuation removed;
+        [Parameter(ParameterSetName='UPNFromDomainLast')]
+        [Parameter(ParameterSetName='DomainFromUPNLast')]
+        [scriptblock]$NickNameRule    = {($GivenName -replace '\W','') +'.' + ($Surname -replace '\W','')},
 
-        [ArgumentCompleter([SkuCompleter])]
-        $Licenses,
+        #A script block specifying how to create a password, by default a date between 1800 and 2199 like 10Oct2126 - easy to type and meets complexity rules.
+        [scriptblock]$PasswordRule    = {([datetime]"1/1/1800").AddDays((Get-Random 146000)).tostring("ddMMMyyyy")},
 
         #If specified prevents any confirmation dialog from appearing
         [switch]$Force
@@ -758,6 +779,7 @@ function New-GraphUser            {
     #re-create any scriptblock passed as a parameter, otherwise variables in this function are out of its scope.
     if ($NickNameRule)            {$NickNameRule      = [scriptblock]::create( $NickNameRule )   }
     if ($DisplayNameRule)         {$DisplayNameRule   = [scriptblock]::create( $DisplayNameRule) }
+    if ($PasswordRule)            {$PasswordRule      = [scriptblock]::create( $PasswordRule)    }
      #if we didn't get a UPN or a mail nickname, make the nickname first, then add the domain to make the UPN
     if (-not $UserPrincipalName -and
         -not $MailNickName  )     {$MailNickName      = Invoke-Command -ScriptBlock $NickNameRule
@@ -783,9 +805,10 @@ function New-GraphUser            {
         throw "couldn't make sense of those parameters"
     }
     #A simple way to create one in 100K temporary passwords. You might get 10Oct2126 - easy to type and meets complexity rules.
-    if (-not $Initialpassword)    {
-             $Initialpassword   = ([datetime]"1/1/1800").AddDays((Get-Random 146000)).tostring("ddMMMyyyy")
-             [pscustomobject]@{'DisplayName'=$DisplayName; 'UserPrincipalName'= $UserPrincipalName; 'Initialpassword'= $Initialpassword}
+    if (-not $Initialpassword)    {$Initialpassword   = Invoke-Command -ScriptBlock $PasswordRule
+                                   [pscustomobject]@{'DisplayName'       = $DisplayName
+                                                     'UserPrincipalName' = $UserPrincipalName
+                                                     'Initialpassword'   = $Initialpassword}
     }
     $settings = @{
         'accountEnabled'    = $true
@@ -818,10 +841,13 @@ function New-GraphUser            {
             if ($SetableProperties) {
                 Set-GraphUser -UserID $u.id @SettableProperties -Force
             }
-            if ($Groups) {
+            if ($manager) {
+                Set-GraphUser -UserID $u.id -Manager $manager -Force
+            }
+            if ($Groups)   {
                 Add-GraphGroupMember -Group $groups -Member $u
             }
-            if ($Roles) {
+            if ($Roles)    {
                 Grant-GraphDirectoryRole -Role $Roles -Member $u
             }
             if ($Licenses) {

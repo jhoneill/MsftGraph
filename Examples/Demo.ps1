@@ -26,7 +26,7 @@ $files  |  Copy-ToGraphFolder  -OutVariable item  -Destination 'root:/General'
 Start-Process $item.webUrl
 
 #Leave the window open to see export happen -  itempath  tab completes - use the file from the previous -
-$users | Select-Object Organization | Export-GraphWorkSheet -SheetName users -ItemPath 'root:/General/test.xlsx'
+Get-GraphUserList -MembersOnly | Select-Object Organization | Export-GraphWorkSheet -SheetName sheet1 -ItemPath 'root:/General/test.xlsx' -Show
 
 #groups upgraded to teams have channels for the teams App
 Get-GraphTeam $newTeam -Channels -OutVariable teamFirstChannel

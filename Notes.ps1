@@ -845,7 +845,9 @@ function Out-GraphOneNote        {
         [ValidateNotNullOrEmpty()][string[]]$PostContent,
         #Normally the page is added 'silently'. If passthru is specified, an object describing the new page will be returned.
         [Alias('PT')]
-        [switch] $PassThru
+        [switch]$PassThru,
+        #If Specified opens the newly created page
+        [switch]$Show
     )
     #collect whatever comes in as Input object and process in the end block
     begin   { $stuff = @() }
@@ -869,24 +871,25 @@ function Out-GraphOneNote        {
         if     ($webParams['uri']-notmatch '/onenote/sections/') {Write-Warning -Message 'That does not appear to be a valid section' ; return}
         #end region
         #region generate the HTML  - filtering the input properties as needed
-        if ($PSBoundParameters['Property','ExcludeProperty']) {
+        if ($PSBoundParameters['Property'] -or $PSBoundParameters['ExcludeProperty']) {
             $Stuff = $stuff | Select-Object -Property $Property -ExcludeProperty $ExcludeProperty
-            [void]$PSBoundParameters.Remove('Property')
-            [void]$PSBoundParameters.Remove('ExcludeProperty')
+            $null = $PSBoundParameters.Remove('Property'), $PSBoundParameters.Remove('ExcludeProperty')
         }
 
-        [void]$PSBoundParameters.Remove('Section')
-        [void]$PSBoundParameters.Remove('InputObject')
-        [void]$PSBoundParameters.Remove('PassThru')
-        if (-not $Title)    {$PSBoundParameters.Add('Title', ( $MyInvocation.Line + '  -  ' +  (Get-Date))) }
+        $null = $PSBoundParameters.Remove('Section'),$PSBoundParameters.Remove('InputObject'), $PSBoundParameters.Remove('PassThru'), $PSBoundParameters.Remove('Show')
+
+        if (-not $Title)    {
+            $PSBoundParameters.Add('Title', ( $MyInvocation.Line + '  -  ' +  (Get-Date).ToString() ))
+        }
         $webParams['body'] = $Stuff | ConvertTo-Html  @PSBoundParameters
         #end region
 
         #Make the call, returning the URL of the new page.
         $result = Invoke-GraphRequest @webParams
-        If ($PassThru) {
-                if ($Section -is [MicrosoftGraphOnenoteSection]) {$result.ParentSection = $section}
-                if ($section.parentnotebook.DisplayName)  {$result.parentNoteBook = $section.parentNotebook}
+        if ($Show)     { Start-Process $result.Links.OneNoteWebUrl.Href}
+        if ($PassThru) {
+                if ($Section -is [MicrosoftGraphOnenoteSection]) {$result.ParentSection = $Section}
+                if ($Section.parentnotebook.DisplayName)  {$result.parentNoteBook = $Section.parentNotebook}
                 return $result
         }
     }
