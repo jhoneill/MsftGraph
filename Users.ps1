@@ -428,10 +428,10 @@ function Get-GraphUser            {
             #if we get a not found error that's propably OK - bail for any other error.
             catch {
                 if     ($_.exception.response.statuscode.value__ -eq 404) {
-                    Write-Warning -Message "'Not found' error while getting data for user '$userid'"
+                    Write-Warning -Message "'Not found' error while getting data for user '$($u.ToString())'"
                 }
                 elseif ($_.exception.response.statuscode.value__ -eq 403) {
-                    Write-Warning -Message "'Forbidden' error while getting data for user '$userid'. Do you have access to the correct scope?"
+                    Write-Warning -Message "'Forbidden' error while getting data for user '$($u.ToString())'. Do you have access to the correct scope?"
                 }
                 else {
                     Write-Progress -Activity 'Getting user information' -Completed
@@ -569,7 +569,7 @@ function Set-GraphUser            {
         if ($userid -ne $me -and $userid -ne $global:GraphUser -and
             $PSBoundparameters['aboutMe', 'birthday', 'hireDate', 'interests', 'mySite', 'pastProjects',
                               'preferredName', 'responsibilities', 'schools', 'skills'] -ne $null) {
-            Write-Warning "One or more of the selected properties can only be set by user '$UserID'."
+            Write-Warning "One or more of the selected properties can only be set by user '$($UserID.ToString())'."
             return
         }
         foreach ($p in $PSBoundparameters.Keys.where({$_ -notin $excludedParams})) {

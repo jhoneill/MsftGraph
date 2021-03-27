@@ -1,4 +1,9 @@
 # 1.4.3
+## After Beta 1
+* Improved auto-load behaviour so Get-GraphUser / Get-GraphGroup will autoload the module, login with cached creds and executed (previously needed to load the module and run connect graph)
+* Additional type extensions (more to come)
+* Warning messages in users now display the UPN (were showing a type name)
+## In Beta 1
 * Added This ChangeLog.md !
 * Fixed breaking typo in `Import-GraphUser`
 * Fixed a bug which prevented `Remove user` running

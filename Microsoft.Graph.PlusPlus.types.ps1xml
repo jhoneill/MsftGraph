@@ -91,6 +91,9 @@
         <AliasProperty><Name>Drive</Name>
             <ReferencedMemberName>id</ReferencedMemberName>
         </AliasProperty>
+        <ScriptMethod><Name>Open</Name><Script>
+            Start-Process $this.WebUrl
+        </Script></ScriptMethod>
     </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphDriveItem</Name><Members>
         <AliasProperty><Name>ItemID</Name>
@@ -99,18 +102,28 @@
         <ScriptProperty><Name>Drive</Name><GetScriptBlock>
             $this.ParentReference.DriveID
         </GetScriptBlock></ScriptProperty>
+        <ScriptMethod><Name>Open</Name><Script>
+            Start-Process $this.WebUrl
+        </Script></ScriptMethod>
     </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphSite</Name><Members>
         <ScriptProperty><Name>Template</Name><GetScriptBlock>
             $this.list.template
         </GetScriptBlock></ScriptProperty>
+        <ScriptMethod><Name>Open</Name><Script>
+            Start-Process $this.WebUrl
+        </Script></ScriptMethod>
+        <ScriptMethod><Name>List</Name><Script>
+            if ($args[0] -is [int])    {$this.lists[$args[0]]}
+            if ($args[0] -is [String]) {$this.lists | where-object name -like $args[0]}
+        </Script></ScriptMethod>
     </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphCalendar</Name><Members>
         <AliasProperty><Name>Calendar</Name>
             <ReferencedMemberName>id</ReferencedMemberName>
         </AliasProperty>
     </Members></Type>
-    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphSite</Name><Members>
+    <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphMessage</Name><Members>
         <ScriptProperty><Name>FromName</Name><GetScriptBlock>
             $this.from.emailAddress.name
         </GetScriptBlock></ScriptProperty>
@@ -123,6 +136,9 @@
         <ScriptMethod><Name>Move</Name><Script>
             param($Destination)
             Move-GraphMailItem -Item $this @PSBoundParameters
+        </Script></ScriptMethod>
+        <ScriptMethod><Name>Open</Name><Script>
+            Start-Process $this.WebUrl
         </Script></ScriptMethod>
     </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphAttachment</Name><Members>
@@ -196,6 +212,10 @@
         <ScriptProperty><Name>Template</Name><GetScriptBlock>
             $this.list.template
         </GetScriptBlock></ScriptProperty>
+        <ScriptMethod><Name>Open</Name><Script>
+            Start-Process $this.WebUrl
+        </Script></ScriptMethod>
+
     </Members></Type>
     <Type><Name>Microsoft.Graph.PowerShell.Models.MicrosoftGraphChatMessage</Name><Members>
         <ScriptProperty><Name>Team</Name><GetScriptBlock>

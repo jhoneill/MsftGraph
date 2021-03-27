@@ -29,7 +29,7 @@ function Test-GraphSession          {
 #>
     param ( [switch]$Quiet )
 
-    if (-not [GraphSession]::Instance.AuthContext) {Connect-Graph -Quiet:$Quiet}
+    if (-not [GraphSession]::Instance.AuthContext) {Connect-Graph -Quiet:$Quiet | Out-Host}
     elseif  ([GraphSession]::Instance.AuthContext.TokenExpires -is [datetime] -and
              [GraphSession]::Instance.AuthContext.TokenExpires -lt [datetime]::Now.AddMinutes(-1)) {
         if ($Script:RefreshParams) {
@@ -543,7 +543,7 @@ function ContextHas                 {
     [cmdletbinding()]
     param (
         #list of scopes. will return true if at least one IS present.
-        [string[]]$scopes,
+        [string[]]$Scopes,
         #if specifies returns ture for a work-or-school account and false for "Live" accounts
         [switch]$WorkOrSchoolAccount,
         #if specified returns ture if connected with a user account and false if connected as an application
@@ -555,10 +555,11 @@ function ContextHas                 {
         #If specified reverses the output.
         [switch]$Not
     )
-    if (-not $scopes) { $state = $true }
+    if (-not [GraphSession]::Instance.AuthContext) { Connect-Graph | Out-Host}
+    if (-not $Scopes) { $state = $true }
     else {
         $state =  $false
-        foreach ($s in $scopes)  {
+        foreach ($s in $Scopes)  {
             $state = $state -or ([GraphSession]::Instance.AuthContext.Scopes -contains $s)
         }
     }
@@ -572,9 +573,9 @@ function ContextHas                 {
         $state = $state -and -not [GraphSession]::Instance.AuthContext.Account
     }
     if ($BreakIfNot ) {
-        if ($scopes              -and -not $state) {Write-Warning ("This requires the {0} scope(s)." -f ($scopes -join ', ')); break}
+        if ($Scopes              -and -not $state) {Write-Warning ("This requires the {0} scope(s)." -f ($Scopes -join ', ')) ; break}
         if ($WorkOrSchoolAccount -and -not $state) {Write-Warning  "This requires a work or school account."                  ; break}
-        if ($AsUser              -and -not $state) {Write-Warning  "This requires a user0logon, not an app-logon."            ; break}
+        if ($AsUser              -and -not $state) {Write-Warning  "This requires a user-logon, not an app-logon."            ; break}
         if ($AsApp               -and -not $state) {Write-Warning  "This requires an app-logon, not a user-logon."            ; break}
     }
     #otherwise return true or false
