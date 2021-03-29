@@ -358,12 +358,13 @@ function Get-GraphGroup             {
                     Invoke-GraphRequest      -Uri "$groupuri`?`$Select=$SelectList" -As ([MicrosoftGraphGroup]) -ExcludeProperty '@odata.context'
                 }
                 else                         {
-                    $g =  Invoke-GraphRequest    -Uri "$groupuri`?`$expand=members" -As ([MicrosoftGraphGroup]) -ExcludeProperty '@odata.context','creationOptions'
+                    $g =  Invoke-GraphRequest    -Uri $groupuri -As ([MicrosoftGraphGroup]) -ExcludeProperty '@odata.context','creationOptions'
+                    #removed $expand=Members as it only returns the first 20.
                     if ($g.resourceProvisioningOptions -notcontains 'Team' -or
                         $MyInvocation.InvocationName -ne 'Get-GraphTeam' -or $NoTeamInfo) { $g }
                     else {
                         $t = Invoke-GraphRequest -Uri  "$teamURI"                   -As ([MicrosoftGraphTeam])  -ExcludeProperty '@odata.context'
-                        $t.members = $g.Members
+                      # $t.members = $g.Members
                         $t
                     }
                 }
@@ -542,7 +543,7 @@ function New-GraphGroup             {
                 return $group
             }
             $team.Description = $group.description
-            $team.Members     = $group.members
+            $team.Members     = $group.members     #Check that all users are returned if more than 20 added on creation.
             $team.visibility  = $group.visibility
 
             Write-Progress -Activity 'Creating Group/Team' -Completed
@@ -928,6 +929,10 @@ function Add-GraphGroupMember       {
                   else   {Get-GraphGroup $g  -NoTeamInfo -ErrorAction Stop  }
             }
         }
+        $memberHash = @{}
+        foreach ($g in  $Group) {
+            $memberHash[$g.id] = Get-GraphGroup -ID $g.id -Members | Select-Object -ExpandProperty id
+        }
     }
     process {
         ContextHas -WorkOrSchoolAccount -BreakIfNot
@@ -945,7 +950,7 @@ function Add-GraphGroupMember       {
                     if (-not $m) {throw "Could not get a member ID"; return }
                 }
                 #Getting a group gets the members but we can't expand members AND owners.
-                if ($m.id -in $g.members.id -and -not $AsOwner) {
+                if ($m.id -in $memberHash[$g.id] -and -not $AsOwner) {
                     Write-Warning "'$($m.displayName)' is already a member of the group '$($g.displayname)'."
                     continue
                 }
@@ -955,7 +960,7 @@ function Add-GraphGroupMember       {
                     try   {  Invoke-GraphRequest -Method post -Uri $uri -Body $body -ContentType 'application/json'  }
                     catch { #if the group is was a variable, the member list may not be current, and we don't validate new owners
                         if ($_.Exception.Response.StatusCode.value__ -eq 400) {
-                            Write-Warning "Adding to group $($g.displayname) returned 'Bad Request' - may already $($m.displayname) be assigned."
+                            Write-Warning "Adding to group $($g.displayname) returned 'Bad Request' - $($m.displayname) may be assigned to the group already."
                         }
                         else {throw $_}
                     }
@@ -1000,9 +1005,13 @@ function Remove-GraphGroupMember    {
     begin   {
         #ensure we have an ID for the group(s) we were passed. If we got a GUID in a string, we'll confirm it's a group and get the display name.
         $Group = foreach ($g in $Group) {
-              # at least this user must be in the group. If the group is empty we will re-fetch it.
-              if     ($g.id -and $g.displayname -and $g.Members.Count -ge 1) {$g}
+              # at least this user must be in the group.
+              if     ($g.id -and $g.displayname ) {$g}
               else   {Get-GraphGroup $g  -NoTeamInfo -ErrorAction Stop  }
+        }
+        $memberHash = @{}
+        foreach ($g in  $Group) {
+            $memberHash[$g.id] = Get-GraphGroup -ID $g.id -Members | Select-Object -ExpandProperty ID
         }
     }
     process {
@@ -1018,8 +1027,8 @@ function Remove-GraphGroupMember    {
                 }
                 #group(s) resolved in begin block so should have an ID and display name.
 
-                if ($FromOwners)                 {$uri = "$GraphUri/groups/$($g.ID)/owners/$($m.id)/`$ref" }
-                elseif ($m.id -in $g.members.id) {$uri = "$GraphUri/groups/$($g.ID)/members/$($m.id)/`$ref"}
+                if ($FromOwners)                       {$uri = "$GraphUri/groups/$($g.ID)/owners/$($m.id)/`$ref" }
+                elseif ($m.id -in  $memberHash[$g.id]) {$uri = "$GraphUri/groups/$($g.ID)/members/$($m.id)/`$ref"}
                 else {Write-Warning "'$($m.displayName)' is not a member of the group '$($g.displayname)'." ; continue }
                 if ($Force -or $PSCmdlet.Shouldprocess($m.displayName,"Remove from Group $($g.displayname)")) {
                     try {

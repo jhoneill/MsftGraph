@@ -3,6 +3,7 @@
 * Improved auto-load behaviour so Get-GraphUser / Get-GraphGroup will autoload the module, login with cached creds and executed (previously needed to load the module and run connect graph)
 * Additional type extensions (more to come)
 * Warning messages in users now display the UPN (were showing a type name)
+* Workround $expand= only expanding the first 20 directory objects. 
 ## In Beta 1
 * Added This ChangeLog.md !
 * Fixed breaking typo in `Import-GraphUser`

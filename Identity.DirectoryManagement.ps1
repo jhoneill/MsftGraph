@@ -539,26 +539,28 @@ function Get-GraphDirectoryRole         {
         }
         if     ($Role -is [MicrosoftGraphDirectoryRole]) {$roles = $Role}
         elseif ($Role -is [string] -and $role -match $GUIDRegex) {
-            $roles = Invoke-GraphRequest  -Uri "$GraphUri/directoryroles/$Role`?`$expand=members"        -AsType  ([MicrosoftGraphDirectoryRole] ) -ExcludeProperty '@odata.context'
+            $roles = Invoke-GraphRequest  -Uri "$GraphUri/directoryroles/$Role"        -AsType  ([MicrosoftGraphDirectoryRole] ) -ExcludeProperty '@odata.context'
         }
         else {
-            $roles = Invoke-GraphRequest  -Uri "$GraphUri/directoryroles?`$expand=members" -ValueOnly    -AsType  ([MicrosoftGraphDirectoryRole] )  |
+            $roles = Invoke-GraphRequest  -Uri "$GraphUri/directoryroles" -ValueOnly    -AsType  ([MicrosoftGraphDirectoryRole] )  |
                         Where-Object -Property displayName -like $role
         }
+        #removed ?`$expand=members as it only expands 20.
         if      (-not $members) {$roles}
         else {
             foreach($r in $roles) {
-                foreach ($u in $r.Members.where({$_.AdditionalProperties.'@odata.type'-match 'user$'})) {
-                    [void]$u.AdditionalProperties.Remove('@odata.type')
-                    New-object -type MicrosoftGraphUser -Property $u.AdditionalProperties |
+                $memberlist =  igr "$GraphUri/directoryroles/$($r.id)/members" -ValueOnly
+                foreach ($u in $memberlist.where({$_.'@odata.type'-match 'user$'})) {
+                    [void]$u.Remove('@odata.type')
+                    New-object -type MicrosoftGraphUser -Property $u |
                         Add-member -NotePropertyName Role -NotePropertyValue $r.DisplayName -PassThru
                 }
-                foreach ($g in $r.Members.where({$_.AdditionalProperties.'@odata.type'-match 'group$'})) {
-                    [void]$g.AdditionalProperties.Remove('@odata.type')
+                foreach ($g in $memberlist.where({$_.'@odata.type'-match 'group$'})) {
+                    [void]$g.Remove('@odata.type')
                     [void]$g.Remove('GroupName')
                     [void]$g.remove('@odata.context')
                     [void]$g.remove('creationOptions')
-                    New-object -type MicrosoftGraphGroup -Property $g.AdditionalProperties |
+                    New-object -type MicrosoftGraphGroup -Property $g |
                         Add-member -NotePropertyName Role -NotePropertyValue $r.DisplayName -PassThru
                 }
             }
