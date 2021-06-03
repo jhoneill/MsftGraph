@@ -2,10 +2,9 @@
   Copyright             =   '(c) 2021 James O''Neill. All rights reserved.'
   Author                =   'James O''Neill'
   CompanyName           =   'Mobula Consulting'
-  ModuleVersion         =   '1.4.3'
+  ModuleVersion         =   '1.5.0'
   PrivateData   = @{
        PSData    = @{
-           Prerelease   = 'beta1';
            Tags         = @('MicrosoftGraph', 'Microsoft', 'Office365', 'Graph', 'PowerShell', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner', 'MSGraph')
            Category     = 'Functions'
            ProjectUri   = 'https://github.com/jhoneill/MsftGraph'

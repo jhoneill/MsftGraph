@@ -579,8 +579,9 @@ function Grant-GraphDirectoryRole       {
         [Parameter(Position=0,Mandatory=$true)]
         [ArgumentCompleter([RoleCompleter])]
         $Role ,
-        #The member to add, can be a user name, or an object representing a group with IsAssignableToRole set or a user.
+        #The member to add, can be a user name, or an object representing either a group with IsAssignableToRole set or a user.
         [Parameter(ValueFromPipeline=$true,Position=1,Mandatory=$true)]
+        [ArgumentCompleter([UPNCompleter])]
         $Member ,
         #Runs the command with no confirmation.
         [switch]$Force
@@ -598,7 +599,7 @@ function Grant-GraphDirectoryRole       {
                 $body = ConvertTo-Json @{ '@odata.id' = "$graphUri/directoryObjects/$($m.Id)" }
                 Write-Debug $body
                 if ($Force -or $pscmdlet.ShouldProcess($m.displayname,"Grant access to role '$($r.displayname)'")) {
-                    try   { Invoke-GraphRequest -Uri "$graphuri/directoryroles/$($role.id)/members/`$ref" -Method post -Body $body -ContentType 'application/json'}
+                    try   { Invoke-GraphRequest -Uri "$graphuri/directoryroles/$($r.id)/members/`$ref" -Method post -Body $body -ContentType 'application/json'}
                     catch { Write-Warning "The request failed. This may be because the member '$($m.toString())' has already been added to the '$($r.displayname)' role." }
                 }
             }
