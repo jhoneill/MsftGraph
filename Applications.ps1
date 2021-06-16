@@ -114,7 +114,8 @@ function Get-GraphServicePrincipal {
 
         $webparams = @{
                     AsType          =  ([MicrosoftGraphServicePrincipal])
-                    ExcludeProperty = @('resourceSpecificApplicationPermissions','@odata.context','createdDateTime','verifiedPublisher')
+                    ExcludeProperty = @('@odata.context','createdDateTime','disabledByMicrosoftStatus',
+                                        'keyCredentials','resourceSpecificApplicationPermissions','verifiedPublisher')
                     Headers         = @{'ConsistencyLevel'= 'Eventual'}
         }
     }
