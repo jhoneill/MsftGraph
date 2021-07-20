@@ -1,5 +1,6 @@
 # 1.5 
 * In `Grant-GraphDirectoryRole`: allow members to tab complete and fix bug granting multiple roles.
+* Update photo support in `Get-GraphUser`
 * Set maximum column widths when formatting group objects. 
 * Bump version number. 
 

@@ -349,8 +349,29 @@ function Get-GraphUser            {
                 elseif ($OutlookCategories  ) {
                     Invoke-GraphRequest -Uri ($uri + '/Outlook/MasterCategories') -All                                                  -As ([MicrosoftGraphOutlookCategory]) }
                 elseif ($Photo              ) {
-                    Invoke-GraphRequest -Uri ($uri + '/Photo')                          -Exclude '@odata.mediaEtag', '@odata.context',
-                                                                                                              '@odata.mediaContentType' -As ([MicrosoftGraphProfilePhoto])}
+                    $response = Invoke-GraphRequest -Uri ($uri + '/Photo')
+                    if ($response.'@odata.context' -match "#users\('(.*)'\)/") {
+                        $picUserId = $Matches[1]
+                    }
+                    else {$picUserId = $null}
+                    if ($response.'@odata.mediaContentType' -and
+                        $PSVersionTable.Platform -like "win*" -and
+                        (Test-Path "HKLM:\SOFTWARE\Classes\MIME\Database\Content Type\$($response.'@odata.mediaContentType')")) {
+                        $picExtension = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Classes\MIME\Database\Content Type\$($response.'@odata.mediaContentType')").Extension
+                    }
+                    else {$picExtension = $null}
+                    $Null = $response.Remove('@odata.mediaEtag'), $response.Remove('@odata.context'),$response.Remove('@odata.mediaContentType')
+                    New-Object -TypeName MicrosoftGraphProfilePhoto -Property $response |
+                        Add-Member -PassThru -NotePropertyName UserID -NotePropertyValue  $picUserId |
+                        Add-Member -PassThru -NotePropertyName Ext    -NotePropertyValue  $picExtension |
+                        Add-Member -PassThru -NotePropertyName URI    -NotePropertyValue ($uri + '/Photo/$value') |
+                        Add-Member -PassThru -MemberType ScriptMethod -Name Download -value{
+                            param ($Path="$Pwd\userPhoto", [switch]$Passthru)
+                            if ($path -notlike "*$($this.ext)") {$Path += $this.ext}
+                            if ($this.uri) {Invoke-GraphRequest $this.uri -OutputFilePath $path}
+                            if ($Passthru) {Get-Item $path}
+                        }
+                }
                 elseif ($PlannerTasks       ) {
                     Invoke-GraphRequest -Uri ($uri + '/planner/tasks')            -All  -Exclude '@odata.etag'                          -As ([MicrosoftGraphPlannerTask])}
                 elseif ($Plans              ) {
