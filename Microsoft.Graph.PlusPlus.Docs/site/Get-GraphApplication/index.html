@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  
+  
+  <link rel="shortcut icon" href="../img/favicon.ico">
+  <title>Get-GraphApplication - Microsoft.Graph.PlusPlus Docs</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Lato:400,700|Roboto+Slab:400,700|Inconsolata:400,700" />
+
+  <link rel="stylesheet" href="../css/theme.css" />
+  <link rel="stylesheet" href="../css/theme_extra.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" />
+  
+  <script>
+    // Current page data
+    var mkdocs_page_name = "Get-GraphApplication";
+    var mkdocs_page_input_path = "Get-GraphApplication.md";
+    var mkdocs_page_url = null;
+  </script>
+  
+  <script src="../js/jquery-2.1.1.min.js" defer></script>
+  <script src="../js/modernizr-2.8.3.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script> 
+  
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+        <a href=".." class="icon icon-home"> Microsoft.Graph.PlusPlus Docs</a>
+        <div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="..">Documentation for Microsoft.Graph.PlusPlus</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-FileToGraphOneNote/">Add-FileToGraphOneNote</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphEvent/">Add-GraphEvent</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphGroupMember/">Add-GraphGroupMember</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphGroupThread/">Add-GraphGroupThread</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphListItem/">Add-GraphListItem</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphOneNotePage/">Add-GraphOneNotePage</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphOneNoteTab/">Add-GraphOneNoteTab</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphPlanBucket/">Add-GraphPlanBucket</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphPlanTask/">Add-GraphPlanTask</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphPlannerTab/">Add-GraphPlannerTab</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphSharePointTab/">Add-GraphSharePointTab</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Add-GraphWikiTab/">Add-GraphWikiTab</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Connect-Graph/">Connect-Graph</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../ConvertTo-GraphDateTimeTimeZone/">ConvertTo-GraphDateTimeTimeZone</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Copy-FromGraphFolder/">Copy-FromGraphFolder</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Copy-GraphOneNotePage/">Copy-GraphOneNotePage</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Copy-ToGraphFolder/">Copy-ToGraphFolder</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Expand-GraphConditionalAccessPolicy/">Expand-GraphConditionalAccessPolicy</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Export-GraphGroupMember/">Export-GraphGroupMember</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Export-GraphUser/">Export-GraphUser</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Export-GraphWorkSheet/">Export-GraphWorkSheet</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Find-GraphPeople/">Find-GraphPeople</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-AccessToken/">Get-AccessToken</a>
+                    </li>
+                </ul>
+                <ul class="current">
+                    <li class="toctree-l1 current"><a class="reference internal current" href="./">Get-GraphApplication</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#synopsis">SYNOPSIS</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#syntax">SYNTAX</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#list1-default">List1 (Default)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#list3">List3</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#list2">List2</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#description">DESCRIPTION</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#examples">EXAMPLES</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#example-1">Example 1</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#parameters">PARAMETERS</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#-id">-Id</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#-appid">-AppId</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#-property">-Property</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#-filter">-Filter</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#commonparameters">CommonParameters</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#inputs">INPUTS</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#outputs">OUTPUTS</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#microsoftgraphpowershellmodelsmicrosoftgraphapplication">Microsoft.Graph.PowerShell.Models.MicrosoftGraphApplication</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#notes">NOTES</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#related-links">RELATED LINKS</a>
+    </li>
+    </ul>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphBucketTaskList/">Get-GraphBucketTaskList</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphChannel/">Get-GraphChannel</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphChannelReply/">Get-GraphChannelReply</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphConditionalAccessPolicy/">Get-GraphConditionalAccessPolicy</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphContact/">Get-GraphContact</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphDeletedObject/">Get-GraphDeletedObject</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphDirectoryLog/">Get-GraphDirectoryLog</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphDirectoryRole/">Get-GraphDirectoryRole</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphDirectoryRoleTemplate/">Get-GraphDirectoryRoleTemplate</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphDomain/">Get-GraphDomain</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphDrive/">Get-GraphDrive</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphEvent/">Get-GraphEvent</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphGroup/">Get-GraphGroup</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphGroupConversation/">Get-GraphGroupConversation</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphGroupList/">Get-GraphGroupList</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphGroupThread/">Get-GraphGroupThread</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphLicense/">Get-GraphLicense</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphList/">Get-GraphList</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphMailFolder/">Get-GraphMailFolder</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphMailItem/">Get-GraphMailItem</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphMailTips/">Get-GraphMailTips</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphNamedLocation/">Get-GraphNamedLocation</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphOneNoteBook/">Get-GraphOneNoteBook</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphOneNotePage/">Get-GraphOneNotePage</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphOneNoteSection/">Get-GraphOneNoteSection</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphOrganization/">Get-GraphOrganization</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphPlan/">Get-GraphPlan</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphPlanTask/">Get-GraphPlanTask</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphReminderView/">Get-GraphReminderView</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphReport/">Get-GraphReport</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphSKU/">Get-GraphSKU</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphServicePrincipal/">Get-GraphServicePrincipal</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphSignInLog/">Get-GraphSignInLog</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphSite/">Get-GraphSite</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphSiteColumn/">Get-GraphSiteColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphSiteUserList/">Get-GraphSiteUserList</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphTeamsApp/">Get-GraphTeamsApp</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphToDoList/">Get-GraphToDoList</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphUser/">Get-GraphUser</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphUserList/">Get-GraphUserList</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-GraphWorkBook/">Get-GraphWorkBook</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-MgDomainNameerenceByRef_List1/">Get-MgDomainNameerenceByRef_List1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-MgDomainServiceConfigurationRecord_List1/">Get-MgDomainServiceConfigurationRecord_List1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-MgDomainVerificationDnsRecord_List1/">Get-MgDomainVerificationDnsRecord_List1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-MgDomain_Get1/">Get-MgDomain_Get1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-MgDomain_List1/">Get-MgDomain_List1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-MgOrganization_List1/">Get-MgOrganization_List1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-MgSubscribedSku_Get1/">Get-MgSubscribedSku_Get1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Get-MgSubscribedSku_List1/">Get-MgSubscribedSku_List1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Grant-GraphDirectoryRole/">Grant-GraphDirectoryRole</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Grant-GraphLicense/">Grant-GraphLicense</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Import-GraphGroup/">Import-GraphGroup</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Import-GraphGroupMember/">Import-GraphGroupMember</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Import-GraphUser/">Import-GraphUser</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Import-GraphWorksheet/">Import-GraphWorksheet</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Invoke-GraphRequest/">Invoke-GraphRequest</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Move-GraphMailItem/">Move-GraphMailItem</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphAttendee/">New-GraphAttendee</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphBooleanColumn/">New-GraphBooleanColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphCalculatedColumn/">New-GraphCalculatedColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphChannel/">New-GraphChannel</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphChannelMessage/">New-GraphChannelMessage</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphChannelReply/">New-GraphChannelReply</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphChoiceColumn/">New-GraphChoiceColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphColumn/">New-GraphColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphContact/">New-GraphContact</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphCurrencyColumn/">New-GraphCurrencyColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphDateTimeColumn/">New-GraphDateTimeColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphFolder/">New-GraphFolder</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphGroup/">New-GraphGroup</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphInvitation/">New-GraphInvitation</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphList/">New-GraphList</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphLookupColumn/">New-GraphLookupColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphMailAddress/">New-GraphMailAddress</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphNumberColumn/">New-GraphNumberColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphOneNoteSection/">New-GraphOneNoteSection</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphPersonOrGroupColumn/">New-GraphPersonOrGroupColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphPhysicalAddress/">New-GraphPhysicalAddress</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphRecipient/">New-GraphRecipient</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphRecurrence/">New-GraphRecurrence</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphTeamPlan/">New-GraphTeamPlan</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphTextColumn/">New-GraphTextColumn</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphToDoList/">New-GraphToDoList</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphToDoTask/">New-GraphToDoTask</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphUser/">New-GraphUser</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-GraphWorkBook/">New-GraphWorkBook</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-MgUserTodoListTask_CreateExpanded1/">New-MgUserTodoListTask_CreateExpanded1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../New-MgUserTodoList_CreateExpanded1/">New-MgUserTodoList_CreateExpanded1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Out-GraphOneNote/">Out-GraphOneNote</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphChannel/">Remove-GraphChannel</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphContact/">Remove-GraphContact</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphEvent/">Remove-GraphEvent</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphGroup/">Remove-GraphGroup</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphGroupMember/">Remove-GraphGroupMember</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphGroupThread/">Remove-GraphGroupThread</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphListItem/">Remove-GraphListItem</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphOneNotePage/">Remove-GraphOneNotePage</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphPlan/">Remove-GraphPlan</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphPlanBucket/">Remove-GraphPlanBucket</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphPlanTask/">Remove-GraphPlanTask</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphToDoList/">Remove-GraphToDoList</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphToDoTask/">Remove-GraphToDoTask</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-GraphUser/">Remove-GraphUser</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-MgUserTodoListTask_Delete1/">Remove-MgUserTodoListTask_Delete1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-MgUserTodoList_Delete1/">Remove-MgUserTodoList_Delete1</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Remove-MgUser_Delete/">Remove-MgUser_Delete</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Rename-GraphPlanBucket/">Rename-GraphPlanBucket</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Reset-GraphUserPassword/">Reset-GraphUserPassword</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Restore-GraphDeletedObject/">Restore-GraphDeletedObject</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Revoke-GraphDirectoryRole/">Revoke-GraphDirectoryRole</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Revoke-GraphLicense/">Revoke-GraphLicense</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Save-GraphMailAttachment/">Save-GraphMailAttachment</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Send-GraphGroupReply/">Send-GraphGroupReply</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Send-GraphMailForward/">Send-GraphMailForward</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Send-GraphMailMessage/">Send-GraphMailMessage</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Send-GraphMailReply/">Send-GraphMailReply</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphContact/">Set-GraphContact</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphDefaultGroup/">Set-GraphDefaultGroup</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphEvent/">Set-GraphEvent</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphGroup/">Set-GraphGroup</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphHomeDrive/">Set-GraphHomeDrive</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphListItem/">Set-GraphListItem</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphOneNoteHome/">Set-GraphOneNoteHome</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphOptions/">Set-GraphOptions</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphPlanDetails/">Set-GraphPlanDetails</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphPlanTask/">Set-GraphPlanTask</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphTeam/">Set-GraphTeam</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Set-GraphUser/">Set-GraphUser</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Show-GraphFolder/">Show-GraphFolder</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Show-GraphSession/">Show-GraphSession</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Test-GraphSession/">Test-GraphSession</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Update-GraphOneNotePage/">Update-GraphOneNotePage</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Update-GraphToDoTask/">Update-GraphToDoTask</a>
+                    </li>
+                </ul>
+                <ul>
+                    <li class="toctree-l1"><a class="reference internal" href="../Update-MgUserTodoListTask_UpdateExpanded1/">Update-MgUserTodoListTask_UpdateExpanded1</a>
+                    </li>
+                </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="..">Microsoft.Graph.PlusPlus Docs</a>
+      </nav>
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="..">Docs</a> &raquo;</li>
+    
+      
+    
+    <li>Get-GraphApplication</li>
+    <li class="wy-breadcrumbs-aside">
+      
+    </li>
+  </ul>
+  
+  <hr/>
+</div>
+          <div role="main">
+            <div class="section">
+              
+                <h1 id="get-graphapplication">Get-GraphApplication</h1>
+<h2 id="synopsis">SYNOPSIS</h2>
+<p>Returns information about Applications</p>
+<h2 id="syntax">SYNTAX</h2>
+<h3 id="list1-default">List1 (Default)</h3>
+<pre><code>Get-GraphApplication [-Property &lt;String[]&gt;] [-Filter &lt;String&gt;] [&lt;CommonParameters&gt;]
+</code></pre>
+
+<h3 id="list3">List3</h3>
+<pre><code>Get-GraphApplication [[-Id] &lt;String&gt;] [-Property &lt;String[]&gt;] [&lt;CommonParameters&gt;]
+</code></pre>
+
+<h3 id="list2">List2</h3>
+<pre><code>Get-GraphApplication [-AppId &lt;String&gt;] [-Property &lt;String[]&gt;] [&lt;CommonParameters&gt;]
+</code></pre>
+
+<h2 id="description">DESCRIPTION</h2>
+<p>{{ Fill in the Description }}</p>
+<h2 id="examples">EXAMPLES</h2>
+<h3 id="example-1">Example 1</h3>
+<pre><code class="powershell">PS C:\&gt; {{ Add example code here }}
+</code></pre>
+
+<p>{{ Add example description here }}</p>
+<h2 id="parameters">PARAMETERS</h2>
+<h3 id="-id">-Id</h3>
+<p>{{ Fill Id Description }}</p>
+<pre><code class="yaml">Type: String
+Parameter Sets: List3
+Aliases:
+
+Required: False
+Position: 1
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+</code></pre>
+
+<h3 id="-appid">-AppId</h3>
+<p>The GUID(s) for Apps(s).
+Or App objects.
+If a name is given instead, the command will try to resolve matching App principals</p>
+<pre><code class="yaml">Type: String
+Parameter Sets: List2
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: True (ByPropertyName)
+Accept wildcard characters: False
+</code></pre>
+
+<h3 id="-property">-Property</h3>
+<p>Select properties to be returned</p>
+<pre><code class="yaml">Type: String[]
+Parameter Sets: (All)
+Aliases: Select
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+</code></pre>
+
+<h3 id="-filter">-Filter</h3>
+<p>Filters items by property values</p>
+<pre><code class="yaml">Type: String
+Parameter Sets: List1
+Aliases:
+
+Required: False
+Position: Named
+Default value: None
+Accept pipeline input: False
+Accept wildcard characters: False
+</code></pre>
+
+<h3 id="commonparameters">CommonParameters</h3>
+<p>This cmdlet supports the common parameters: -Debug, -ErrorAction, -ErrorVariable, -InformationAction, -InformationVariable, -OutVariable, -OutBuffer, -PipelineVariable, -Verbose, -WarningAction, and -WarningVariable. For more information, see <a href="http://go.microsoft.com/fwlink/?LinkID=113216">about_CommonParameters</a>.</p>
+<h2 id="inputs">INPUTS</h2>
+<h2 id="outputs">OUTPUTS</h2>
+<h3 id="microsoftgraphpowershellmodelsmicrosoftgraphapplication">Microsoft.Graph.PowerShell.Models.MicrosoftGraphApplication</h3>
+<h2 id="notes">NOTES</h2>
+<h2 id="related-links">RELATED LINKS</h2>
+              
+            </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../Get-GraphBucketTaskList/" class="btn btn-neutral float-right" title="Get-GraphBucketTaskList">Next <span class="icon icon-circle-arrow-right"></span></a>
+      
+      
+        <a href="../Get-AccessToken/" class="btn btn-neutral" title="Get-AccessToken"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+    
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+      
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="versions">
+    <span class="rst-current-version" data-toggle="rst-current-version">
+      
+      
+        <span><a href="../Get-AccessToken/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+      
+      
+        <span style="margin-left: 15px"><a href="../Get-GraphBucketTaskList/" style="color: #fcfcfc">Next &raquo;</a></span>
+      
+    </span>
+</div>
+    <script>var base_url = '..';</script>
+    <script src="../js/theme.js" defer></script>
+      <script src="../search/main.js" defer></script>
+    <script defer>
+        window.onload = function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        };
+    </script>
+
+</body>
+</html>
