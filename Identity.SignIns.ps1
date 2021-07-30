@@ -96,7 +96,7 @@ function Get-GraphNamedLocation {
                 }
                 else {$includeUnknown = $null }
 
-                $null = $r.remove('@odata.type')
+                $null = $r.remove('@odata.type'),  $r.remove('@odata.id')
                 New-object -TypeName  Microsoft.Graph.PowerShell.Models.MicrosoftGraphNamedLocation -Property $r  |
                         Add-Member -PassThru -NotePropertyName IsTrusted            -NotePropertyValue $trusted   |
                         Add-Member -PassThru -NotePropertyName IpRanges             -NotePropertyValue $ipranges  |

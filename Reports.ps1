@@ -115,7 +115,7 @@ function Get-GraphSignInLog    {
     foreach ($r in $records) {
         $r.pstypenames.add('GraphSigninLog')
         $r['RiskEventTypesV2'] = $r['RiskEventTypes_V2'] ;
-        [void]$r.Remove('RiskEventTypes_V2');
+        $null = $r.Remove('RiskEventTypes_V2'), $r.remove( "@odata.etag") ;
         New-Object -TypeName MicrosoftGraphSignIn -Property $r
     }
     Write-Progress -Activity 'Getting Sign-in Auditlog'-Completed

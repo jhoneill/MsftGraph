@@ -551,15 +551,12 @@ function Get-GraphDirectoryRole         {
             foreach($r in $roles) {
                 $memberlist =  igr "$GraphUri/directoryroles/$($r.id)/members" -ValueOnly
                 foreach ($u in $memberlist.where({$_.'@odata.type'-match 'user$'})) {
-                    [void]$u.Remove('@odata.type')
+                    $null = $u.Remove('@odata.type') ,  $u.remove('@odata.id')
                     New-object -type MicrosoftGraphUser -Property $u |
                         Add-member -NotePropertyName Role -NotePropertyValue $r.DisplayName -PassThru
                 }
                 foreach ($g in $memberlist.where({$_.'@odata.type'-match 'group$'})) {
-                    [void]$g.Remove('@odata.type')
-                    [void]$g.Remove('GroupName')
-                    [void]$g.remove('@odata.context')
-                    [void]$g.remove('creationOptions')
+                    $null = $g.Remove('@odata.type') ,  $g.remove('@odata.id'), $g.remove('@odata.context'), $g.Remove('GroupName'), $g.remove('creationOptions')
                     New-object -type MicrosoftGraphGroup -Property $g |
                         Add-member -NotePropertyName Role -NotePropertyValue $r.DisplayName -PassThru
                 }

@@ -207,6 +207,50 @@ function Get-GraphOneNoteSection {
 
 }
 
+
+function New-GraphOneNoteNotebook {
+    #>
+    [cmdletbinding(SupportsShouldProcess=$true)]
+    param   (
+        [Parameter(Mandatory=$true)]
+        $Name ,
+        [Parameter(ValueFromPipeline=$true)]
+        $Team,
+        $Site,
+        #If specified, the command will run without asking for confirmation; this is the default unless Confirm Preference has been set
+        [switch]$Force
+    )
+    process {
+        $webParams = @{
+            'Method'           = 'Post'
+            'ContentType'      = 'application/json'
+            'AsType'           = [MicrosoftGraphOnenote]
+            'PropertyNotMatch' = '@odata.context'
+        }
+        if ($Team -and -not $Team.id) {$Team = Get-GraphTeam $Team}
+        if ($Team.id) {
+            $webParams['uri'] = "$GraphUri/groups/$($Team.id)/onenote/notebooks"
+        }
+        elseif ($PSBoundParameters['Team'] -and -not $teamID) {
+            throw 'Could not get ID for team'; return
+        }
+        if ($site.ID) {
+            $webParams['uri'] = "$GraphUri/sites/$($site.id)/onenote/notebooks"
+        }
+        elseif ($site) {
+            throw 'Site needs to be an object with an ID'; return
+        }
+        elseif (-not $site -and -not $team) {
+            $webParams['uri'] = "$GraphUri/me/onenote/notebooks"
+        }
+        $webparams['body']  = ConvertTo-Json @{"displayName" = $name}
+        Write-Debug $webparams['body']
+        if ($Force -or $PSCmdlet.ShouldProcess($SectionName,"Add new Notebook $Name")) {
+            Invoke-GraphRequest @webParams
+        }
+    }
+}
+
 function New-GraphOneNoteSection {
     <#
       .Synopsis

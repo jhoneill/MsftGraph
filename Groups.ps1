@@ -381,18 +381,13 @@ function Get-GraphGroup             {
         }
         foreach( $g in $usersAndGroups.where({$_.'@odata.type' -match 'group$'})) {
             $displayname = $g.GroupName
-            [void]$g.Remove('GroupName')
-            [void]$g.remove('@odata.type')
-            [void]$g.remove('@odata.context')
-            [void]$g.remove('creationOptions')
+            $null = $g.remove('@odata.type'), $g.remove('@odata.context'),  $g.remove('@odata.id'), $g.Remove('GroupName'), $g.remove('creationOptions')
             New-Object -Property  $g -TypeName MicrosoftGraphGroup |
                 Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
         }
         foreach( $u in $usersAndGroups.where({$_.'@odata.type' -match 'user$'})) {
             $displayname = $u.GroupName
-            [void]$u.Remove('GroupName')
-            [void]$u.Remove('@odata.type')
-            [void]$u.Remove('@odata.context')
+            $null = $u.Remove('GroupName') , $u.Remove('@odata.type'), $u.Remove('GroupName'), $u.Remove('@odata.context')
             New-Object -Property $u -TypeName MicrosoftGraphUser |
                 Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
         }

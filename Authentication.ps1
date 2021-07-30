@@ -119,11 +119,8 @@ function Invoke-GraphRequest        {
         [string]$AsType
     )
     begin   {
-        [void]$PSBoundParameters.Remove('AllValues')
-        [void]$PSBoundParameters.Remove('AsType')
-        [void]$PSBoundParameters.Remove('ExcludeProperty')
-        [void]$PSBoundParameters.Remove('PropertyNotMatch')
-        [void]$PSBoundParameters.Remove('ValueOnly')
+        $null = $PSBoundParameters.Remove('AllValues') , $PSBoundParameters.Remove('AsType'), $PSBoundParameters.Remove('ExcludeProperty'), $PSBoundParameters.Remove('PropertyNotMatch') , $PSBoundParameters.Remove('ValueOnly')
+        if ($ExcludeProperty -notcontains  '@odata.id') {$ExcludeProperty += '@odata.id'}
         Test-GraphSession
     }
     process {
@@ -143,7 +140,7 @@ function Invoke-GraphRequest        {
         else  {$result = $response}
         if ($StatusCodeVariable) {Set-variable $StatusCodeVariable -Scope 1 -Value (Get-Variable $StatusCodeVariable -ValueOnly) }
         foreach ($r in $result) {
-            foreach ($p in $ExcludeProperty) {[void]$r.remove($p)}
+            foreach ($p in $ExcludeProperty) {$r.remove($p)}
             if ($PropertyNotMatch) {
                 $keystoRemove = $r.keys -match $PropertyNotMatch
                 foreach ($p in $keystoRemove) {[void]$r.remove($p)}

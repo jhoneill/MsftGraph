@@ -1,6 +1,8 @@
 # 1.5 
 * In `Grant-GraphDirectoryRole`: allow members to tab complete and fix bug granting multiple roles.
 * Update photo support in `Get-GraphUser`
+* Fix errors from additional properties when logged on with Azure access token
+* Restore alias "New-RecurrencePattern" which had got lost. 
 * Set maximum column widths when formatting group objects. 
 * Bump version number. 
 

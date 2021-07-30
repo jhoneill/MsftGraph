@@ -193,8 +193,7 @@ function Get-GraphDrive        {
                     Sort-Object -Property Name
         }
         else                 {
-            [void]$driveObj.remove('root@odata.context')
-            [void]$driveObj.remove('@odata.context')
+            $null = $driveObj.remove('root@odata.context') , $driveObj.remove('@odata.context'), $driveObj.remove('@odata.id')
             New-object -TypeName MicrosoftGraphDrive -Property $driveObj
             return
         }

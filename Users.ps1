@@ -15,7 +15,7 @@ function ConvertTo-GraphUser      {
             #We expand manager by default, or might be told to expand direct reports. Make either into users.
             if (-not $r.manager) { $mgr = $null}
             else {
-                    $null = $r.manager.remove('@odata.type')
+                    $null = $r.manager.remove('@odata.type'),$r.manager.remove('@odata.id')
                     $mgr  = New-Object -TypeName MicrosoftGraphUser -Property $r.manager
                     $null = $r.remove('manager')
             }
@@ -23,12 +23,12 @@ function ConvertTo-GraphUser      {
             else {
                 $directs = @()
                 foreach ($d in $r.directReports) {
-                    $null = $d.remove('@odata.type')
+                    $null = $d.remove('@odata.type'),$d.remove('@odata.id')
                     $directs += New-Object -TypeName MicrosoftGraphUser -Property $d
                 }
                 $null = $r.remove('directReports')
             }
-            $null = $r.Remove('@odata.type'), $r.Remove('@odata.context')
+            $null = $r.Remove('@odata.type'), $r.Remove('@odata.context') , $r.Remove('@odata.id')
             $user =  New-Object -TypeName MicrosoftGraphUser -Property $r
             if ($mgr)      {$user.manager      = $mgr}
             if ($directs)  {$user.DirectReports= $directs}
@@ -360,7 +360,7 @@ function Get-GraphUser            {
                         $picExtension = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Classes\MIME\Database\Content Type\$($response.'@odata.mediaContentType')").Extension
                     }
                     else {$picExtension = $null}
-                    $Null = $response.Remove('@odata.mediaEtag'), $response.Remove('@odata.context'),$response.Remove('@odata.mediaContentType')
+                    $Null = $response.Remove('@odata.mediaEtag'), $response.Remove('@odata.context'),  $response.Remove('@odata.id'), $response.Remove('@odata.mediaContentType')
                     New-Object -TypeName MicrosoftGraphProfilePhoto -Property $response |
                         Add-Member -PassThru -NotePropertyName UserID -NotePropertyValue  $picUserId |
                         Add-Member -PassThru -NotePropertyName Ext    -NotePropertyValue  $picExtension |
@@ -465,15 +465,12 @@ function Get-GraphUser            {
         foreach ($r in ($result )) {
             if     ($r.'@odata.type' -match 'directoryRole$') {
                     #This is a hack so we get role memberships and group memberships laying nicely
-                    [void]$r.remove('@odata.type')
-                    [void]$r.remove('roleTemplateId')
+                    $null = $r.remove('@odata.type'), $r.remove('@odata.id'), $r.remove('roleTemplateId')
                     [void]$r.add('GroupTypes','DirectoryRole')
                     New-Object -Property $r -TypeName ([MicrosoftGraphGroup])
             }
             elseif ($r.'@odata.type' -match 'group$') {
-                    [void]$r.remove('@odata.type')
-                    [void]$r.remove('@odata.context')
-                    [void]$r.remove('creationOptions')
+                    $null = $r.remove('@odata.type'),  $r.remove('@odata.id'), $r.remove('@odata.context'), $r.remove('creationOptions')
                     New-Object -Property $r -TypeName ([MicrosoftGraphGroup])
             }
             elseif ($r.'@odata.type' -match 'user$' -or $PSCmdlet.parameterSetName -eq 'None' -or $Select) {
@@ -1268,7 +1265,7 @@ function Get-GraphMailFolder      {
     $folderList              = @()
     $response                = Invoke-GraphRequest -Uri $uri
     if ($response.Keys -notcontains 'value') { #Value may be empty.
-          [void]$response.remove('@odata.context')
+           $null = $response.remove('@odata.context'), $response.remove('@odata.id')
            $folderList      += $response
     }
     else  {$folderList      += $response.value
@@ -1415,13 +1412,11 @@ function Get-GraphMailItem        {
         #we need to handle attachments here.
         $results = Invoke-GraphRequest @webparams
         foreach ($msg in $results) {
-            $msg.Remove('@odata.etag')
-            $msg.Remove("@odata.type")
+            $null = $msg.Remove('@odata.etag') ,$msg.Remove('@odata.id') , $msg.Remove("@odata.type")
             $msgpath =  "$baseUri/messages/$($msg.id)"
             #$msg won't convert unless we convert the attachments first.
             foreach ($a in $msg.attachments) {
-                        $a.Remove("@odata.type")
-                        $a.Remove("@odata.mediacontenttype")
+                        $null = $a.Remove("@odata.type"),  $a.Remove("@odata.id"), $a.Remove("@odata.mediacontenttype")
                         $a = New-Object MicrosoftGraphAttachment -Property $a
             }
             $newMsg = New-object MicrosoftGraphMessage -Property $msg |
@@ -1771,6 +1766,7 @@ function New-GraphAttendee        {
         Helper function to create a new meeting attendee, with a mail address and the type of attendance.
     #>
     [cmdletbinding(DefaultParameterSetName='Default')]
+    [alias('New-EventAttendee')]
     [outputType([system.collections.hashtable])]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification='Does not change system state.')]
     param   (
@@ -1805,6 +1801,7 @@ function New-GraphRecurrence      {
     .links
         https://docs.microsoft.com/en-us/graph/api/resources/patternedrecurrence?view=graph-rest-1.0
 #>
+    [alias('New-RecurrencePattern')]
     param   (
         #The day of the month on which the event occurs. Required if type is absoluteMonthly or absoluteYearly.
         [ValidateRange(1,31)]
@@ -1883,7 +1880,7 @@ function New-GraphRecurrence      {
         index          = $Index
         interval       = $Interval
         month          = $month
-        type           = $type
+        type           = $Type
     }
     return @{
             pattern   = $pattern

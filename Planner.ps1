@@ -43,7 +43,7 @@ function Get-GraphPlan           {
             $response = Invoke-GraphRequest  -Uri "$uri/Tasks" -ValueOnly | Sort-Object -Property orderHint
             $result   = foreach ($r in $response) {
                 $etag = $r.'@odata.etag'
-                [void]$r.remove( '@odata.etag') ;
+                $null = $r.remove( '@odata.etag') , $r.remove( '@odata.id')
                 $taskobj = New-Object -Property $r -TypeName MicrosoftGraphPlannerTask
                 if ($planTitle) { Add-Member -InputObject $taskobj -NotePropertyName  PlanTitle -NotePropertyValue $planTitle}
 
@@ -59,7 +59,7 @@ function Get-GraphPlan           {
             #we need @odata.etag for changing items, but it isn't in the object definition ... grrr.
             Invoke-GraphRequest   -Uri "$uri/Buckets" -ValueOnly | Sort-Object -Property orderHint | ForEach-Object {
                 $etag = $_.'@odata.etag'
-                [void]$_.remove('@odata.etag')
+                $null = $_.remove('@odata.etag'), $_.remove('@odata.id')
                 $bucketobj = New-object -Property $_ -TypeName MicrosoftGraphPlannerBucket |
                     Add-Member -PassThru -NotePropertyName  etag -NotePropertyValue $etag
                 if ($planTitle) {Add-Member -PassThru -InputObject $bucketobj -NotePropertyName PlanTitle -NotePropertyValue $planTitle     }
@@ -231,8 +231,7 @@ function Add-GraphPlanBucket     {
             if ($force -or $PSCmdlet.ShouldProcess($Name,"Add Bucket to plan $($Plan.title)")){
             $result    = Invoke-GraphRequest @webParams -Body $json
             $etag = $result.'@odata.etag'
-            [void]$result.remove('@odata.etag')
-            [void]$result.remove('@odata.context')
+            $null = $result.remove('@odata.etag')  , $result.remove('@odata.context'), $result.remove('@odata.id')
             $bucketobj = New-object -Property $result -TypeName MicrosoftGraphPlannerBucket |
                 Add-Member -PassThru -NotePropertyName  etag -NotePropertyValue $etag
             if ($plan.Title) {Add-Member -PassThru -InputObject $bucketobj -NotePropertyName PlanTitle -NotePropertyValue $plan.Title     }
@@ -328,7 +327,7 @@ function Get-GraphBucketTaskList {
         }
         $taskObjs = foreach ($r in $result) {
             $etag      =  $r.'@odata.etag'
-            [void]$r.remove( "@odata.etag") ;
+            $null      =  $r.remove( "@odata.etag"), $r.remove( "@odata.id") ;
             New-Object -Property $r -TypeName MicrosoftGraphPlannerTask |
                 Add-Member -PassThru -NotePropertyName  etag -NotePropertyValue $etag
         }
