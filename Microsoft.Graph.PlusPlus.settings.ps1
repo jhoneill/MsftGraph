@@ -83,4 +83,11 @@ Set-GraphOptions -ClientID "14d82eec-204b-4c2f-b7e8-296a70dab67e" #the Graph-Pow
 
 #Really this should be saved somewhere else as a secure string.
 #Set-GraphOptions  -ClientSecret  "xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-#Set-GraphOptions  -Client_Secret (Import-Clixml "$PSScriptRoot\myclientSecret.xml")
+#Set-GraphOptions  -ClientSecret (Import-Clixml "$PSScriptRoot\myclientSecret.xml")
+
+
+#To update the Committed version remove the private info and run
+#git update-index --no-skip-worktree .\Microsoft.Graph.PlusPlus.settings.ps1
+##Commit. and then run
+#git update-index --skip-worktree .\Microsoft.Graph.PlusPlus.settings.ps1
+#Before putting private info back

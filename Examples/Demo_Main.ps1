@@ -17,9 +17,9 @@ Get-GraphTeam $newTeam -Drive -OutVariable teamdrive |  Set-GraphHomeDrive ; $te
 Get-GraphDrive -SpecialFolder Documents
 Get-GraphDrive /
 
-#Send a local file to one drive, and open it -use it for exporting in a moment.
-
+#Send a local file to onedrive, and open it -use it for exporting in a moment.
 Get-ChildItem test*.xlsx -OutVariable files
+
 #Destination tab completes - use General for preference
 $files  |  Copy-ToGraphFolder  -OutVariable item  -Destination 'root:/General'
 
