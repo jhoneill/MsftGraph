@@ -188,6 +188,38 @@ function Get-AccessToken            {
     Invoke-RestMethod -Method Post -Uri $tokenUri -Body $body
 }
 
+function Get-AzureIdentityToken {
+    [CmdletBinding(DefaultParameterSetName='scopes')]
+    param (
+        [Parameter(ParameterSetName = 'scopes')]
+        [String[]]$Scopes = 'https://graph.microsoft.com/',
+        [Parameter(ParameterSetName = 'tokenRequest', Mandatory)]
+        [TokenRequestContext]$TokenRequestContext,
+        [Switch]$Interactive,
+        [ValidateSet('AzureCLI','Default','DeviceCode','InteractiveBrowser')]
+        [string]$Type = 'Default'
+    )
+    end {
+        if ($Type -in @('InteractiveBrowser','DeviceCode')) {
+           $scopes = @('User.ReadWrite.all', 'openid', 'profile')
+        }
+        if (!$TokenRequestContext) {$TokenRequestContext = [Azure.Core.TokenRequestContext]::new($Scopes)}
+
+        switch ($type) {
+           "AzureCLI"           {$tokenCache = [Azure.Identity.AzureCliCredential]::new()}   #returns scopes  AuditLog.Read.All Directory.AccessAsUser.All Group.ReadWrite.All User.ReadWrite.All / client 04b07795-8ddb-461a-bbee-02f9e1bf7b46 : Microsoft Azure CLI
+                                #.AuthorizationCodeCredential, would take $Script:TenantID, $Script:ClientID,  $Script:ClientSecret + AuthCode;  can't get AzurePowerShellCredential to work
+                                #.ChainedTokenCredential takes array of tokencredentials, ClientCertificateCredential takes  $Script:TenantID, $Script:ClientID  cert
+                                # ClientSecretCredential takes $Script:TenantID, $Script:ClientID,  $Script:ClientSecret' EnvironmentCredential uses env variables
+           "Default"            {$tokenCache = [Azure.Identity.DefaultAzureCredential]::new($Interactive)}  # returns scopes  Application.ReadWrite.All email openid profile User.ReadWrite.All / client 872cd9fa-d31f-45e0-9eab-6e460a02d1f1 :    : Visual Studio
+           "DeviceCode"         {$tokenCache = [Azure.Identity.DeviceCodeCredential]::new()}                # returns Scopes  AuditLog.Read.All Directory.AccessAsUser.All email Group.ReadWrite.All openid profile User.ReadWrite.All  / client 04b07795-8ddb-461a-bbee-02f9e1bf7b46 : Microsoft Azure CLI
+           "InteractiveBrowser" {$tokenCache = [Azure.Identity.InteractiveBrowserCredential]::new()}        # AuditLog.Read.All Directory.AccessAsUser.All email Group.ReadWrite.All openid profile User.ReadWrite.All  / client 04b07795-8ddb-461a-bbee-02f9e1bf7b46 : Microsoft Azure CLI
+                                        #ManagedIdentityCredential takes clientID ;SharedTokenCacheCredential doesn't need anything (but is empty for me!)
+                                        #.UsernamePasswordCredential string username, string password, string tenantId, string clientId
+        }
+        $tokenCache.GetToken($TokenRequestContext,[System.Threading.CancellationToken]::new($false))
+    }
+}
+
 function Connect-Graph              {
     <#
         .Synopsis
@@ -263,6 +295,11 @@ function Connect-Graph              {
             $paramDictionary.Add('FromAzureSession',[RuntimeDefinedParameter]::new('FromAzureSession', [SwitchParameter], $FromAzParamAttribute))
             $paramDictionary.Add('DefaultProfile',  [RuntimeDefinedParameter]::new('DefaultProfile',   [System.Object],   $DefProfParamAttribute))
         }
+        if (Get-Command az) {
+            $NoRefreshAttributeCollection.Add((New-Object System.Management.Automation.ParameterAttribute -Property @{       ParameterSetName='CLIParameterSet'}))
+            $FromCLIParamAttribute = New-Object System.Management.Automation.ParameterAttribute -Property @{ParameterSetName='CLIParameterSet';Position=5}
+            $paramDictionary.Add('FromAzCLI',[RuntimeDefinedParameter]::new('FromAzCLI', [SwitchParameter], $FromCLIParamAttribute))
+        }
         if ($NoRefreshAttributeCollection.Count -ge 1) {
             #Dont register the global refresh handler workaround. This is required if you want to use HttpPipelinePrepend
             $paramDictionary.Add('NoRefresh', [RuntimeDefinedParameter]::new("NoRefresh", [SwitchParameter],$NoRefreshAttributeCollection))
@@ -297,7 +334,7 @@ function Connect-Graph              {
         #credential , refresh, Azaupp, FromAzureSession are dynamic to hide them if we dont have what they need
         #If specified, get (or refresh) a token for a user name / password with a registerd appID in a known tennant,
         #or for an app-id / secret, or by calling Get-AzAccessToken in the Az.Accounts module (V2 and later)
-        if ($bp.Credential -or $bp.Refresh -or $bp.AsApp -or $bp.FromAzureSession ){
+        if ($bp.Credential -or $bp.Refresh -or $bp.AsApp -or $bp.FromAzureSession -or $bp.FromAzCLI ){
             $tokenUri   = "https://login.microsoft.com/$Script:TenantID/oauth2/token"
             if     ($bp.Refresh)              {
                 Write-Verbose "CONNECT: Sending a 'Refresh_token' token request "
@@ -311,24 +348,32 @@ function Connect-Graph              {
                 if ($Script:Client_secret) {
                     $parts['client_secret'] = $Script:Client_secret
                 }
-                 $authresp     = Get-AccessToken -GrantType password -BodyParts $parts
+                $authresp     = Get-AccessToken -GrantType password -BodyParts $parts
             }
             elseif ($bp.AsApp)                {
                 Write-Verbose "CONNECT: Sending a 'client_credentials' token request for the App."
-                 $authresp     = Get-AccessToken  -GrantType client_credentials -BodyParts @{'client_secret' = $Script:Client_secret}
+                $authresp     = Get-AccessToken  -GrantType client_credentials -BodyParts @{'client_secret' = $Script:Client_secret}
             }
             elseif ($bp.FromAzureSession)     {
+                Write-Verbose "CONNECT: getting an access token from an Azure PowerShell session."
                 if ($bp.DefaultProfile) {$Global:__MgAzContext = $DefaultProfile }
                 $authresp =  Get-AzAccessToken -ResourceUrl 'https://graph.microsoft.com' -DefaultProfile $Global:__MgAzContext
             }
+            elseif ($bp.FromAzCLI)     {
+                Write-Verbose "CONNECT: getting an access token from the Azure CLI."
+                $authresp = az account get-access-token  --resource-type ms-graph  --output json | ConvertFrom-Json
+            }
 
             #Did we get our token? If so, store it and whatever we need to refreshing
-            if (-not ($authresp.access_token -or $authResp.Token))    {
+            if (-not ($authresp.access_token -or $authresp.accesstoken -or $authResp.Token))    {
                 throw [System.UnauthorizedAccessException]::new("No Token was returned")
             }
             Write-Verbose ("CONNECT: Token Response= " + ($authresp | Get-Member -MemberType NoteProperty).name -join ", ")
             if       ($authresp.access_token) {
                     $null = $paramsToPass.Add("AccessToken",  $authresp.access_token)
+            }
+            elseif   ($authresp.accesstoken)  {
+                    $null = $paramsToPass.Add("AccessToken",  $authresp.accesstoken)
             }
             elseif   ($authresp.Token)        {
                     $null = $paramsToPass.Add("AccessToken",  $authresp.Token)
@@ -339,11 +384,10 @@ function Connect-Graph              {
             if     ($authresp.expires_in)     {$Global:__MgAzTokenExpires = (Get-Date).AddSeconds([int]$authresp.expires_in -60 )}
             elseif ($authresp.expires_on -or  $authresp.expireson )    {
                 if ($authresp.expires_on) {$e = $authresp.expires_on} else {$e = $authresp.ExpiresOn}
-                if ($e -is [string] -and
-                    $e.expires_on -match "^\w{10}$") {
-                                              $Global:__MgAzTokenExpires = [datetime]::UnixEpoch.AddSeconds($e)}
-                elseif ($e  -is [datetimeoffset]){
-                                              $Global:__MgAzTokenExpires = $e.LocalDateTime }
+                if     ($e -is [string] -and
+                        $e -match "^\w{10}$")     {$Global:__MgAzTokenExpires = [datetime]::UnixEpoch.AddSeconds($e)}
+                elseif ($e -is [string] )         {$Global:__MgAzTokenExpires = [datetime]::$e   }
+                elseif ($e  -is [datetimeoffset]) {$Global:__MgAzTokenExpires = $e.LocalDateTime }
             }
 
             if     ($bp.NoRefresh)            {
@@ -353,10 +397,15 @@ function Connect-Graph              {
                 $Script:RefreshParams      = @{'Quiet' = $true; 'FromAzureSession' = $True}
                 $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -FromAzureSession '))
             }
+            elseif ($bp.FromAzCLI)           {
+                $Script:RefreshParams      = @{'Quiet' = $true; 'FromAzCLI' = $true}
+                $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' FromAzCLI '))
+            }
             elseif ($bp.AsApp)                {
                 $Script:RefreshParams      = @{'Quiet' = $true; 'AsApp' = $true}
                 $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -Refresh '))
             }
+
             elseif ($Script:RefreshToken)     {
                 $Script:RefreshParams      = @{'Quiet' = $true; 'Refresh' = $true}
                 $RefreshScriptBlock        = [scriptblock]::Create(($RefreshScript -f ' -Refresh '))
