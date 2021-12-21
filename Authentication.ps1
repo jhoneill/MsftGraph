@@ -253,13 +253,13 @@ function Connect-Graph              {
     dynamicParam {
     <#
         If the Azure commands are present offer -FromAzureToken
-        If client_secret, ClientID and TenantID have all been set, offer -Credential & -AsApp and if a refresh token was stored, -refresh
+        If ClientSecret, ClientID and TenantID have all been set, offer -Credential & -AsApp and if a refresh token was stored, -refresh
         In either of those cases offer -NoRefresh
         If client ID and TenantID have been set (with or without secret) offer the cert parameters.
     #>
         $paramDictionary     = New-Object System.Management.Automation.RuntimeDefinedParameterDictionary
         $NoRefreshAttributeCollection = New-Object System.Collections.ObjectModel.Collection[System.Attribute]
-        if ($Script:Client_secret -and $Script:ClientID -and $Script:TenantID) {
+        if ($Script:ClientSecret -and $Script:ClientID -and $Script:TenantID) {
             $AppParamAttribute     = New-Object System.Management.Automation.ParameterAttribute -Property @{Mandatory=$true; ParameterSetName='AppSecretParameterSet';}
             #If Specified logs in as the app and gets the access granted to the app instead of logging on as a user.
             $paramDictionary.Add('AsApp',[RuntimeDefinedParameter]::new("AsApp",       [SwitchParameter],$AppParamAttribute))
@@ -345,14 +345,14 @@ function Connect-Graph              {
                 $parts = @{ 'username' = $bp.Credential.UserName;
                             'password' = $bp.Credential.GetNetworkCredential().Password
                 }
-                if ($Script:Client_secret) {
-                    $parts['client_secret'] = $Script:Client_secret
+                if ($Script:ClientSecret) {
+                    $parts['client_secret'] = $Script:ClientSecret
                 }
                 $authresp     = Get-AccessToken -GrantType password -BodyParts $parts
             }
             elseif ($bp.AsApp)                {
                 Write-Verbose "CONNECT: Sending a 'client_credentials' token request for the App."
-                $authresp     = Get-AccessToken  -GrantType client_credentials -BodyParts @{'client_secret' = $Script:Client_secret}
+                $authresp     = Get-AccessToken  -GrantType client_credentials -BodyParts @{'client_secret' = $Script:ClientSecret}
             }
             elseif ($bp.FromAzureSession)     {
                 Write-Verbose "CONNECT: getting an access token from an Azure PowerShell session."
@@ -531,7 +531,7 @@ function Show-GraphSession          {
         elseif ($Options) {[pscustomobject][Ordered]@{
             'TenantID'              = $Script:TenantID
             'ClientID'              = $Script:ClientID
-            'ClientSecretSet'       = $Script:Client_Secret -as [bool]
+            'ClientSecretSet'       = $Script:ClientSecret -as [bool]
             'DefaultScopes'         = $Script:DefaultGraphScopes -join ', '
             'DefaultUserProperties' = $Script:DefaultUserProperties -join ', '
             'DefaultUsageLocation'  = $Script:DefaultUsageLocation
