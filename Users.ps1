@@ -856,7 +856,7 @@ function New-GraphUser            {
     if ($force -or $pscmdlet.ShouldProcess($displayname, 'Create New User')){
         try {
             $u = Invoke-GraphRequest @webparams
-            if ($SetableProperties) {
+            if ($SettableProperties) {
                 Set-GraphUser -UserID $u.id @SettableProperties -Force
             }
             if ($manager) {
