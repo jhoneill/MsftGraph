@@ -15,7 +15,7 @@ function ConvertTo-GraphUser      {
             #We expand manager by default, or might be told to expand direct reports. Make either into users.
             if (-not $r.manager) { $mgr = $null}
             else {
-                    $null = $r.manager.remove('@odata.type'),$r.manager.remove('@odata.id')
+                    $null = $r.manager.remove('@odata.type'),$r.manager.remove('@odata.id'),$r.manager.remove('authorizationInfo')
                     $mgr  = New-Object -TypeName MicrosoftGraphUser -Property $r.manager
                     $null = $r.remove('manager')
             }

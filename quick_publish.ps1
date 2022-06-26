@@ -4,7 +4,7 @@ param (
     $key
 )
 
-Remove-Item *.dll -ErrorAction SilentlyContinue
+Get-item *.dll |  Remove-Item -ErrorAction stop
 if (Get-Item *.dll) {throw 'Remove DLLs' ; break}
 if (Select-String -Path .\Microsoft.Graph.PlusPlus.settings.ps1 -Pattern 'clientsecret\s+["''](?!xxx)|TenantID\s+["''](?!xxx)') {
     throw "Settings contains secrets!"; break
@@ -23,7 +23,7 @@ $files = @{}
 #we will use git to bring these  back
 Remove-Item .\.vscode\* -Force -Recurse
 Remove-Item .\.gitignore
-Get-ChildItem -Recurse -File -Exclude $MyInvocation.MyCommand.name |
+Get-ChildItem -Recurse -File -Exclude $MyInvocation.MyCommand.name, .\.git |
     Where-Object {-not $files[$_.FullName] } |
      Remove-Item
 if ($PSCmdlet.ShouldProcess('Publish')) {

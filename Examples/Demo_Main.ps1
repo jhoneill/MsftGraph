@@ -4,9 +4,9 @@ Connect-Graph
 
 Get-Module | ForEach-Object {get-command -Module $_ -CommandType Cmdlet,Function} | Measure-Object | ForEach-Object count
 
-#select some users and put them in a new team. For my demoa pre-set value of department => group membership
-$GroupName        = 'Accounts'
-$newProjectName   = "Mccaw"
+#Select some users and put them in a new team. For my demo I pre-set value of department => group membership
+$GroupName        = 'Presenters'
+$newProjectName   = "Vienna"
 Get-GraphUserList -Filter "Department eq '$GroupName'" -OutVariable users  | Format-Table Organization
 New-GraphTeam -Name $GroupName  -Description "The $GroupName Department" -Visibility public -Members $users -OutVariable newTeam
 
@@ -18,7 +18,7 @@ Get-GraphDrive -SpecialFolder Documents
 Get-GraphDrive /
 
 #Send a local file to onedrive, and open it -use it for exporting in a moment.
-Get-ChildItem test*.xlsx -OutVariable files
+Get-ChildItem $env:temp\Test*.xlsx -OutVariable files
 
 #Destination tab completes - use General for preference
 $files  |  Copy-ToGraphFolder  -OutVariable item  -Destination 'root:/General'

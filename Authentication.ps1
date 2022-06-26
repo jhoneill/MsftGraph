@@ -188,7 +188,7 @@ function Get-AccessToken            {
     Invoke-RestMethod -Method Post -Uri $tokenUri -Body $body
 }
 
-function Get-AzureIdentityToken {
+function Get-AzureIdentityToken     {
     [CmdletBinding(DefaultParameterSetName='scopes')]
     param (
         [Parameter(ParameterSetName = 'scopes')]

@@ -2,7 +2,7 @@ using namespace System.Management.Automation
 using namespace Microsoft.Graph.PowerShell.Models
 #Uses functions from  and MicrosoftGraphSubscribedSku type from  Microsoft.Graph.Identity.DirectoryManagement.private.dll
 
-#xxxx todo: check context is a workorschool account and that it has the right scopes and warn / error / throw if not.
+#xxxx todo: check context is a WorkOrSchool account and that it has the right scopes and warn / error / throw if not.
 function Get-GraphDomain                {
     <#
       .synopsis
@@ -50,7 +50,7 @@ function Get-GraphDomain                {
             }
             elseif ($NameReferenceList)           {
                 $null = $PSBoundParameters.Remove("NameReferenceList")
-                Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgDomainNameerenceByRef_List1 -DomainId $d @PSBoundParameters
+                Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgDomainNameReference_List1 -DomainId $d @PSBoundParameters
             }
             else   {
                 Microsoft.Graph.Identity.DirectoryManagement.private\Get-MgDomain_Get1 -DomainId $d @PSBoundParameters

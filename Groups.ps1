@@ -273,11 +273,11 @@ function Get-GraphGroup             {
                     $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/TransitiveMembers"  -AllValues |
                         ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
-                elseif ($MemberOf)          {
+                elseif ($MemberOf)           {
                     $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/memberof"  -AllValues |
                         ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
-                elseif ($TransitiveMemberOf)  {
+                elseif ($TransitiveMemberOf) {
                     $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/TransitiveMemberof"  -AllValues |
                         ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
@@ -339,7 +339,7 @@ function Get-GraphGroup             {
                         $ChannelName)       {
                     if ($ChannelName)   { $uri =  "$teamURI/channels?`$filter=startswith(tolower(displayname), '$($ChannelName.ToLower())')"}
                     else                { $uri =  "$teamURI/channels"}
-                    Invoke-GraphRequest  -Uri $uri -ValueOnly -As ([MicrosoftGraphChannel]) |
+                    Invoke-GraphRequest  -Uri $uri -ValueOnly -As ([MicrosoftGraphChannel]) -ExcludeProperty "tenantId" |
                         Add-Member -PassThru -NotePropertyName Team      -NotePropertyValue $teamid |
                         Add-Member -PassThru -NotePropertyName TeamName  -NotePropertyValue $displayname
                 }
@@ -449,6 +449,12 @@ function New-GraphGroup             {
         [parameter(ParameterSetName='Security')]
         $Owners,
 
+
+        #Some settings can only be set when the group is created By default any user in the organization can post conversations to the group,
+        #groups are visible and discoverable in Outlook, New Group-Members are not subscribed to conversations and a welcome mail is sent.
+        [validateSet('AllowOnlyMembersToPost', 'HideGroupInOutlook', 'SubscribeNewGroupMembers', 'WelcomeEmailDisabled')]
+        [string[]]$BehaviorOptions,
+
         #if specified group will be added without prompting
         [Switch]$Force
     )
@@ -458,30 +464,33 @@ function New-GraphGroup             {
         throw "There is already a group with the display name '$Name'." ; return
     }
     #Server-side is case-sensitive for [most] JSON so make sure hashtable names and constants have the right case!
-    if (-not $MailNickName) {$MailNickName = $Name -replace "\W",'' }
-    $settings = @{  'displayName'          = $Name
-                    'mailNickname'         = $MailNickName
-                    'mailEnabled'          = -not $AsSecurity
-                    'securityEnabled'      = $AsSecurity -as [bool]
-                    'visibility'           = $Visibility.ToLower()
-                    'groupTypes'           = @()
+    if (-not $MailNickName) {$MailNickName    = $Name -replace "\W",'' }
+    $settings = @{  'displayName'             = $Name
+                    'mailNickname'            = $MailNickName
+                    'mailEnabled'             = -not $AsSecurity
+                    'securityEnabled'         = $AsSecurity -as [bool]
+                    'visibility'              = $Visibility.ToLower()
+                    'groupTypes'              = @()
     }
     if (-not $AsSecurity ) {
-          $settings.groupTypes            += "Unified"
-          if ($MyInvocation.InvocationName -eq 'New-GraphTeam' -and -not $PSBoundParameters.ContainsKey('AsTeam')) {
+          $settings.groupTypes               += 'Unified'
+          if ($MyInvocation.InvocationName  -eq 'New-GraphTeam' -and -not $PSBoundParameters.ContainsKey('AsTeam')) {
               $AsTeam = $true
           }
     }
     elseif ($AsAssignableToRole) {
-          $settings['isAssignableToRole']  = $true
-          $settings['visibility']          ='Private'
+          $settings['isAssignableToRole']     = $true
+          $settings['visibility']             ='Private'
+    }
+    if ($BehaviorOptions) {
+        $settings["resourceBehaviorOptions"]  = $BehaviorOptions
     }
     if ($Description) {
-          $settings['description']         = $Description
+          $settings['description']            = $Description
     }
     #if we got owners or users with no ID, fix them at the end, if they have an ID add them now
     if ($Members) {
-        $settings['members@odata.bind']    = @();
+        $settings['members@odata.bind']       = @();
         foreach ($m in $Members) {
             if  ($m.id) {$settings['members@odata.bind'] += "$GraphUri/users/$($m.id)"}
             else        {$settings['members@odata.bind'] += "$GraphUri/users/$m"}
@@ -490,16 +499,16 @@ function New-GraphGroup             {
     #If we make someone else the owner of the group, we can't make it a team,
     #so parameter sets should ensure we can't get owners here if we are making a team.
     if ($Owners) {
-        $settings['owners@odata.bind']     = @()
+        $settings['owners@odata.bind']        = @()
         foreach    ($o in $Owners)  {
             if     ($o.id) {$settings['owners@odata.bind']  += "$GraphUri/users/$($o.id)"}
             else{           $settings['owners@odata.bind']  += "$GraphUri/users/$o"}
         }
     }
     $webparams = @{
-        Method     = 'Post'
-        Uri        = "$GraphUri/groups"
-        Body       = (ConvertTo-Json $settings)
+        Method      = 'Post'
+        Uri         = "$GraphUri/groups"
+        Body        = (ConvertTo-Json $settings)
         ContentType = 'application/json'
     }
     Write-Debug $webparams.body
@@ -523,7 +532,7 @@ function New-GraphGroup             {
             $retries = 0
             do {
                 try   {
-                    $team      = Invoke-GraphRequest @webparams -Exclude '@odata.context' -As ([MicrosoftGraphTeam]) |
+                    $team     = Invoke-GraphRequest @webparams -Exclude '@odata.context' -As ([MicrosoftGraphTeam]) |
                                     Add-Member -PassThru -NotePropertyName Mail -NotePropertyValue $group.Mail
                 }
                 catch {
@@ -532,7 +541,7 @@ function New-GraphGroup             {
                     Start-Sleep -Seconds 5
                 }
             }
-            until ($team -or [datetime]::now -gt $TimeToStop)
+            until   ($team -or [datetime]::now -gt $TimeToStop)
             if (-not $team ) {
                 Write-Warning "Group was created, but could not elevate it to a team."
                 return $group
