@@ -295,7 +295,7 @@ function Connect-Graph              {
             $paramDictionary.Add('FromAzureSession',[RuntimeDefinedParameter]::new('FromAzureSession', [SwitchParameter], $FromAzParamAttribute))
             $paramDictionary.Add('DefaultProfile',  [RuntimeDefinedParameter]::new('DefaultProfile',   [System.Object],   $DefProfParamAttribute))
         }
-        if (Get-Command az) {
+        if (Get-Command az -ErrorAction SilentlyContinue) {
             $NoRefreshAttributeCollection.Add((New-Object System.Management.Automation.ParameterAttribute -Property @{       ParameterSetName='CLIParameterSet'}))
             $FromCLIParamAttribute = New-Object System.Management.Automation.ParameterAttribute -Property @{ParameterSetName='CLIParameterSet';Position=5}
             $paramDictionary.Add('FromAzCLI',[RuntimeDefinedParameter]::new('FromAzCLI', [SwitchParameter], $FromCLIParamAttribute))
