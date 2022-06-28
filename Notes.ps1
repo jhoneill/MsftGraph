@@ -207,7 +207,6 @@ function Get-GraphOneNoteSection {
 
 }
 
-
 function New-GraphOneNoteNotebook {
     #>
     [cmdletbinding(SupportsShouldProcess=$true)]

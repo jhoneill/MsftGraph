@@ -30,6 +30,7 @@ else  { Set-GraphOptions -DefaultScopes @(
                 'Mail.ReadWrite',
                 'Mail.Send',
                 'MailboxSettings.ReadWrite',
+                'Notes.ReadWrite',
                 'Notes.ReadWrite.All',
                 'Notes.Create',
                 'People.Read.All',

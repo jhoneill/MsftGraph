@@ -438,23 +438,31 @@ function Connect-Graph              {
         $result = Connect-MgGraph @paramsToPass
         #endregion
         #region connection succeeds, cache information about the user and session, and if necessary setup a trigger to auto-refresh tokens we fetched above
-        if ($result -match "Welcome To Microsoft Graph") {
+        if ($result -notmatch "Welcome To Microsoft Graph") {Write-Verbose "Result was $result"}
+        else {
             $authcontext      = [GraphSession]::Instance.AuthContext
-            #we could call Get-Mgorganization but this way we don't depend on anything outside authentication module
-            $Organization     = Invoke-GraphRequest -Method GET -Uri "$GraphURI/organization/" -ValueOnly
-            if ($Organization.id) {
+            if ($authcontext.TenantId) { #
+                #we could call Get-Mgorganization but this way we don't depend on anything outside authentication module
+                $Organization     = Invoke-GraphRequest -Method GET -Uri "$GraphURI/organization/$($authcontext.TenantId)"
                 Write-Verbose -Message "CONNECT: Account is from $($Organization.DisplayName)"
                 Add-Member -force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyValue $Organization.DisplayName
                 Add-Member -force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $true
+                if ($authcontext.Account) {
+                      $user       = Invoke-GraphRequest -Method GET -Uri "$GraphURI/me/"
+                }
+                else {$result     = "Welcome To Microsoft Graph, connected to tenant '{1}' as the app '{0}'." -f $authcontext.AppName, $authcontext.TenantName }
             }
             else                  {
                 Write-Verbose -Message "CONNECT: Account is from Windows live"
-                Add-Member -force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyVa.lue $Organization.DisplayName
-                Add-Member -force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $true
+                Add-Member -force -InputObject $authcontext -NotePropertyName TenantName          -NotePropertyValue "Personal Account"
+                Add-Member -force -InputObject $authcontext -NotePropertyName WorkOrSchool        -NotePropertyValue $false
+                $user             = Invoke-GraphRequest -Method GET -Uri "$GraphURI/me/"
+                if ($user -and $user.userPrincipalName -and -not $authcontext.Account) {
+                    $authContext.Account = $user.userPrincipalName
+                }
             }
-            if ($authcontext.Account) {
+            if ($user) {
                 $result           = 'Welcome To Microsoft Graph++, {0}.' -f $authcontext.Account
-                $user             =   Invoke-MgGraphRequest -Method GET -Uri "$GraphURI/me/"
                 if ($Global:GraphUser -and $Global:GraphUser -ne $user.userPrincipalName) {
                     Set-GraphOneNoteHome $null
                     Set-GraphHomeDrive   $null
@@ -463,11 +471,10 @@ function Connect-Graph              {
                 Add-Member -Force -InputObject $authcontext -NotePropertyName UserDisplayName     -NotePropertyValue $user.displayName
                 Add-Member -Force -InputObject $authcontext -NotePropertyName UserID              -NotePropertyValue $user.ID
             }
-            else {$result           = "Welcome To Microsoft Graph, connected to tenant '{1}' as the app '{0}'." -f $authcontext.AppName, $authcontext.TenantName }
             Add-Member     -Force -InputObject $authcontext -NotePropertyName RefreshTokenPresent -NotePropertyValue ($Script:RefreshToken -as [bool])
             Add-Member     -Force -InputObject $authcontext -NotePropertyName TokenAutoRefresh    -NotePropertyValue ($RefreshScriptBlock  -as [bool])
             if    ($Global:__MgAzTokenExpires) {
-                Add-Member -Force -InputObject $authcontext -NotePropertyName TokenExpires         -NotePropertyValue ($Global:__MgAzTokenExpires)
+                Add-Member -Force -InputObject $authcontext -NotePropertyName TokenExpires        -NotePropertyValue ($Global:__MgAzTokenExpires)
             }
             elseif ($authcontext.TokenExpires) {$authcontext.TokenExpires = $null}
             if ($RefreshScriptBlock -and -not $Global:PSDefaultParameterValues['*-Mg*:HttpPipelinePrepend']) {
@@ -480,6 +487,7 @@ function Connect-Graph              {
                 Write-Host -Fore Cyan "-NoRefresh was specified. You will need to run this command again after $($tokeninfo.ExpiresOn.LocalDateTime.ToString())"
             }
         }
+
         #endregion
 
         if (-not $Quiet) {return $result}

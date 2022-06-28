@@ -2,7 +2,7 @@
   Copyright             =   '(c) 2021-2 James O''Neill. All rights reserved.'
   Author                =   'James O''Neill'
   CompanyName           =   'Mobula Consulting'
-  ModuleVersion         =   '1.5.3'
+  ModuleVersion         =   '1.5.4'
   PrivateData   = @{
        PSData    = @{
            Tags         = @('MicrosoftGraph', 'Microsoft', 'Office365', 'Graph', 'PowerShell', 'AzureAD', 'OneNote', 'OneDrive', 'Outlook', 'Sharepoint', 'Planner', 'MSGraph')

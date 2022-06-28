@@ -116,7 +116,7 @@ function Get-GraphDrive        {
         $Drive = $Drive -replace '/$','' -replace '^/',''
         try   {
             if  (ContextHas -WorkOrSchool) {$uri = "$GraphUri/$Drive`?`$expand=root(`$expand=children)"}
-            else                           {$uri = "$GrpahUri/$Drive"} #The expand fails on consumer one drive
+            else                           {$uri = "$GraphUri/$Drive"} #The expand fails on consumer one drive
             $driveObj  =  Invoke-GraphRequest -uri $uri #Don't convert to a type yet
             $Global:DriveCache[$driveObj.id] = $driveObj.name
         }

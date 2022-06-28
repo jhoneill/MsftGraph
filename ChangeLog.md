@@ -1,5 +1,11 @@
 # Change Log
 
+## 1.5.4
+
+* Fixed a bug logging on with personal accounts, and using them to access OneDrive.
+* Fixed a issue finding types in the .PSM1 file in some configurations
+* Reformatted readme to to keep markdown lint happy.
+
 ## 1.5.3
 
 * Version issues - tried to update the gallery correctly with 1.5.2 using version number 1.5.1
@@ -9,7 +15,7 @@
 * Fixed handling of two rest calls sending back extra properties (MicrosoftGraphChannel with TenantID) and Users Managers with authorizationInfo
 * Fixed DomainName completer not working
 * Fixed incorrect cmdlet name for getting Domain Name Reference List
-* Added support for Behavior Options when creating groups 
+* Added support for Behavior Options when creating groups
 * Re-formatted this log to keep markdown lint happy.
 
 ## 1.5

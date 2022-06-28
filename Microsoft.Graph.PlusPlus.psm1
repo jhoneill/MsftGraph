@@ -477,7 +477,7 @@ function Set-GraphOptions {
 if     ($env:GraphSettingsPath )                       {. $env:GraphSettingsPath}
 elseif (Test-Path "$PSScriptRoot\Microsoft.Graph.PlusPlus.settings.ps1") {. "$PSScriptRoot\Microsoft.Graph.PlusPlus.settings.ps1"}
 
-if      ($null -eq [GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
-elseif ([GraphSession]::instance.AuthContext.AppName -and -not [GraphSession]::instance.AuthContext.Account) {
-      Write-Host ("Already logged on as the app '$([GraphSession]::instance.AuthContext.AppName)'." )}
-else {Write-Host ("Already logged on as '$([GraphSession]::instance.AuthContext.Account)'." )}
+if      ($null -eq [Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext) {Write-Host  "Ready for Connect-Graph."}
+elseif ([Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext.AppName -and -not [Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext.Account) {
+      Write-Host ("Already logged on as the app '$([Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext.AppName)'." )}
+else {Write-Host ("Already logged on as '$([Microsoft.Graph.PowerShell.Authentication.GraphSession]::instance.AuthContext.Account)'." )}
