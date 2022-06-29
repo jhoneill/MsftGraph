@@ -2,6 +2,7 @@
 
 ## 1.5.4
 
+* Added Support for -UseDeviceAuthentication
 * Fixed a bug logging on with personal accounts, and using them to access OneDrive.
 * Fixed a issue finding types in the .PSM1 file in some configurations
 * Reformatted readme to to keep markdown lint happy.

@@ -226,8 +226,63 @@ function Connect-Graph              {
             Starts a session with Microsoft Graph
         .Description
             This commands is a wrapper for Connect-MgGraph it extends the authentication methods available
-            and caches information needed by other commands.
+            and caches information needed by other commands. Some logon methods apply to the current user
+            and may allow access to the same user without re-authenticating. Others only apply to the
+            current process.
+        .Example
+            PS> Connect-Graph -UseDeviceAuthentication
+            When Connect-Graph is run without parameters, it will select a suitable logon method.
+            Specifying -UseDeviceAuthentication ensures the method is to display a code to paste (or type)
+            into a Microsoft Web page to authenticate with either a Personal Account or work-or-school
+            (Azure AD) account. Where necessary the login can be done on a different device to one
+            running PowerShell commands. With an interactive logon, the user may be asked to approve the scopes
+            which determine what the app may do on their behalf.
 
+        .Example
+            PS> Set-GraphOptions  -TenantID "fedcba98-7654-3210-1234-567890abcdef" -ClientID  "12345678-abcd-9876-fedc-ba9876543210" -ClientSecret "XxYyZaABCDE.12345"
+            PS> Connect-Graph -AsApp
+            The first line sets the Azure TennantID, within this tennant an app is defined with the ID 123...3210 and the secret Xx...345
+            Usually this is set in the Microsoft.Graph.PlusPlus.settings.ps1 file.
+            -AsApp is a dynamic parameter and is only available if these settings are set.
+            An error saying the parameter does not exist will be because the values have not been set
+
+            The second line connects to Graph as this application. The process is non-interactive and
+            the scopes defining what the app may do must be assigned to it before it logs on.
+
+        .Example
+            PS> Set-GraphOptions  -TenantID "fedcba98-7654-3210-1234-567890abcdef" -ClientID  "12345678-abcd-9876-fedc-ba9876543210"
+            PS> $MyCred = Import-CliXML cred.xml
+            PS> Connect-Graph -Credential $MyCred
+            The first line sets the Azure TennantID, within this tennant an app is defined with the ID 123...3210.
+            Users may connect using this App ID which is allowed to take certain actions on their behalf.
+            Usually this is set in the Microsoft.Graph.PlusPlus.settings.ps1 file.
+            The second line loads the users credential from a file, and the third logs on by getting
+            an access token for that app to work as that user. This is also a non-interactive logon so scopes
+            must be assigned to the app before use.
+
+        .Example
+            PS> $AzResponse = Get-AzAccessToken -ResourceUrl 'https://graph.microsoft.com'
+            PS> Connect-Graph -AccessToken $AzResponse.Token
+
+            Connect-Graph will accept pre-built access tokens from other commands. In this case the
+            Get-AzAccessToken cmdlet in the Az.Accounts module is used, this will means the user
+            signs in to Azure from something else, and requests a new Access token for a particular resource.
+            If the resource is 'https://graph.microsoft.com' the token can be passed to Connect-Graph
+
+
+        .Example
+            PS> Connect-Graph -FromAzureCli
+
+            If the AZ command suite is present Connect-Graph will add a dynamic paramter to get an Access token,
+            saving a step compared to the previous example.
+
+        .Example
+            PS> Show-GraphSession
+            PS> Connect-Graph -ForceRefresh
+
+            The first command shows information about the current session, including the name and ID of the App
+            which logged on, the Azure AD tennant (if applicable), and the type of logon. If this is "UserProvidedAccessToken"
+            Connect-Graph can refresh the token and the second command forces a refresh of the current token.
     #>
     [cmdletbinding(DefaultParameterSetName='UserParameterSet')]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', '', Justification='False positive for global vars.')]
@@ -240,6 +295,9 @@ function Connect-Graph              {
         #Specifies a bearer token for Microsoft Graph service. Access tokens do timeout and you'll have to handle their refresh.
         [Parameter(ParameterSetName = 'AccessTokenParameterSet', Position = 1, Mandatory = $true)]
         [string]$AccessToken,
+
+        [Parameter(ParameterSetName = 'UserParameterSet')]
+        [switch]$UseDeviceAuthentication,
 
         #Forces the command to get a new access token silently.
         [switch]$ForceRefresh ,
@@ -434,14 +492,17 @@ function Connect-Graph              {
         if ($pscmdlet.ParameterSetName -match '^AppCert') {
             $paramsToPass['ClientId'] = $Script:ClientID
         }
-
-        $result = Connect-MgGraph @paramsToPass
+        #SDK hasn't heard of [cmdletbinding()]
+        $oldeap                = $ErrorActionPreference
+        $ErrorActionPreference    = 'Stop'
+        $result                   = Connect-MgGraph @paramsToPass | ForEach-Object {if ($_ -match "sign in") {Write-Host $_} else {$_} }
+        $ErrorActionPreference    = $oldeap
         #endregion
         #region connection succeeds, cache information about the user and session, and if necessary setup a trigger to auto-refresh tokens we fetched above
         if ($result -notmatch "Welcome To Microsoft Graph") {Write-Verbose "Result was $result"}
         else {
-            $authcontext      = [GraphSession]::Instance.AuthContext
-            if ($authcontext.TenantId) { #
+            $authcontext          = [GraphSession]::Instance.AuthContext
+            if ($authcontext.TenantId -and $authcontext.TenantId -ne "9188040d-6c67-4c5b-b112-36a304b66dad" ) { #Well know ID for "Personal Account Tennant$"
                 #we could call Get-Mgorganization but this way we don't depend on anything outside authentication module
                 $Organization     = Invoke-GraphRequest -Method GET -Uri "$GraphURI/organization/$($authcontext.TenantId)"
                 Write-Verbose -Message "CONNECT: Account is from $($Organization.DisplayName)"
