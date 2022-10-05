@@ -1509,54 +1509,99 @@ function Save-GraphMailAttachment {
     }
 }
 
-function Send-GraphMailMessage    {
+function Send-GraphMailMessage {
     <#
-      .Synopsis
-        Sends Mail using the Graph API from the current user's mailbox.
-      .Example
-        >Send-GraphMail -To "chris@contoso.com" -subject "You left your keys behind[nt]"
-        Sends a mail with a subject but no body or attachments
-      .Example
-        >Send-GraphMail -To "chris@contoso.com" -body "Keys are with reception" -NoSave
-        Sends a mail but thi time the subject will read "No subject" and the test will be in the body.
-        -NoSave means that no copy of this message will be kept in sent items
-      .Example
-        >Send-GraphMail -To "chris@contoso.com" -Subject "Screen shot" -body "How does this look ?" -Attachments .\Logon.png -Receipt
-        #This message has an attachement and requests a read receipt.
-      .Example
-        >$body"<h1>New dialog</h1><br /><img src='cid:Logon.png' -alt='Look at that'><br/>what do you think"
-        >$link = Send-GraphMail -To "jhoneill@waitrose.com" -Subject "Login Sreen" -body $body -BodyType HTML  -NoSave -Attachments .\Logon.png -SaveDraftOnly
-        This creates an HTML body, the attached picture can be referenced in an <img> tag with cid:fileName.ext
-        this time the mail is not sent but left in the user's drafts folder for review.
+    .Synopsis
+    Sends Mail using the Graph API from the current user's mailbox. Requires "Mail.Send" permission.
+
+    .PARAMETER User
+    me or UserID as ID or User Principal name, whose calendar should be fetched If not specified defaults to "me", Requires "Mail.Send" API permission or delegated permission "Mail.Send if you want to use /me
+    Default value: me --> delegated permissions needed
+
+    .PARAMETER To
+    Recipient(s) on the "to" line, each is either created with New-MailRecipient (a hash table), or a string holding an address.
+
+    .PARAMETER CC
+    Recipient(s) on the "CC" line
+
+    .PARAMETER BCC
+    Recipient(s) on the "Bcc line" line
+
+    .PARAMETER Subject
+    The subject of the message. A message must have a subject and/or body and/or attachments. If the subject is left blank it will be sent as "No Subject"
+
+    .PARAMETER Body
+    The type of the body  content. Possible values are Text and HTML.
+
+    .PARAMETER BodyType
+    The type of the body  content. Possible values are Text and HTML.
+
+    .PARAMETER Importance
+    The importance of the message: Low, Normal or High
+
+    .PARAMETER Attachments
+    Path to file(s) to send as attachments
+
+    .PARAMETER Receipt
+    If Specified, requests a receipt.
+
+    .PARAMETER SaveDraftOnly
+    If specified leaves the message in the drafts folder without sending it and returns a link to open the message.
+
+    .PARAMETER NoSave
+    If specified specifies that a copy of the mail should not be saved
+
+    .Example
+    >Send-GraphMail -User "jane@contoso.com" -To "chris@contoso.com" -subject "You left your keys behind[nt]"
+    Sends a mail with a subject but no body or attachments
+
+    .Example
+    >Send-GraphMail -User "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" -To "chris@contoso.com" -subject "You left your keys behind[nt]"
+    Sends a mail with a subject but no body or attachments
+
+    .Example
+    >Send-GraphMail -To "chris@contoso.com" -subject "You left your keys behind[nt]"
+    Sends a mail with a subject but no body or attachments
+    .Example
+    >Send-GraphMail -To "chris@contoso.com" -body "Keys are with reception" -NoSave
+    Sends a mail but thi time the subject will read "No subject" and the test will be in the body.
+    -NoSave means that no copy of this message will be kept in sent items
+    .Example
+    >Send-GraphMail -To "chris@contoso.com" -Subject "Screen shot" -body "How does this look ?" -Attachments .\Logon.png -Receipt
+    #This message has an attachement and requests a read receipt.
+    .Example
+    >$body"<h1>New dialog</h1><br /><img src='cid:Logon.png' -alt='Look at that'><br/>what do you think"
+    >$link = Send-GraphMail -To "jhoneill@waitrose.com" -Subject "Login Sreen" -body $body -BodyType HTML  -NoSave -Attachments .\Logon.png -SaveDraftOnly
+    This creates an HTML body, the attached picture can be referenced in an <img> tag with cid:fileName.ext
+    this time the mail is not sent but left in the user's drafts folder for review.
     #>
-    [Cmdletbinding(DefaultParameterSetName='None')]
+    [Cmdletbinding(DefaultParameterSetName = 'None')]
     param   (
-        #Recipient(s) on the "to" line, each is either created with New-MailRecipient (a hash table), or a string holding an address.
-        [parameter(Mandatory=$true,Position=0)]
-        $To ,
-        #Recipient(s) on the "CC" line,
-        $CC  ,
-        #Recipient(s) on the "Bcc line" line,
+        [parameter( HelpMessage = "`"me`" or UserID as ID or User Principal name, whose calendar should be fetched If not specified defaults to `"me`", Requires `"Mail.Send`" API permission or delegated permission `"Mail.Send if you want to use /me")]
+        $User = "me",
+        [parameter(Mandatory = $true, Position = 0, HelpMessage = "Recipient(s) on the `"to`" line, each is either created with New-MailRecipient (a hash table), or a string holding an address")]
+        $To,
+        [parameter(HelpMessage = "Recipient(s) on the `"CC`" line")]
+        $CC,
+        [parameter(HelpMessage = "Recipient(s) on the `"Bcc line`" line, not visible for other recipients")]
         $BCC,
-        #The subject of the message. A message must have a subject and/or body and/or attachments. If the subject is left blank it will be sent as "No Subject"
+        [parameter(HelpMessage = "The subject of the message. A message must have a subject and/or body and/or attachments. If the subject is left blank it will be sent as `"No Subject`"")]
         [String]$Subject,
-        #The content of the message; assumed to be plain text, but HTML can be specified with -BodyType
-        [String]$Body    ,
-        #The type of the body  content. Possible values are Text and HTML.
-        [ValidateSet("Text","HTML")]
+        [parameter(HelpMessage = "The content of the message; assumed to be plain text, but HTML can be specified with -BodyType")]
+        [String]$Body,
+        [ValidateSet("Text", "HTML")]
+        [parameter(HelpMessage = "The type of the body  content. Possible values are Text and HTML.")]
         $BodyType = "Text",
-        #The importance of the message: Low, Normal or High
-        [ValidateSet('Low','Normal', 'High')]
-        $Importance = 'Normal' ,
-        #Path to file(s) to send as attachments
+        [ValidateSet('Low', 'Normal', 'High')]
+        [parameter(HelpMessage = "The importance of the message: Low, Normal or High")]
+        $Importance = 'Normal',
+        [parameter(HelpMessage = "Path to file(s) to send as attachments.")]
         $Attachments,
-        #If Specified, requests a receipt.
+        [parameter(HelpMessage = "If Specified, requests a receipt.")]
         [switch]$Receipt,
-        #If specified leaves the message in the drafts folder without sending it and returns a link to open the message.
-        [parameter(ParameterSetName='SaveDraftOnly',Mandatory=$true)]
+        [parameter(ParameterSetName = 'SaveDraftOnly', Mandatory = $true, HelpMessage = "If specified leaves the message in the drafts folder without sending it and returns a link to open the message")]
         [switch]$SaveDraftOnly,
-        #If specified specifies that a copy of the mail should not be saved
-        [parameter(ParameterSetName='NoSave',Mandatory=$true)]
+        [parameter(ParameterSetName = 'NoSave', Mandatory = $true, HelpMessage = "If specified specifies that a copy of the mail should not be saved")]
         [switch]$NoSave
     )
 
@@ -1568,10 +1613,10 @@ function Send-GraphMailMessage    {
             Write-Warning (($Attachments -join ", ") + "Gave no items. Message sending will continue")
         }
         else {
-            if ($Attachments.Where({$_.length -gt 2.85mb}))  {
+            if ($Attachments.Where({ $_.length -gt 2.85mb })) {
                 #The Maximum size for a POST is 4MB.
                 #Attachments are base 64 encoded so 3MB of attachements become 4MB. Don't try closer than 95% of that
-                throw ("Attachment would exceed maximum size for a POST. Maximum file size is ~ 2,900,000 bytes")
+                throw ("Attachment would exceed maximum size for a POST. Maximum file size is ~ 2, 900, 000 bytes")
                 return
             }
             elseif (-not $asDraft -and ($Attachments | Measure-Object -Sum length).sum -gt 2.7mb) {
@@ -1583,19 +1628,22 @@ function Send-GraphMailMessage    {
                 }
                 else {
                     Write-Verbose -Message "SEND-GRAPHMAILMESSAGE After BASE64 encoding attacments, message may exceed 4MB. Using Draft and sequential attachment method"
-                    $asDraft= $true
+                    $asDraft = $true
                 }
             }
-            else { Write-Verbose -Message "SEND-GRAPHMAILMESSAGE $($Attachments).count attachment(s); small enough to send in a single operation"}
-         }
+            else { Write-Verbose -Message "SEND-GRAPHMAILMESSAGE $($Attachments).count attachment(s); small enough to send in a single operation" }
+        }
     }
     elseif (-not $Subject -and -not $Body) {
         Write-Warning -Message "Nothing to send" ; return
     }
-    elseif (-not $Subject) {$Subject = "No subject"}
-
-    if ($asDraft) {$Uri = "$GraphUri/me/Messages"}
-    else          {$Uri = "$GraphUri/me/sendmail"}
+    elseif (-not $Subject) { $Subject = "No subject" }
+    $prefix = ""
+    if ($User -ne "me") {
+        $prefix = "/users" #needed for other users than /me
+    }
+    if ($asDraft) { $Uri = "$GraphUri$prefix/$User/Messages" }
+    else { $Uri = "$GraphUri$prefix/$User/sendmail" }
 
     #Build a hash table with the parts of the message, this will be coverted into JSON
     #BEWARE names are case sensitive. if you create $msgSettings.Body instead of $msgSettings.body
@@ -1603,45 +1651,48 @@ function Send-GraphMailMessage    {
     #My personal coding style is to use inital CAPS for parameters and inital lower case for variables (though Powershell doesn't care)
     #so the parameter is $Body and the hash table key name and JSON label is body.
 
-    $msgSettings   =  @{   'body' = @{
-            'contentType'  = $BodyType;
-                'content'  = $Body}
-                'subject'  = $Subject
-             'importance'  = $Importance
-            'toRecipients' = @()
+    $msgSettings = @{   'body' = @{
+            'contentType' = $BodyType;
+            'content'     = $Body
+        }
+        'subject'              = $Subject
+        'importance'           = $Importance
+        'toRecipients'         = @()
     }
     foreach ($recip in $To ) {
-            if     ($recip  -is [string] ) { $msgSettings[ 'toRecipients'] += New-GraphRecipient $recip}
-            else                           { $msgSettings[ 'toRecipients'] += $recip}
+        if ($recip -is [string] ) { $msgSettings[ 'toRecipients'] += New-GraphRecipient $recip }
+        else { $msgSettings[ 'toRecipients'] += $recip }
     }
     if ($CC) {
-        $msgSettings['ccRecipients']      = @()
+        $msgSettings['ccRecipients'] = @()
         foreach ($recip in $cc ) {
-            if     ($recip  -is [string] ) { $msgSettings[ 'ccRecipients'] += New-GraphRecipient $recip}
-            else                           { $msgSettings[ 'ccRecipients'] += $recip}}
+            if ($recip -is [string] ) { $msgSettings[ 'ccRecipients'] += New-GraphRecipient $recip }
+            else { $msgSettings[ 'ccRecipients'] += $recip }
+        }
     }
     if ($BCC) {
-        $msgSettings['bccRecipients']      = @()
+        $msgSettings['bccRecipients'] = @()
         foreach ($recip in $bcc ) {
-            if     ($recip  -is [string] ) { $msgSettings['bccRecipients'] += New-GraphRecipient $recip}
-            else                           { $msgSettings['bccRecipients'] += $recip}}
+            if ($recip -is [string] ) { $msgSettings['bccRecipients'] += New-GraphRecipient $recip }
+            else { $msgSettings['bccRecipients'] += $recip }
+        }
     }
-    if ($Receipt)                          { $msgSettings['isDeliveryReceiptRequested'] = $true }
+    if ($Receipt) { $msgSettings['isDeliveryReceiptRequested'] = $true }
 
     #If we are creating a draft, save it now; if sending-in-one be ready for attachments
-    if     ($asDraft) {
+    if ($asDraft) {
         Write-Progress -Activity "Sending Message" -CurrentOperation "Uploading draft"
         $json = ConvertTo-Json $msgSettings -Depth 5 #default depth isn't enough !
-        try            {$msg  = Invoke-GraphRequest -Method post  -uri $uri  -Body $json -ContentType "application/json" }
-        catch          {throw "There was an error creating the draft message."; return }
-        if (-not $msg) {throw "The draft message was not created as expected" ; return }
-        else           {
+        try { $msg = Invoke-GraphRequest -Method post  -uri $uri  -Body $json -ContentType "application/json" }
+        catch { throw "There was an error creating the draft message."; return }
+        if (-not $msg) { throw "The draft message was not created as expected" ; return }
+        else {
             Write-Verbose -Message "SEND-GRAPHMAILMESSAGE  Message created with id '$($msg.id)'"
             $uri = $uri + "/" + $msg.id
         }
     }
     elseif ($AttachmentItems) {
-        $msgSettings["attachments"]= @()
+        $msgSettings["attachments"] = @()
     }
 
     foreach ($f in $AttachmentItems) {
@@ -1649,7 +1700,7 @@ function Send-GraphMailMessage    {
             '@odata.type' = '#microsoft.graph.fileAttachment';
             name          = $f.Name ;
             contentId     = $f.name ;
-            contentBytes  =  [convert]::ToBase64String( [system.io.file]::readallbytes($f.FullName))
+            contentBytes  = [convert]::ToBase64String( [system.io.file]::readallbytes($f.FullName))
 
         }
         if ($asDraft) {
@@ -1670,28 +1721,28 @@ function Send-GraphMailMessage    {
     }
 
     if ($SaveDraftOnly) {
-            Write-Progress -Activity "Sending Message" -Completed
-            return $msg.webLink
+        Write-Progress -Activity "Sending Message" -Completed
+        return $msg.webLink
     }
     elseif ($asDraft) {
-            Write-Progress -Activity "Sending Message" -CurrentOperation "Sending Draft"
-            try {
-                Invoke-GraphRequest  -Method post  -uri "$uri/send" -Body " " # underlying stuff requires -body, but server ignores it.
-                Write-Progress -Activity "Sending Message" -Completed
-            }
-            catch {throw "There was an error sending the draft message; it remains in the drafts folder"}
+        Write-Progress -Activity "Sending Message" -CurrentOperation "Sending Draft"
+        try {
+            Invoke-GraphRequest  -Method post  -uri "$uri/send" -Body " " # underlying stuff requires -body, but server ignores it.
+            Write-Progress -Activity "Sending Message" -Completed
+        }
+        catch { throw "There was an error sending the draft message; it remains in the drafts folder" }
     }
     else {
-        $mail = @{Message=$msgSettings}
+        $mail = @{Message = $msgSettings }
         if ($NoSave) {
-           $mail['saveToSentItems'] = $false
+            $mail['saveToSentItems'] = $false
         }
         Write-Progress -Activity "Sending Message" -CurrentOperation "Uploading and sending"
 
         $json = ConvertTo-Json $mail -Depth 10
         Write-Debug $Json
-        try            {Invoke-GraphRequest -Method post  -uri $uri  -Body $json -ContentType "application/json" }
-        catch          {throw "There was an error sending message."; return }
+        try { Invoke-GraphRequest -Method post  -uri $uri  -Body $json -ContentType "application/json" }
+        catch { throw "There was an error sending message."; return }
         Write-Progress -Activity "Sending Message" -Completed
     }
 }
