@@ -282,7 +282,7 @@ function Get-GraphGroup             {
                         ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
                 elseif ($Owners)             {
-                    $usersqAndGroups +=  Invoke-GraphRequest  -Uri  "$groupURI/Owners" -AllValues|
+                    $usersAndGroups +=  Invoke-GraphRequest  -Uri  "$groupURI/Owners" -AllValues|
                         ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
                 elseif ($Notebooks)          {
