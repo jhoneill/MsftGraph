@@ -477,11 +477,12 @@ function Connect-Graph              {
         $paramsFromCurrentSet =  $pscmdlet.MyInvocation.MyCommand.Parameters.values.where({
                                     ($_.ParameterSets.containskey($pscmdlet.ParameterSetName) -or
                                      $_.ParameterSets.containskey('__AllParameterSets')     ) -and
-                                     $_.Name -in $paramsinTarget -and
-                                     (Get-Variable $_.Name -ValueOnly -ErrorAction SilentlyContinue)})
+                                     $_.Name -in $paramsinTarget -and   #(Get-Variable $_.Name -ValueOnly -ErrorAction SilentlyContinue)
+                                     $sb[$_.Name] })
 
         foreach ($p in $paramsFromCurrentSet.Name ) {
-            $paramsToPass[$p] = Get-Variable $P -ValueOnly   ; Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p])
+            $paramsToPass[$p] = $sb[$p]   #was Get-Variable $P -ValueOnly
+             Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p])
         }
         foreach ($p in [System.Management.Automation.Cmdlet]::CommonParameters.Where({$bp.ContainsKey($_)})) {
             $paramsToPass[$p] = $bp[$p]                      ; Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p])
