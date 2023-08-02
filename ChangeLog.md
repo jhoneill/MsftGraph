@@ -6,7 +6,6 @@
 * Fixed a bug in Get-GraphGroup which prevented owners of a group being returned (small typo)
 * Added control of user properties fetched for owners and members of groups in Get-GraphGroup
 
-
 ## 1.5.4
 
 * Added Support for -UseDeviceAuthentication

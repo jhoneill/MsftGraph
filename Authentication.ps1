@@ -478,10 +478,10 @@ function Connect-Graph              {
                                     ($_.ParameterSets.containskey($pscmdlet.ParameterSetName) -or
                                      $_.ParameterSets.containskey('__AllParameterSets')     ) -and
                                      $_.Name -in $paramsinTarget -and   #(Get-Variable $_.Name -ValueOnly -ErrorAction SilentlyContinue)
-                                     $sb[$_.Name] })
+                                     $bp[$_.Name] })
 
         foreach ($p in $paramsFromCurrentSet.Name ) {
-            $paramsToPass[$p] = $sb[$p]   #was Get-Variable $P -ValueOnly
+            $paramsToPass[$p] = $bp[$p]   #was Get-Variable $P -ValueOnly
              Write-Verbose ("{0,20} = {1}" -f $p.ToUpper(), $paramsToPass[$p])
         }
         foreach ($p in [System.Management.Automation.Cmdlet]::CommonParameters.Where({$bp.ContainsKey($_)})) {
