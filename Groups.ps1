@@ -157,6 +157,28 @@ function Get-GraphGroup             {
         #If specified returns the Owners of the team
         [Parameter(Mandatory=$true, parameterSetName='Owners')]
         [switch]$Owners,
+         #Field(s) to select for the members or owners of the group : ID and displayname are always included
+        [Parameter(Mandatory=$false, parameterSetName='Members')]
+        [Parameter(Mandatory=$false, parameterSetName='TransitiveMembers')]
+        [parameter(Mandatory=$false, parameterSetName="Owners")]
+        [ValidateSet  ('aboutMe', 'accountEnabled' , 'activities', 'ageGroup', 'agreementAcceptances' , 'appRoleAssignments',
+                       'assignedLicenses', 'assignedPlans', 'authentication', 'birthday', 'businessPhones',
+                       'calendar', 'calendarGroups', 'calendars', 'calendarView', 'city', 'companyName', 'consentProvidedForMinor',
+                       'contactFolders', 'contacts', 'country', 'createdDateTime', 'createdObjects', 'creationType' ,
+                       'deletedDateTime', 'department', 'directReports', 'displayName', 'drive', 'drives',
+                       'employeeHireDate', 'employeeId', 'employeeOrgData', 'employeeType', 'events', 'extensions',
+                       'externalUserState', 'externalUserStateChangeDateTime', 'faxNumber', 'followedSites', 'givenName', 'hireDate',
+                       'id', 'identities', 'imAddresses', 'inferenceClassification', 'insights', 'interests', 'isResourceAccount', 'jobTitle', 'joinedTeams',
+                       'lastPasswordChangeDateTime', 'legalAgeGroupClassification', 'licenseAssignmentStates', 'licenseDetails' ,
+                       'mail' , 'mailFolders' , 'mailNickname', 'managedAppRegistrations', 'managedDevices', 'manager' , 'memberOf' , 'messages', 'mobilePhone', 'mySite',
+                       'oauth2PermissionGrants' ,  'officeLocation', 'onenote', 'onlineMeetings' , 'onPremisesDistinguishedName', 'onPremisesDomainName',
+                       'onPremisesExtensionAttributes', 'onPremisesImmutableId', 'onPremisesLastSyncDateTime',   'onPremisesProvisioningErrors', 'onPremisesSamAccountName',
+                       'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName', 'otherMails', 'outlook', 'ownedDevices', 'ownedObjects',
+                       'passwordPolicies', 'passwordProfile', 'pastProjects', 'people', 'photo', 'photos', 'planner', 'postalCode', 'preferredLanguage',
+                       'preferredName', 'presence', 'provisionedPlans', 'proxyAddresses',  'registeredDevices', 'responsibilities',
+                       'schools', 'scopedRoleMemberOf', 'settings', 'showInAddressList', 'signInSessionsValidFromDateTime', 'skills', 'state', 'streetAddress', 'surname',
+                       'teamwork', 'todo', 'transitiveMemberOf', 'usageLocation', 'userPrincipalName', 'userType')]
+        [String[]]$UserProperties =  $Script:DefaultUserProperties ,
         #If specified returns the team's notebook(s)
         [Parameter(Mandatory=$true, parameterSetName='Notebooks')]
         [switch]$Notebooks,
@@ -170,14 +192,13 @@ function Get-GraphGroup             {
         [Parameter(Mandatory=$true, parameterSetName='Site')]
         [switch]$Site,
         #limits searches for appsby name.
-        [Parameter(parameterSetName='Apps')]
+        [Parameter(parameterSetName='Apps') ]
         [String]$AppName,
         #limits searches for channels by name. Other items can't be filtered by name ...  perhaps notebooks can but a group only has one.
         [Parameter(parameterSetName='Channels')]
         [ArgumentCompleter([ChannelCompleter])]
         [String]$ChannelName,
-         #Field(s) to select: ID and displayname are always included
-        #The following are available when getting a single group:
+         #Field(s) to select for the group: ID and displayname are always included
         [ValidateSet('acceptedSenders', 'allowExternalSenders', 'appRoleAssignments', 'assignedLabels', 'assignedLicenses',
                 'autoSubscribeNewMembers', 'calendar', 'calendarView', 'classification', 'conversations', 'createdDateTime',
                 'createdOnBehalfOf', 'deletedDateTime', 'description', 'displayName', 'drive', 'drives', 'events',
@@ -231,6 +252,11 @@ function Get-GraphGroup             {
             if (-not ($i.DisplayName -and $i.id)) {
                 Write-Warning 'Could not resoulve the group' ; continue
             }
+            if ($Owners -or $Members -or $TransitiveMembers) {
+                if ('id'          -notin $UserProperties) {$UserProperties += 'id'}
+                if ('displayName' -notin $UserProperties) {$UserProperties += 'displayName'}
+                $UserPropertiesSelect = '?`$Select='  +   ($UserProperties -join ',')
+            }
             $displayname  =  $i.DisplayName
             $groupid      =  $teamid = $i.id
             $groupURI     = "$GraphUri/groups/$groupid"
@@ -265,24 +291,25 @@ function Get-GraphGroup             {
                         Add-Member -PassThru -NotePropertyName GroupName    -NotePropertyValue $displayname
                     continue
                 }
+                elseif ($Owners)             {
+                    $usersAndGroups +=  Invoke-GraphRequest -Uri  "$groupURI/Owners$UserPropertiesSelect"  -AllValues |
+                        ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
+                }
                 elseif ($Members)            { #can do group ?$expand=Memebers, the others don't expand
-                    $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/members"  -AllValues |
+                    $usersAndGroups += Invoke-GraphRequest  -Uri "$groupURI/members$UserPropertiesSelect"  -AllValues |
                         ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
                 elseif ($TransitiveMembers)  {
-                    $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/TransitiveMembers"  -AllValues |
+                    $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/TransitiveMembers?$UserPropertiesSelect" -AllValues |
                         ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
+                #xxxx Allow group properties for memeber of ?
                 elseif ($MemberOf)           {
                     $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/memberof"  -AllValues |
                         ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
                 elseif ($TransitiveMemberOf) {
                     $usersAndGroups += Invoke-GraphRequest  -Uri  "$groupURI/TransitiveMemberof"  -AllValues |
-                        ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
-                }
-                elseif ($Owners)             {
-                    $usersAndGroups +=  Invoke-GraphRequest  -Uri  "$groupURI/Owners" -AllValues|
                         ForEach-Object {$_['GroupName'] =  $displayname ; $_ }
                 }
                 elseif ($Notebooks)          {
@@ -336,7 +363,8 @@ function Get-GraphGroup             {
                     continue
                 }
                 elseif ($Channels -or
-                        $ChannelName)       {
+                        $ChannelName)
+                                             {
                     if ($ChannelName)   { $uri =  "$teamURI/channels?`$filter=startswith(tolower(displayname), '$($ChannelName.ToLower())')"}
                     else                { $uri =  "$teamURI/channels"}
                     Invoke-GraphRequest  -Uri $uri -ValueOnly -As ([MicrosoftGraphChannel]) -ExcludeProperty "tenantId" |
@@ -344,7 +372,8 @@ function Get-GraphGroup             {
                         Add-Member -PassThru -NotePropertyName TeamName  -NotePropertyValue $displayname
                 }
                 elseif ($Apps -or
-                        $AppName)           {
+                        $AppName)
+                                             {
                     $uri = $teamURI + '/installedApps?$expand=teamsAppDefinition'
                     if ($AppName) { $uri = $URI + '&$filter=' +
                                     "startswith(tolower(teamsappdefinition/displayname),'$($AppName.ToLower())')"
