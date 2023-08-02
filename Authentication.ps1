@@ -122,32 +122,36 @@ function Invoke-GraphRequest        {
         $null = $PSBoundParameters.Remove('AllValues') , $PSBoundParameters.Remove('AsType'), $PSBoundParameters.Remove('ExcludeProperty'), $PSBoundParameters.Remove('PropertyNotMatch') , $PSBoundParameters.Remove('ValueOnly')
         if ($ExcludeProperty -notcontains  '@odata.id') {$ExcludeProperty += '@odata.id'}
         Test-GraphSession
+        function sendResult {
+            param ($result)
+            foreach ($r in $result) {
+                foreach ($p in $ExcludeProperty) {$r.remove($p)}
+                if ($PropertyNotMatch) {
+                    $keystoRemove = $r.keys -match $PropertyNotMatch
+                    foreach ($p in $keystoRemove) {[void]$r.remove($p)}
+                }
+                if ($AsType) {New-Object -TypeName $AsType -Property $r}
+                else         {$r}
+            }
+        }
     }
     process {
         #I try to use "response" when it is an interim thing not the final result.
         $response = $null
         $response = Microsoft.Graph.Authentication\Invoke-MgGraphRequest @PSBoundParameters
         if ($ValueOnly -or $AllValues) {
-            $result = $response.value
+            sendresult $response.value
             if ($AllValues) {
                 while ($response.'@odata.nextLink') {
                     $PSBoundParameters['Uri'] =  $response.'@odata.nextLink'
                     $response   =   Microsoft.Graph.Authentication\Invoke-MgGraphRequest @PSBoundParameters
-                    $result += $response.value
+                    sendResult $response.value
                 }
             }
         }
-        else  {$result = $response}
+        else  {sendResult $response}
         if ($StatusCodeVariable) {Set-variable $StatusCodeVariable -Scope 1 -Value (Get-Variable $StatusCodeVariable -ValueOnly) }
-        foreach ($r in $result) {
-            foreach ($p in $ExcludeProperty) {$r.remove($p)}
-            if ($PropertyNotMatch) {
-                $keystoRemove = $r.keys -match $PropertyNotMatch
-                foreach ($p in $keystoRemove) {[void]$r.remove($p)}
-            }
-            if ($AsType) {New-Object -TypeName $AsType -Property $r}
-            else         {$r}
-        }
+
     }
 }
 
