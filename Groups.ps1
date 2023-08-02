@@ -21,8 +21,8 @@ function Get-GraphGroupList         {
     [outputtype([Microsoft.Graph.PowerShell.Models.MicrosoftGraphGroup])]
     param   (
         #if specified limits the groups returned to those with names begining...
-        [Parameter(Mandatory=$true, parameterSetName='FilterByName', Position=0)]
-        [string]$Name,
+        [Parameter(parameterSetName='FilterByName', Position=0)]
+        [string]$Name = "*",
         #Field(s) to select: ID and displayname are always included;
         #The following are only available when getting a single group:
         #'allowExternalSenders','autoSubscribeNewMembers','isSubscribedByMail' 'unseenCount',
@@ -65,13 +65,17 @@ function Get-GraphGroupList         {
             if ("displayName" -notin $select) {$select += 'displayName'}
             $uri =  $GraphUri + '/Groups/?$select='  + ($Select -join ',')
         }
-        elseif ($Filter)  {$uri =  $GraphUri + '/Groups/?$filter='  + $Filter }
-        elseif ($Name)    {$uri =  $GraphUri + '/Groups/?&$filter=' +(FilterString $Name)}
-        elseif ($orderby) {$uri =  $GraphUri + '/Groups/?$OrderBy=' + $OrderBy }
-        else              {$uri =  $GraphUri + '/Groups/' }
+        elseif ($Filter)        {$uri =  $GraphUri + '/Groups/?$filter='  + $Filter }
+        elseif ($Name -and $name -match  '\*.*\*|^\*.+')   {  # ie. *xxx* or xxx* but not "*"  alone or xxx*
+                                 $uri =  $GraphUri + '/Groups/?$search="displayname:'  + ($Name -replace '\*','') +'"'
+        }
+        elseif ($Name -ne '*')  {$uri =  $GraphUri + '/Groups/?$filter='  +(FilterString $Name)}
+        elseif ($orderby)       {$uri =  $GraphUri + '/Groups/?$OrderBy=' + $OrderBy }
+        else                    {$uri =  $GraphUri + '/Groups/' }
         Write-Progress -Activity "Finding Groups"
-        Invoke-GraphRequest -Uri $uri -AllValues -ExcludeProperty 'creationOptions' -AsType ([MicrosoftGraphGroup]) |
-             Sort-Object -Property $OrderBy -Descending:$Descending
+        Invoke-GraphRequest -Uri $uri -AllValues -ExcludeProperty 'creationOptions' -AsType ([MicrosoftGraphGroup]) -Headers @{'consistencyLevel'='eventual'} |
+            where-object    -Property displayname -like $Name
+                Sort-Object -Property $OrderBy    -Descending:$Descending
         Write-Progress -Activity "Finding Groups" -Completed
     }
 }
