@@ -74,7 +74,7 @@ function Get-GraphGroupList         {
         else                    {$uri =  $GraphUri + '/Groups/' }
         Write-Progress -Activity "Finding Groups"
         Invoke-GraphRequest -Uri $uri -AllValues -ExcludeProperty 'creationOptions' -AsType ([MicrosoftGraphGroup]) -Headers @{'consistencyLevel'='eventual'} |
-            where-object    -Property displayname -like $Name
+            Where-Object        {$_.displayname -like $Name -or $_.displayname -like [WildcardPattern]::Escape($Name)} |
                 Sort-Object -Property $OrderBy    -Descending:$Descending
         Write-Progress -Activity "Finding Groups" -Completed
     }
@@ -228,15 +228,17 @@ function Get-GraphGroup             {
                 $ug ,
                 $DisplayName
             )
-            if     ($ug.'@odata.type' -match 'group$') {
-                    $null =  $ug.Remove('@odata.type'),  $ug.Remove('@odata.context'),  $ug.remove('@odata.id'),  $ug.remove('creationOptions')
-                    New-Object -Property  $ug -TypeName MicrosoftGraphGroup |
-                        Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
-            }
-            elseif ($ug.'@odata.type' -match 'user$') {
-                    $null =  $ug.Remove('@odata.type'),  $ug.Remove('@odata.context')
-                    New-Object -Property $ug -TypeName MicrosoftGraphUser |
-                        Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
+            process {
+                if     ($ug.'@odata.type' -match 'group$') {
+                        $null =  $ug.Remove('@odata.type'),  $ug.Remove('@odata.context'),  $ug.remove('@odata.id'),  $ug.remove('creationOptions')
+                        New-Object -Property  $ug -TypeName MicrosoftGraphGroup |
+                            Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
+                }
+                elseif ($ug.'@odata.type' -match 'user$') {
+                        $null =  $ug.Remove('@odata.type'),  $ug.Remove('@odata.context')
+                        New-Object -Property $ug -TypeName MicrosoftGraphUser |
+                            Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
+                }
             }
         }
     }

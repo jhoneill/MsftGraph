@@ -5,6 +5,8 @@
 * Fixed a problem with Connect-Graph not passing dynamic parameters (like Certificate) to Connect-MgGraph
 * Fixed a bug in Get-GraphGroup which prevented owners of a group being returned (small typo)
 * Added control of user properties fetched for owners and members of groups in Get-GraphGroup
+* Fixed a bug which meant group membership was not being expanded correctly
+* Made a change to group name matching so that names which contain [ ] do not treat them as a wildcard set.
 
 ## 1.5.4
 
