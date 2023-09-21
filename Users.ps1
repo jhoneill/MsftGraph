@@ -131,16 +131,14 @@ function Get-GraphUserList        {
         if ($Sort)           {$uri = $uri + '&$orderby=' + $Sort            }
         if ($ExpandProperty) {$uri = $uri + '&expand='   + $ExpandProperty  }
 
-        if (-not $Name)      {$result = Invoke-GraphRequest -Uri $uri @webParams }
+        if (-not $Name)      {Invoke-GraphRequest -Uri $uri @webParams | ConvertTo-GraphUser}
         else {
-            $result = @()
             foreach ($n in $Name) {
                 $filter = '&$Filter=' + (FilterString $n -ExtraFields 'userPrincipalName','givenName','surname','mail')
-                 $result += Invoke-GraphRequest -Uri ($uri + $filter) @webParams
+                Invoke-GraphRequest -Uri ($uri + $filter) @webParams | ConvertTo-GraphUser
             }
         }
         Write-Progress "Getting the list of Users" -Completed
-        $result  | ConvertTo-GraphUser
     }
 }
 
