@@ -1,5 +1,13 @@
 # Change Log
 
+## 1.5.6
+
+* Modified Get-GraphUserList to send results as they are received and instead of buffering a lot of users.
+* Allow Get-GraphUserList to accept "none" for the -expand parameter.
+* Updated the validate set for user properties.
+* Moved hard coded parts of Export-Graph user list into parameters to allow custom exports.
+* Improved robustness of process that removes  properties returned by API which are not properties of .NET objects.
+
 ## 1.5.5
 
 * Fixed a problem with Connect-Graph not passing dynamic parameters (like Certificate) to Connect-MgGraph

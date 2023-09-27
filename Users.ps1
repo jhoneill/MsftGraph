@@ -15,8 +15,8 @@ function ConvertTo-GraphUser      {
             #We expand manager by default, or might be told to expand direct reports. Make either into users.
             if (-not $r.manager) { $mgr = $null}
             else {
-                    $null = $r.manager.remove('@odata.type'),$r.manager.remove('@odata.id'),
-                            $r.manager.remove('authorizationInfo'),$r.manager.remove('refreshTokensValidFromDateTime')
+                    $disallowedProperties = $r.manager.keys.where({$_ -notin $script:UserProperties})
+                    foreach ($p in $disallowedProperties) {$null = $r.manager.remove($p)}
                     $mgr  = New-Object -TypeName MicrosoftGraphUser -Property $r.manager
                     $null = $r.remove('manager')
             }
@@ -24,12 +24,14 @@ function ConvertTo-GraphUser      {
             else {
                 $directs = @()
                 foreach ($d in $r.directReports) {
-                    $null = $d.remove('@odata.type'),$d.remove('@odata.id')
+                    $disallowedProperties = $d.keys.where({$_ -notin $script:UserProperties})
+                    foreach ($p in $disallowedProperties) {$null = $d.remove($p)}
                     $directs += New-Object -TypeName MicrosoftGraphUser -Property $d
                 }
                 $null = $r.remove('directReports')
             }
-            $null = $r.Remove('@odata.type'), $r.Remove('@odata.context') , $r.Remove('@odata.id')
+            $disallowedProperties = $r.keys.where({$_ -notin $script:UserProperties})
+            foreach ($p in $disallowedProperties) {$null = $r.remove($p)}
             $user =  New-Object -TypeName MicrosoftGraphUser -Property $r
             if ($mgr)      {$user.manager      = $mgr}
             if ($directs)  {$user.DirectReports= $directs}
@@ -57,17 +59,19 @@ function Get-GraphUserList        {
 
         #Names of the fields to return for each user.Note that some properties - aboutMe, Birthday etc, are only available when getting a single user, not a list.
         #The  API defaults to :  businessPhones, displayName, givenName, id, jobTitle, mail, mobilePhone, officeLocation, preferredLanguage, surname, userPrincipalName
-        #The module adds to this set - the exactlist can be set with Set-GraphOption -DefaultUserProperties
-        [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones', 'city',
-                    'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'department',
-                    'displayName', 'givenName', 'id', 'imAddresses', 'jobTitle', 'legalAgeGroupClassification',
-                    'mail', 'mailNickname', 'mobilePhone', 'officeLocation',
-                    'onPremisesDomainName', 'onPremisesExtensionAttributes', 'onPremisesImmutableId',
-                    'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccouname',
-                    'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
-                    'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
-                    'preferredLanguage', 'provisionedPlans', 'proxyAddresses', 'state', 'streetAddress',
-                    'surname', 'usageLocation', 'userPrincipalName', 'userType')]
+        #The module adds to this set - the default list can be set with Set-GraphOption -DefaultUserProperties which has the master copy of the validate set used here
+        [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones',
+                     'city', 'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'creationType',
+                     'deletedDateTime', 'department',  'displayName',
+                     'employeeHireDate', 'employeeID', 'employeeOrgData', 'employeeType', 'externalUserState', 'externalUserStateChangeDateTime',
+                     'givenName', 'id', 'identities', 'imAddresses', 'isResourceAccount','jobTitle', 'legalAgeGroupClassification',
+                     'mail', 'mailNickname', 'mobilePhone',
+                     'officeLocation', 'onPremisesDistinguishedName', 'onPremisesDomainName', 'onPremisesExtensionAttributes',
+                     'onPremisesImmutableId', 'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName', 'otherMails',
+                     'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
+                     'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
+                     'preferredLanguage', 'provisionedPlans', 'proxyAddresses',
+                     'showInAddressList','state', 'streetAddress', 'surname', 'usageLocation', 'userPrincipalName', 'userType')]
         [Alias('Property')]
         [string[]]$Select = $Script:DefaultUserProperties  ,
 
@@ -92,7 +96,7 @@ function Get-GraphUserList        {
         [parameter(Mandatory=$true, parameterSetName='FilterToGuests')]
         [switch]$GuestsOnly,
 
-        [validateSet('directReports', 'manager', 'memberOf', 'ownedDevices', 'ownedObjects', 'registeredDevices', 'transitiveMemberOf',  'extensions')]
+        [validateSet('directReports', 'manager', 'memberOf', 'ownedDevices', 'ownedObjects', 'registeredDevices', 'transitiveMemberOf',  'extensions','')]
         [string]$ExpandProperty = 'manager',
 
         # The URI for the proxy server to use
@@ -464,12 +468,14 @@ function Get-GraphUser            {
         foreach ($r in ($result )) {
             if     ($r.'@odata.type' -match 'directoryRole$') {
                     #This is a hack so we get role memberships and group memberships laying nicely
-                    $null = $r.remove('@odata.type'), $r.remove('@odata.id'), $r.remove('roleTemplateId')
+                    $disallowedProperties = $r.keys.where({$_ -notin $script:GroupProperties})
+                    foreach ($p in $disallowedProperties) {$null = $r.remove($p)}
                     [void]$r.add('GroupTypes','DirectoryRole')
                     New-Object -Property $r -TypeName ([MicrosoftGraphGroup])
             }
             elseif ($r.'@odata.type' -match 'group$') {
-                    $null = $r.remove('@odata.type'),  $r.remove('@odata.id'), $r.remove('@odata.context'), $r.remove('creationOptions')
+                    $disallowedProperties = $r.keys.where({$_ -notin $script:GroupProperties})
+                    foreach ($p in $disallowedProperties) {$null = $r.remove($p)}
                     New-Object -Property $r -TypeName ([MicrosoftGraphGroup])
             }
             elseif ($r.'@odata.type' -match 'user$' -or $PSCmdlet.parameterSetName -eq 'None' -or $Select) {
@@ -1146,25 +1152,45 @@ function Export-GraphUser         {
         #Filter clause for the query for example "department eq 'accounts'"
         $Filter,
         #String to insert between parts of multi-part items.
-        $ListSeparator = "; "
-    )
-    $exportFields = @(
-        'UserPrincipalName', 'MailNickName',   'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
-        @{n='AccountDisabled';e={-not $_.accountEnabled}} ,
-        'PasswordPolicies', 'Mail',  'MobilePhone',
-        @{n='BusinessPhones' ;e={$_.'BusinessPhones' -join $ListSeparator }},
-        @{n='Manager';e={$_.manager.AdditionalProperties.userPrincipalName}},
-        'JobTitle',  'Department', 'OfficeLocation', 'CompanyName',
-        'StreetAddress', 'City', 'State', 'Country', 'PostalCode'
+        $ListSeparator = "; ",
+        # Fields to export for each user the values here are the same as the ones in Get-GraphUserList but here we don't use the default set.
+        [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones',
+                     'city', 'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'creationType',
+                     'deletedDateTime', 'department',  'displayName',
+                     'employeeHireDate', 'employeeID', 'employeeOrgData', 'employeeType', 'externalUserState', 'externalUserStateChangeDateTime',
+                     'givenName', 'id', 'identities', 'imAddresses', 'isResourceAccount','jobTitle', 'legalAgeGroupClassification',
+                     'mail', 'mailNickname', 'mobilePhone',
+                     'officeLocation', 'onPremisesDistinguishedName', 'onPremisesDomainName', 'onPremisesExtensionAttributes',
+                     'onPremisesImmutableId', 'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName', 'otherMails',
+                     'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
+                     'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
+                     'preferredLanguage', 'provisionedPlans', 'proxyAddresses',
+                     'showInAddressList','state', 'streetAddress', 'surname', 'usageLocation', 'userPrincipalName', 'userType')]
+        [Alias('Property')]
+        [string[]]$Select =  @('UserPrincipalName', 'MailNickName',  'mail', 'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
+                           'PasswordPolicies',  'MobilePhone',   'BusinessPhones',    'JobTitle', 'Department',  'OfficeLocation',
+                           'CompanyName',       'StreetAddress', 'City', 'State',     'Country',  'PostalCode',  'accountEnabled'),
+
+        [validateSet('directReports', 'manager', 'memberOf', 'ownedDevices', 'ownedObjects', 'registeredDevices', 'transitiveMemberOf',  'extensions','')]
+        [string]$ExpandProperty = 'manager',
+
+        $OutputProperty =  @(   'UserPrincipalName', 'MailNickName',   'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
+                                @{n='AccountDisabled';e={-not $_.accountEnabled}} ,
+                                'PasswordPolicies', 'Mail',  'MobilePhone',
+                                @{n='BusinessPhones' ;e={$_.'BusinessPhones' -join $ListSeparator }},
+                                @{n='Manager';e={$_.manager.AdditionalProperties.userPrincipalName}},
+                                'JobTitle',  'Department', 'OfficeLocation', 'CompanyName',
+                                'StreetAddress', 'City', 'State', 'Country', 'PostalCode')
     )
     $listParams = @{
-        Select         = @('UserPrincipalName', 'MailNickName',  'mail', 'GivenName', 'Surname',  'DisplayName', 'UsageLocation',
-                           'PasswordPolicies',  'MobilePhone',   'BusinessPhones',    'JobTitle', 'Department',  'OfficeLocation',
-                           'CompanyName',       'StreetAddress', 'City', 'State',     'Country',  'PostalCode',  'accountEnabled')
-        ExpandProperty =   'Manager'
+        Select         = $select
+        ExpandProperty = $ExpandProperty
     }
     if ($Filter) {$listParams['Filter'] = $Filter}
-    Get-GraphUserList @listParams | Select-Object  $exportFields | Export-Csv -Path $Path -NoTypeInformation
+    $progressCount = 0
+    Get-GraphUserList @listParams |
+        ForEach-Object {if (-not $progressCount %1000) {Write-Progress -Activity 'Exporting' -Status $progressCount } ; $progressCount ++ ; $_ } |
+            Select-Object  $exportFields | Export-Csv -Path $Path -NoTypeInformation
 }
 
 #region MailBox commands: these only depend on the user module from the SDK so go in the same file as user commands

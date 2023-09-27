@@ -230,12 +230,14 @@ function Get-GraphGroup             {
             )
             process {
                 if     ($ug.'@odata.type' -match 'group$') {
-                        $null =  $ug.Remove('@odata.type'),  $ug.Remove('@odata.context'),  $ug.remove('@odata.id'),  $ug.remove('creationOptions')
+                        $disallowedProperties = $ug.keys.where({$_ -notin $script:GroupProperties})
+                        foreach ($p in $disallowedProperties) {$null = $ug.remove($p)}
                         New-Object -Property  $ug -TypeName MicrosoftGraphGroup |
                             Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
                 }
                 elseif ($ug.'@odata.type' -match 'user$') {
-                        $null =  $ug.Remove('@odata.type'),  $ug.Remove('@odata.context')
+                        $disallowedProperties = $ug.keys.where({$_ -notin $script:UserProperties})
+                        foreach ($p in $disallowedProperties) {$null = $ug.remove($p)}
                         New-Object -Property $ug -TypeName MicrosoftGraphUser |
                             Add-Member -PassThru -NotePropertyName GroupName  -NotePropertyValue $displayname
                 }

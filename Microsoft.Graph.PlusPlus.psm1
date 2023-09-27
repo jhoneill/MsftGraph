@@ -19,6 +19,9 @@ $Script:DefaultUserProperties     = @(
 $Script:DefaultUsageLocation      =   'GB'
 $Script:SkippedSubmodules         = @(    )
 
+$Script:UserProperties            = [MicrosoftGraphUser].DeclaredProperties.Name
+$Script:GroupProperties           = [MicrosoftGraphGroup].DeclaredProperties.Name
+
 #region global helper functions, completer, transformer, and validator attributes for parameters **CLASSES NEED TO BE IN PSM1
 class UpperCaseTransformAttribute : ArgumentTransformationAttribute  {
     [object] Transform([System.Management.Automation.EngineIntrinsics]$EngineIntrinsics, [object] $InputData) {
@@ -426,16 +429,18 @@ function Set-GraphOptions {
         #Allows a saved Refresh Token (e.g. from Show-GraphSession) to be added to the session.
         $RefreshToken,
         #Changes the dafault properties returned by Get-GraphUser and Get-GraphUserList
-        [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones', 'city',
-                    'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'department',
-                    'displayName', 'givenName', 'id', 'imAddresses', 'jobTitle', 'legalAgeGroupClassification',
-                    'mail', 'mailNickname', 'mobilePhone', 'officeLocation',
-                    'onPremisesDomainName', 'onPremisesExtensionAttributes', 'onPremisesImmutableId',
-                    'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName',
-                    'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
-                    'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
-                    'preferredLanguage', 'provisionedPlans', 'proxyAddresses', 'state', 'streetAddress',
-                    'surname', 'usageLocation', 'userPrincipalName', 'userType')]
+        [validateSet('accountEnabled', 'ageGroup', 'assignedLicenses', 'assignedPlans', 'businessPhones',
+                     'city', 'companyName', 'consentProvidedForMinor', 'country', 'createdDateTime', 'creationType',
+                     'deletedDateTime', 'department',  'displayName',
+                     'employeeHireDate', 'employeeID', 'employeeOrgData', 'employeeType', 'externalUserState', 'externalUserStateChangeDateTime',
+                     'givenName', 'id', 'identities', 'imAddresses', 'isResourceAccount','jobTitle', 'legalAgeGroupClassification',
+                     'mail', 'mailNickname', 'mobilePhone',
+                     'officeLocation', 'onPremisesDistinguishedName', 'onPremisesDomainName', 'onPremisesExtensionAttributes',
+                     'onPremisesImmutableId', 'onPremisesLastSyncDateTime', 'onPremisesProvisioningErrors', 'onPremisesSamAccountName', 'otherMails',
+                     'onPremisesSecurityIdentifier', 'onPremisesSyncEnabled', 'onPremisesUserPrincipalName',
+                     'passwordPolicies', 'passwordProfile', 'postalCode', 'preferredDataLocation',
+                     'preferredLanguage', 'provisionedPlans', 'proxyAddresses',
+                     'showInAddressList','state', 'streetAddress', 'surname', 'usageLocation', 'userPrincipalName', 'userType')]
         [string[]]$DefaultUserProperties,
 
         #Changes the default two letter (ISO  3166) country code - for new users so they can be assigned licenses.  Examples include: 'US', 'JP', and 'GB'

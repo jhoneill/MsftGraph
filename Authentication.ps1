@@ -120,18 +120,21 @@ function Invoke-GraphRequest        {
     )
     begin   {
         $null = $PSBoundParameters.Remove('AllValues') , $PSBoundParameters.Remove('AsType'), $PSBoundParameters.Remove('ExcludeProperty'), $PSBoundParameters.Remove('PropertyNotMatch') , $PSBoundParameters.Remove('ValueOnly')
-        if ($ExcludeProperty -notcontains  '@odata.id') {$ExcludeProperty += '@odata.id'}
+        if ($ExcludeProperty -notcontains  '@odata.id') {$ExcludeProperty  += '@odata.id'}
+        if     ($AsType -match "MicrosoftGraphGroup$" ) {$allowedProperties = $Script:GroupProperties.where({$_ -notin $ExcludeProperty}) }
+        elseif ($AsType -match "MicrosoftGraphUser$"  ) {$allowedProperties = $Script:UserProperties.where({$_ -notin $ExcludeProperty})  }
+        elseif ($AsType)                                {$allowedProperties = ([type]$AsType).DeclaredProperties.Name.where({$_ -notin $ExcludeProperty})}
+        if ($PropertyNotMatch)                          {$allowedProperties = $allowedProperties -notmatch $PropertyNotMatch}
+
         Test-GraphSession
         function sendResult {
             param ($result)
             foreach ($r in $result) {
-                foreach ($p in $ExcludeProperty) {$r.remove($p)}
-                if ($PropertyNotMatch) {
-                    $keystoRemove = $r.keys -match $PropertyNotMatch
-                    foreach ($p in $keystoRemove) {[void]$r.remove($p)}
+                if (-not $AsType) {$r}
+                else  {
+                    foreach ($p in  $r.keys.where({$_ -notin $allowedProperties})) {[void]$r.remove($p)}
+                    New-Object -TypeName $AsType -Property $r
                 }
-                if ($AsType) {New-Object -TypeName $AsType -Property $r}
-                else         {$r}
             }
         }
     }
