@@ -19,9 +19,6 @@ $Script:DefaultUserProperties     = @(
 $Script:DefaultUsageLocation      =   'GB'
 $Script:SkippedSubmodules         = @(    )
 
-$Script:UserProperties            = [MicrosoftGraphUser].DeclaredProperties.Name
-$Script:GroupProperties           = [MicrosoftGraphGroup].DeclaredProperties.Name
-
 #region global helper functions, completer, transformer, and validator attributes for parameters **CLASSES NEED TO BE IN PSM1
 class UpperCaseTransformAttribute : ArgumentTransformationAttribute  {
     [object] Transform([System.Management.Automation.EngineIntrinsics]$EngineIntrinsics, [object] $InputData) {
@@ -404,6 +401,10 @@ else { #These submodules will work with just the users module.
     . "$PSScriptRoot\OneDrive.ps1"
     . "$PSScriptRoot\Planner.ps1"
     . "$PSScriptRoot\Sharepoint.ps1"
+    $Script:UserProperties   = [MicrosoftGraphUser].DeclaredProperties.Name
+    if ($Script:SkippedSubmodules -Notcontains 'Groups') {
+        $Script:GroupProperties  = [MicrosoftGraphGroup].DeclaredProperties.Name
+    }
 }
 if ($Script:SkippedSubmodules) {
       Write-Host -ForegroundColor DarkGray ("Skipped " + ($Script:SkippedSubmodules -join ", ") + " because their Microsoft.Graph module(s) or private.dll file(s) were not found.")
